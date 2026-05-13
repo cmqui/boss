@@ -49,6 +49,7 @@ public enum BossSettingsCodec {
     public static let standbyTimerFunctionRaw: UInt8 = 0x04
     public static let onHeadDetectionFunctionRaw: UInt8 = 0x10
     public static let autoPlayPauseFunctionRaw: UInt8 = 0x18
+    public static let volumeControlFunctionRaw: UInt8 = 0x1C
     public static let autoAnswerFunctionRaw: UInt8 = 0x1B
     public static let autoAwareFunctionRaw: UInt8 = 0x1D
 
@@ -163,5 +164,12 @@ public struct BossSettingsSnapshot: Sendable {
             return try BossSettingsCodec.parseEnabledFlag(from: packet)
         }
         return try onHeadDetection()?.isAutoAnswerEnabled
+    }
+
+    public func volumeControl() throws -> BossVolumeControlStatus? {
+        guard let packet = packet(functionRaw: BossSettingsCodec.volumeControlFunctionRaw) else {
+            return nil
+        }
+        return try BossAudioModesCodec.parseVolumeControlStatus(from: packet)
     }
 }

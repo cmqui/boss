@@ -7,6 +7,10 @@ public protocol BossLink: Sendable {
     func close() async
 }
 
+public enum BossLinkError: Error, Equatable {
+    case unexpectedStreamTermination
+}
+
 public final class StreamBmapLink: BossLink, @unchecked Sendable {
     public let transportKind: BossTransportKind = .stream
     public let packets: AsyncThrowingStream<BmapPacket, Error>
@@ -26,7 +30,11 @@ public final class StreamBmapLink: BossLink, @unchecked Sendable {
                         continuation.yield(packet)
                     }
                 }
-                continuation.finish()
+                if Task.isCancelled {
+                    continuation.finish()
+                } else {
+                    continuation.finish(throwing: BossLinkError.unexpectedStreamTermination)
+                }
             } catch {
                 continuation.finish(throwing: error)
             }
@@ -64,7 +72,11 @@ public final class BleBmapLink: BossLink, @unchecked Sendable {
                         continuation.yield(try BmapCodec.decode(packetData))
                     }
                 }
-                continuation.finish()
+                if Task.isCancelled {
+                    continuation.finish()
+                } else {
+                    continuation.finish(throwing: BossLinkError.unexpectedStreamTermination)
+                }
             } catch {
                 continuation.finish(throwing: error)
             }

@@ -176,6 +176,7 @@ public final class AppleBleBossTransport: NSObject, BossBleTransport, @unchecked
                 return
             }
 
+            self.debug("closing transport")
             self.isClosed = true
             self.timeoutTask?.cancel()
             self.timeoutTask = nil
@@ -189,6 +190,7 @@ public final class AppleBleBossTransport: NSObject, BossBleTransport, @unchecked
             if let peripheral = self.activePeripheral {
                 self.central.cancelPeripheralConnection(peripheral)
             } else {
+                self.debug("finishing frame stream cleanly because no active peripheral remains during close")
                 self.frameContinuation.finish()
             }
         }
@@ -243,6 +245,7 @@ public final class AppleBleBossTransport: NSObject, BossBleTransport, @unchecked
     }
 
     private func finishStart(with error: Error) {
+        debug("finishStart with error: \(error)")
         timeoutTask?.cancel()
         timeoutTask = nil
         central.stopScan()
@@ -452,8 +455,10 @@ extension AppleBleBossTransport: CBCentralManagerDelegate {
         readyToSendContinuation = nil
 
         if let disconnectError {
+            debug("finishing frame stream with disconnect error: \(disconnectError)")
             frameContinuation.finish(throwing: disconnectError)
         } else {
+            debug("finishing frame stream cleanly after disconnect")
             frameContinuation.finish()
         }
 
@@ -557,6 +562,7 @@ extension AppleBleBossTransport: CBPeripheralDelegate {
 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         if let error {
+            debug("finishing frame stream from didUpdateValueFor error on \(characteristic.uuid.uuidString): \(error)")
             frameContinuation.finish(throwing: error)
             return
         }

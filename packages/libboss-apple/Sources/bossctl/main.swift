@@ -4,6 +4,8 @@ import libbossApple
 
 @main
 struct BossctlCLI {
+    private static let debugLoggingEnabled = ProcessInfo.processInfo.environment["LIBBOSS_APPLE_DEBUG"] == "1"
+
     static func main() async {
         do {
             let command = try Command.parse(arguments: CommandLine.arguments.dropFirst())
@@ -215,6 +217,131 @@ struct BossctlCLI {
                         timeout: .seconds(5)
                     )
                     print("Auto-answer updated: \(try BossSettingsCodec.parseEnabledFlag(from: response))")
+
+                case .getVolumeControl:
+                    let snapshot = try await awaitSettingsSnapshot(on: link, timeout: .seconds(5))
+                    guard let status = try snapshot.volumeControl() else {
+                        throw BossctlError.unsupportedSetting("volume-control")
+                    }
+                    print("Volume control: \(status.value.displayName)")
+
+                case .setVolumeControl(let value):
+                    let response = try await sendAndAwaitSameFunction(
+                        packet: BossSettingsCodec.settingsPacket(
+                            functionRaw: BossSettingsCodec.volumeControlFunctionRaw,
+                            operatorValue: .setGet,
+                            payload: Data([value.rawValue])
+                        ),
+                        on: link,
+                        timeout: .seconds(5)
+                    )
+                    print("Volume control updated: \(try BossAudioModesCodec.parseVolumeControlStatus(from: response).value.displayName)")
+                }
+            }
+
+        case .audioMode(let command):
+            let connection = audioModeConnectionOptions(for: command)
+            try await withConnectedLinkRetrying(connection) { error, preference in
+                guard connection.characteristicPreference == .automatic,
+                      preference == .unsecure else {
+                    return false
+                }
+                if case BossctlError.responseTimedOut = error {
+                    return true
+                }
+                if case BossctlError.bmapErrorResponse(_, let payloadHex) = error,
+                   bmapErrorCode(from: payloadHex) == .insecureTransport {
+                    return true
+                }
+                return false
+            } operation: { link in
+                switch command.action {
+                case .list:
+                    let modes = try await awaitAudioModeConfigs(on: link, timeout: .seconds(30))
+                    let displayModes = displayableAudioModes(from: modes)
+                    let currentIndex = try await currentAudioModeIfAvailable(on: link, timeout: .seconds(2))
+                    if let currentIndex {
+                        print("Current audio mode: \(currentIndex)")
+                    } else {
+                        print("Current audio mode: unavailable")
+                    }
+                    print("Available audio modes:")
+                    for mode in displayModes {
+                        let currentMarker = mode.modeIndex == currentIndex ? "*" : " "
+                        let favoriteMarker = mode.favorite ? " favorite" : ""
+                        let customMarker = mode.userConfigured ? " user-configured" : (mode.userConfigurable ? " user-configurable" : "")
+                        print("\(currentMarker) \(mode.modeIndex): \(mode.name)\(favoriteMarker)\(customMarker)")
+                    }
+
+                case .getCurrent:
+                    let response = try await sendAndAwaitSameFunction(
+                        packet: BossAudioModesCodec.currentModeGetPacket(),
+                        on: link,
+                        timeout: .seconds(5)
+                    )
+                    print("Current audio mode: \(try BossAudioModesCodec.parseCurrentMode(from: response))")
+
+                case .setCurrent(let selection, let playVoicePrompt):
+                    let targetIndex = try await resolveAudioModeSelection(selection, on: link)
+                    if let currentIndex = try await currentAudioModeIfAvailable(on: link, timeout: .seconds(2)),
+                       currentIndex == targetIndex {
+                        print("Current audio mode unchanged: \(currentIndex)")
+                        return
+                    }
+                    let modeIndex: Int
+                    do {
+                        let response = try await sendAndAwaitSameFunction(
+                            packet: BossAudioModesCodec.currentModeStartPacket(modeIndex: targetIndex, playVoicePrompt: playVoicePrompt),
+                            on: link,
+                            timeout: .seconds(5)
+                        )
+                        if response.operator == .result {
+                            if let responseModeIndex = response.payload.first {
+                                modeIndex = Int(responseModeIndex)
+                            } else {
+                                modeIndex = try await verifyCurrentAudioMode(
+                                    on: link,
+                                    targetIndex: targetIndex,
+                                    timeoutPerAttempt: .seconds(2),
+                                    attempts: 3,
+                                    retryDelay: .milliseconds(500)
+                                )
+                            }
+                        } else {
+                            modeIndex = try BossAudioModesCodec.parseCurrentMode(from: response)
+                        }
+                    } catch {
+                        guard shouldFallbackForAudioModeWrite(error) else {
+                            throw error
+                        }
+                        debug("audio-mode set fallback triggered for target=\(targetIndex): \(error)")
+                        do {
+                            modeIndex = try await verifyCurrentAudioMode(
+                                on: link,
+                                targetIndex: targetIndex,
+                                timeoutPerAttempt: .seconds(3),
+                                attempts: 4,
+                                retryDelay: .seconds(1),
+                                fallbackError: error
+                            )
+                        } catch {
+                            debug("in-link verification failed for target=\(targetIndex): \(error)")
+                            do {
+                                modeIndex = try await verifyCurrentAudioModeAfterReconnect(
+                                    connection: command.connection,
+                                    targetIndex: targetIndex,
+                                    fallbackError: error
+                                )
+                            } catch let reconnectError {
+                                if isVerificationInconclusiveError(reconnectError) {
+                                    print("Current audio mode switch sent; verification inconclusive for target \(targetIndex)")
+                                    return
+                                }
+                                throw reconnectError
+                            }
+                        }
+                    }
+                    print("Current audio mode updated: \(modeIndex)")
                 }
             }
         }
@@ -225,6 +352,19 @@ struct BossctlCLI {
             return options
         }
         return options.withCharacteristicPreference(.secure)
+    }
+
+    private static func audioModeConnectionOptions(for command: AudioModeCommand) -> ConnectionOptions {
+        switch command.action {
+        case .setCurrent:
+            return settingsConnectionOptions(for: command.connection)
+        case .list, .getCurrent:
+            return command.connection
+        }
+    }
+
+    private static func audioModeReadConnectionOptions(for options: ConnectionOptions) -> ConnectionOptions {
+        options
     }
 
     private static func withConnectedLink<T: Sendable>(
@@ -279,6 +419,13 @@ struct BossctlCLI {
         }
         let link = BleBmapLink(transport: transport)
         return try await operation(link)
+    }
+
+    private static func debug(_ message: String) {
+        guard debugLoggingEnabled else {
+            return
+        }
+        fputs("[bossctl] \(message)\n", stderr)
     }
 
     private static func nextResponse(
@@ -394,6 +541,225 @@ struct BossctlCLI {
         }
     }
 
+    private static func awaitAudioModeConfigs(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> [BossAudioModeInfo] {
+        try await link.send(packet: BossAudioModesCodec.modeConfigStartPacket())
+        return try await withThrowingTaskGroup(of: [BossAudioModeInfo].self) { group in
+            group.addTask {
+                var modesByIndex: [Int: BossAudioModeInfo] = [:]
+                for try await packet in link.packets {
+                    guard packet.functionBlock == .audioModes,
+                          packet.function.rawValue == BossAudioModesCodec.modeConfigFunctionRaw else {
+                        continue
+                    }
+                    if packet.operator == .error {
+                        throw BossctlError.bmapErrorResponse(
+                            context: "audioModes.\(packet.function.name)",
+                            payloadHex: packet.payload.hexString
+                        )
+                    }
+                    if packet.operator == .result {
+                        return modesByIndex.values.sorted { $0.modeIndex < $1.modeIndex }
+                    }
+                    guard packet.operator == .status else {
+                        continue
+                    }
+                    let mode = try BossAudioModesCodec.parseModeConfig(from: packet)
+                    modesByIndex[mode.modeIndex] = mode
+                }
+                throw BossctlError.responseStreamEnded
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                throw BossctlError.responseTimedOut(seconds: timeout.components.seconds)
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
+    private static func currentAudioModeIfAvailable(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> Int? {
+        do {
+            let response = try await sendAndAwaitSameFunction(
+                packet: BossAudioModesCodec.currentModeGetPacket(),
+                on: link,
+                timeout: timeout
+            )
+            return try BossAudioModesCodec.parseCurrentMode(from: response)
+        } catch {
+            guard shouldFallbackForAudioModeWrite(error) else {
+                throw error
+            }
+            return nil
+        }
+    }
+
+    private static func requiredCurrentAudioMode(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> Int {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossAudioModesCodec.currentModeGetPacket(),
+            on: link,
+            timeout: timeout
+        )
+        return try BossAudioModesCodec.parseCurrentMode(from: response)
+    }
+
+    private static func verifyCurrentAudioMode(
+        on link: BleBmapLink,
+        targetIndex: Int,
+        timeoutPerAttempt: Duration,
+        attempts: Int,
+        retryDelay: Duration,
+        fallbackError: Error? = nil
+    ) async throws -> Int {
+        var lastError: Error = fallbackError ?? BossctlError.responseTimedOut(seconds: timeoutPerAttempt.components.seconds)
+        var lastObservedIndex: Int?
+        for attempt in 0..<attempts {
+            do {
+                debug("verifying current audio mode attempt \(attempt + 1)/\(attempts) target=\(targetIndex)")
+                let currentIndex = try await requiredCurrentAudioMode(on: link, timeout: timeoutPerAttempt)
+                debug("verification attempt \(attempt + 1) observed current mode=\(currentIndex)")
+                lastObservedIndex = currentIndex
+                if currentIndex == targetIndex {
+                    return currentIndex
+                }
+            } catch {
+                debug("verification attempt \(attempt + 1) failed: \(error)")
+                lastError = error
+            }
+            if attempt < attempts - 1 {
+                try await Task.sleep(for: retryDelay)
+            }
+        }
+        if let lastObservedIndex {
+            throw BossctlError.modeChangeNotObserved(targetIndex: targetIndex, observedIndex: lastObservedIndex)
+        }
+        throw fallbackError ?? lastError
+    }
+
+    private static func verifyCurrentAudioModeAfterReconnect(
+        connection: ConnectionOptions,
+        targetIndex: Int,
+        fallbackError: Error
+    ) async throws -> Int {
+        var lastError: Error = fallbackError
+        for attempt in 0..<4 {
+            do {
+                debug("reconnect verification attempt \(attempt + 1)/4 target=\(targetIndex)")
+                let currentIndex = try await withConnectedLinkRetrying(
+                    audioModeReadConnectionOptions(for: connection),
+                    shouldRetry: { error, preference in
+                        guard preference == .unsecure else {
+                            return false
+                        }
+                        return shouldFallbackForAudioModeWrite(error)
+                    }
+                ) { link in
+                    try await verifyCurrentAudioMode(
+                        on: link,
+                        targetIndex: targetIndex,
+                        timeoutPerAttempt: .seconds(3),
+                        attempts: 3,
+                        retryDelay: .milliseconds(750),
+                        fallbackError: fallbackError
+                    )
+                }
+                debug("reconnect verification succeeded with mode=\(currentIndex)")
+                return currentIndex
+            } catch {
+                debug("reconnect verification attempt \(attempt + 1) failed: \(error)")
+                lastError = error
+                try await Task.sleep(for: .seconds(1))
+            }
+        }
+        throw lastError
+    }
+
+    private static func shouldFallbackForAudioModeWrite(_ error: Error) -> Bool {
+        if let error = error as? BossctlError {
+            switch error {
+            case .responseTimedOut, .responseStreamEnded:
+                return true
+            default:
+                return false
+            }
+        }
+        if let error = error as? BossLinkError, error == .unexpectedStreamTermination {
+            return true
+        }
+        return false
+    }
+
+    private static func isVerificationInconclusiveError(_ error: Error) -> Bool {
+        if shouldFallbackForAudioModeWrite(error) {
+            return true
+        }
+        if let error = error as? BossctlError {
+            switch error {
+            case .bmapErrorResponse(_, let payloadHex):
+                return bmapErrorCode(from: payloadHex) == .insecureTransport
+            default:
+                return false
+            }
+        }
+        return false
+    }
+
+    private static func displayableAudioModes(from modes: [BossAudioModeInfo]) -> [BossAudioModeInfo] {
+        modes.filter { mode in
+            !(mode.userConfigurable && !mode.userConfigured && mode.name == "None")
+        }
+    }
+
+    private static func resolveAudioModeSelection(
+        _ selection: AudioModeSelection,
+        on link: BleBmapLink
+    ) async throws -> Int {
+        switch selection {
+        case .index(let index):
+            return index
+        case .name(let name):
+            let normalizedTarget = normalizeAudioModeName(name)
+            if let builtInIndex = builtInAudioModeIndex(for: normalizedTarget) {
+                return builtInIndex
+            }
+            let modes = try await awaitAudioModeConfigs(on: link, timeout: .seconds(30))
+            guard let match = displayableAudioModes(from: modes).first(where: {
+                normalizeAudioModeName($0.name) == normalizedTarget
+            }) else {
+                throw UsageError("Unknown audio mode: \(name)")
+            }
+            return match.modeIndex
+        }
+    }
+
+    private static func normalizeAudioModeName(_ name: String) -> String {
+        name.lowercased().filter { $0.isLetter || $0.isNumber }
+    }
+
+    private static func builtInAudioModeIndex(for normalizedName: String) -> Int? {
+        switch normalizedName {
+        case "quiet":
+            return 0
+        case "aware":
+            return 1
+        case "immersion":
+            return 2
+        case "cinema":
+            return 3
+        default:
+            return nil
+        }
+    }
+
     private static func formatOptionalBool(_ value: Bool?) -> String {
         guard let value else { return "unsupported" }
         return value ? "enabled" : "disabled"
@@ -432,6 +798,7 @@ private enum Command {
     case bmapTrace(BmapTraceOptions)
     case bmapProbe(BmapProbeOptions)
     case settings(SettingsCommand)
+    case audioMode(AudioModeCommand)
 
     static func parse<S: Sequence>(arguments: S) throws -> Command where S.Element == String {
         var args = Array(arguments)
@@ -445,6 +812,8 @@ private enum Command {
             return .bootstrap(try ConnectionOptions.parse(arguments: args))
         case "settings":
             return .settings(try SettingsCommand.parse(arguments: args))
+        case "audio-mode":
+            return .audioMode(try AudioModeCommand.parse(arguments: args))
         case "bmap":
             guard !args.isEmpty else {
                 throw UsageError(Command.usage)
@@ -477,6 +846,11 @@ private enum Command {
       bossctl settings set auto-aware --enabled <true|false> [connection options]
       bossctl settings set auto-play-pause --enabled <true|false> [connection options]
       bossctl settings set auto-answer --enabled <true|false> [connection options]
+      bossctl settings get volume-control [connection options]
+      bossctl settings set volume-control --mode <disabled|button|captouch|imu> [connection options]
+      bossctl audio-mode list [connection options]
+      bossctl audio-mode get current [connection options]
+      bossctl audio-mode set current (--index <n> | --mode <name>) [--play-voice-prompt <true|false>] [connection options]
       bossctl bmap send --block <id> --function <id> --op <set|get|setGet|start|0x..> [--device-id <n>] [--port <n>] [--payload <hex>] [--match same|any] [--response-timeout <seconds>] [connection options]
       bossctl bmap trace --block <id> --function <id> --op <set|get|setGet|start|0x..> [--device-id <n>] [--port <n>] [--payload <hex>] [--match same|any] [--listen <seconds>] [connection options]
       bossctl bmap watch [--count <n>] [connection options]
@@ -664,6 +1038,8 @@ private struct SettingsCommand {
                 return SettingsCommand(connection: connection, action: .getAutoPlayPause)
             case "auto-answer":
                 return SettingsCommand(connection: connection, action: .getAutoAnswer)
+            case "volume-control":
+                return SettingsCommand(connection: connection, action: .getVolumeControl)
             default:
                 throw UsageError("Unknown settings get target: \(key)")
             }
@@ -688,6 +1064,10 @@ private struct SettingsCommand {
                 let enabled = try parser.requiredBool(for: "--enabled")
                 let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
                 return SettingsCommand(connection: connection, action: .setAutoAnswer(enabled))
+            case "volume-control":
+                let value = try parser.requiredVolumeControlValue(for: "--mode")
+                let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
+                return SettingsCommand(connection: connection, action: .setVolumeControl(value))
             default:
                 throw UsageError("Unknown settings set target: \(key)")
             }
@@ -707,6 +1087,62 @@ private enum SettingsAction {
     case setAutoPlayPause(Bool)
     case getAutoAnswer
     case setAutoAnswer(Bool)
+    case getVolumeControl
+    case setVolumeControl(BossVolumeControlValue)
+}
+
+private struct AudioModeCommand {
+    let connection: ConnectionOptions
+    let action: AudioModeAction
+
+    static func parse(arguments: [String]) throws -> AudioModeCommand {
+        var args = arguments
+        guard !args.isEmpty else {
+            throw UsageError(Command.usage)
+        }
+        let verb = args.removeFirst()
+        switch verb {
+        case "list":
+            let connection = try ConnectionOptions.parse(arguments: args)
+            return AudioModeCommand(connection: connection, action: .list)
+        case "get":
+            guard !args.isEmpty else { throw UsageError(Command.usage) }
+            let key = args.removeFirst()
+            let connection = try ConnectionOptions.parse(arguments: args)
+            switch key {
+            case "current":
+                return AudioModeCommand(connection: connection, action: .getCurrent)
+            default:
+                throw UsageError("Unknown audio-mode get target: \(key)")
+            }
+        case "set":
+            guard !args.isEmpty else { throw UsageError(Command.usage) }
+            let key = args.removeFirst()
+            var parser = ArgumentParser(arguments: args)
+            switch key {
+            case "current":
+                let selection = try parser.requiredAudioModeSelection()
+                let playVoicePrompt = try parser.optionalBool(for: "--play-voice-prompt") ?? false
+                let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
+                return AudioModeCommand(connection: connection, action: .setCurrent(selection: selection, playVoicePrompt: playVoicePrompt))
+            default:
+                throw UsageError("Unknown audio-mode set target: \(key)")
+            }
+        default:
+            throw UsageError(Command.usage)
+        }
+    }
+}
+
+private enum AudioModeAction {
+    case list
+    case getCurrent
+    case setCurrent(selection: AudioModeSelection, playVoicePrompt: Bool)
+}
+
+private enum AudioModeSelection {
+    case index(Int)
+    case name(String)
 }
 
 private enum ResponseMatchMode: String {
@@ -767,6 +1203,17 @@ private struct ArgumentParser {
         guard let value = try optionalValue(for: flag) else {
             throw UsageError("Missing value for \(flag)")
         }
+        return try parseBool(value, flag: flag)
+    }
+
+    mutating func optionalBool(for flag: String) throws -> Bool? {
+        guard let value = try optionalValue(for: flag) else {
+            return nil
+        }
+        return try parseBool(value, flag: flag)
+    }
+
+    private func parseBool(_ value: String, flag: String) throws -> Bool {
         switch value.lowercased() {
         case "true", "1", "yes", "on":
             return true
@@ -774,6 +1221,42 @@ private struct ArgumentParser {
             return false
         default:
             throw UsageError("Invalid boolean for \(flag): \(value)")
+        }
+    }
+
+    mutating func requiredVolumeControlValue(for flag: String) throws -> BossVolumeControlValue {
+        guard let value = try optionalValue(for: flag) else {
+            throw UsageError("Missing value for \(flag)")
+        }
+        switch value.lowercased() {
+        case "disabled":
+            return .disabled
+        case "button":
+            return .button
+        case "captouch":
+            return .capTouch
+        case "imu":
+            return .imu
+        default:
+            throw UsageError("Invalid volume control value for \(flag): \(value)")
+        }
+    }
+
+    mutating func requiredAudioModeSelection() throws -> AudioModeSelection {
+        let indexValue = try optionalValue(for: "--index")
+        let modeValue = try optionalValue(for: "--mode")
+        switch (indexValue, modeValue) {
+        case let (.some(indexValue), nil):
+            guard let parsed = Int(indexValue) else {
+                throw UsageError("Invalid integer for --index: \(indexValue)")
+            }
+            return .index(parsed)
+        case let (nil, .some(modeValue)):
+            return .name(modeValue)
+        case (nil, nil):
+            throw UsageError("Missing value for --index or --mode")
+        default:
+            throw UsageError("Specify only one of --index or --mode")
         }
     }
 
@@ -906,6 +1389,7 @@ private enum BossctlError: LocalizedError {
     case unexpectedResponse(String)
     case bmapErrorResponse(context: String, payloadHex: String)
     case unsupportedSetting(String)
+    case modeChangeNotObserved(targetIndex: Int, observedIndex: Int)
 
     var errorDescription: String? {
         switch self {
@@ -922,6 +1406,8 @@ private enum BossctlError: LocalizedError {
             return "BMAP error response for \(context): payload=\(payloadHex)"
         case .unsupportedSetting(let settingName):
             return "Setting is not exposed by this device/session: \(settingName)"
+        case .modeChangeNotObserved(let targetIndex, let observedIndex):
+            return "Mode change was not observed: target=\(targetIndex), observed=\(observedIndex)"
         }
     }
 

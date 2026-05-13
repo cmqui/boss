@@ -171,7 +171,7 @@ final class LibbossTests: XCTestCase {
     }
 
     func testBootstrapSessionTimesOut() async throws {
-        let transport = MockTransport(frames: [])
+        let transport = MockTransport(frames: [], finishStream: false)
         let link = StreamBmapLink(transport: transport)
         let session = BootstrapSession(
             link: link,
@@ -212,7 +212,7 @@ private final class MockTransport: BossTransport, @unchecked Sendable {
         }
     }
 
-    init(frames: [Data], initialDelay: Duration? = nil) {
+    init(frames: [Data], initialDelay: Duration? = nil, finishStream: Bool = true) {
         self.incomingFrames = AsyncThrowingStream { continuation in
             Task {
                 if let initialDelay {
@@ -221,7 +221,9 @@ private final class MockTransport: BossTransport, @unchecked Sendable {
                 for frame in frames {
                     continuation.yield(frame)
                 }
-                continuation.finish()
+                if finishStream {
+                    continuation.finish()
+                }
             }
         }
     }
