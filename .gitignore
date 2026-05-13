@@ -1,0 +1,6 @@
+decomp/
+docs/
+.DS_Store
+.build/
+.env*
+.tmp/
