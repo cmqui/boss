@@ -4,3 +4,4 @@ docs/
 .build/
 .env*
 .tmp/
+.vscode/
