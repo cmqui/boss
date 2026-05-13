@@ -71,6 +71,10 @@ public final class BleBmapLink: BossLink, @unchecked Sendable {
         }
     }
 
+    public convenience init(transport: any BossBleTransport) {
+        self.init(transport: transport, mtu: transport.attMTU)
+    }
+
     public func send(packet: BmapPacket) async throws {
         let encoded = try BmapCodec.encode(packet)
         for frame in try BleSegmentation.encode(packetBytes: encoded, mtu: mtu) {

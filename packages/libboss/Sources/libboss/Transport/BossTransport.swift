@@ -10,3 +10,7 @@ public protocol BossTransport: Sendable {
     var incomingFrames: AsyncThrowingStream<Data, Error> { get }
     func close() async
 }
+
+public protocol BossBleTransport: BossTransport {
+    var attMTU: Int { get }
+}
