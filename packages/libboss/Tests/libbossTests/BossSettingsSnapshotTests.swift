@@ -1,7 +1,6 @@
 import Foundation
 import XCTest
 @testable import libboss
-@testable import libbossApple
 
 final class BossSettingsSnapshotTests: XCTestCase {
     func testAutoPlayPauseResolvesFromStandaloneSnapshotPacket() throws {
@@ -109,6 +108,81 @@ final class BossSettingsSnapshotTests: XCTestCase {
         XCTAssertTrue(mode.favorite)
         XCTAssertTrue(mode.userConfigurable)
         XCTAssertFalse(mode.userConfigured)
+    }
+
+    func testAudioModeSettingsConfigParserReadsLiveSettings() throws {
+        let packet = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.settingsConfigFunctionRaw),
+            operator: .status,
+            payload: Data([0x05, 0x00, 0x02, 0x01, 0x01])
+        )
+
+        let config = try BossAudioModesCodec.parseSettingsConfig(from: packet)
+        XCTAssertEqual(config.cncLevel, 5)
+        XCTAssertFalse(config.autoCNCEnabled)
+        XCTAssertEqual(config.spatialAudioMode, .head)
+        XCTAssertTrue(config.windBlockEnabled)
+        XCTAssertTrue(config.ancToggleEnabled)
+    }
+
+    func testAudioModeSettingsConfigEncoderWritesFiveByteSetGetPayload() throws {
+        let config = BossAudioModeSettingsConfig(
+            cncLevel: 3,
+            autoCNCEnabled: false,
+            spatialAudioMode: .room,
+            windBlockEnabled: false,
+            ancToggleEnabled: true
+        )
+
+        let packet = try BossAudioModesCodec.settingsConfigSetGetPacket(config)
+        XCTAssertEqual(packet.functionBlock, .audioModes)
+        XCTAssertEqual(packet.function.rawValue, BossAudioModesCodec.settingsConfigFunctionRaw)
+        XCTAssertEqual(packet.operator, .setGet)
+        XCTAssertEqual(packet.payload, Data([0x03, 0x00, 0x01, 0x00, 0x01]))
+    }
+
+    func testAudioModeSettingsConfigPatchPreservesUnspecifiedFields() {
+        let current = BossAudioModeSettingsConfig(
+            cncLevel: 8,
+            autoCNCEnabled: false,
+            spatialAudioMode: .off,
+            windBlockEnabled: true,
+            ancToggleEnabled: true
+        )
+        let patch = BossAudioModeSettingsConfigPatch(
+            cncLevel: 4,
+            spatialAudioMode: .head,
+            windBlockEnabled: false
+        )
+
+        let merged = patch.merged(with: current)
+        XCTAssertEqual(merged.cncLevel, 4)
+        XCTAssertFalse(merged.autoCNCEnabled)
+        XCTAssertEqual(merged.spatialAudioMode, .head)
+        XCTAssertFalse(merged.windBlockEnabled)
+        XCTAssertTrue(merged.ancToggleEnabled)
+        XCTAssertFalse(patch.isEmpty)
+        XCTAssertTrue(BossAudioModeSettingsConfigPatch().isEmpty)
+    }
+
+    func testAudioModeSettingsConfigPatchMatchesOnlySpecifiedFields() {
+        let patch = BossAudioModeSettingsConfigPatch(ancToggleEnabled: false)
+
+        XCTAssertTrue(patch.matches(BossAudioModeSettingsConfig(
+            cncLevel: 10,
+            autoCNCEnabled: false,
+            spatialAudioMode: .off,
+            windBlockEnabled: false,
+            ancToggleEnabled: false
+        )))
+        XCTAssertFalse(patch.matches(BossAudioModeSettingsConfig(
+            cncLevel: 5,
+            autoCNCEnabled: false,
+            spatialAudioMode: .off,
+            windBlockEnabled: false,
+            ancToggleEnabled: true
+        )))
     }
 
     private func settingsPacket(functionRaw: UInt8, payload: Data) -> BmapPacket {

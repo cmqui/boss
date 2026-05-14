@@ -9,11 +9,12 @@ Current scope:
 - stream-safe packet extraction
 - transport-agnostic bootstrap session
 - typed ProductInfo bootstrap parsers
+- typed Settings and AudioModes BMAP codecs/snapshot parsers
 
 Out of scope in this milestone:
 
 - live `CoreBluetooth` transport
 - authentication
 - notification subscriptions
-- feature-specific higher-level APIs
+- device-specific command-line UX
 - firmware transfer orchestration

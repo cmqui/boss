@@ -90,4 +90,34 @@ public enum BmapFunctionBlock: Hashable, Sendable, Comparable {
     public static func < (lhs: BmapFunctionBlock, rhs: BmapFunctionBlock) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
+
+    public var displayName: String {
+        switch self {
+        case .productInfo: "productInfo"
+        case .settings: "settings"
+        case .status: "status"
+        case .firmwareUpdate: "firmwareUpdate"
+        case .deviceManagement: "deviceManagement"
+        case .audioManagement: "audioManagement"
+        case .callManagement: "callManagement"
+        case .control: "control"
+        case .debug: "debug"
+        case .notification: "notification"
+        case .reservedBosebuild1: "reservedBosebuild1"
+        case .reservedBosebuild2: "reservedBosebuild2"
+        case .hearingAssistance: "hearingAssistance"
+        case .dataCollection: "dataCollection"
+        case .heartRate: "heartRate"
+        case .peerBud: "peerBud"
+        case .vpa: "vpa"
+        case .wifi: "wifi"
+        case .authentication: "authentication"
+        case .experimental: "experimental"
+        case .cloud: "cloud"
+        case .augmentedReality: "augmentedReality"
+        case .print: "print"
+        case .audioModes: "audioModes"
+        case .unknown(let rawValue): "unknown(\(rawValue))"
+        }
+    }
 }

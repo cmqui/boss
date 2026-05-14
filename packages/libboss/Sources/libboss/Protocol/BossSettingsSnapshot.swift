@@ -1,5 +1,4 @@
 import Foundation
-import libboss
 
 public struct BossStandbyTimerValue: Equatable, Sendable {
     public let minutes: Int

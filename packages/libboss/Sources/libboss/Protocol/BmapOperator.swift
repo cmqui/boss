@@ -55,4 +55,18 @@ public enum BmapOperator: Hashable, Sendable {
             .unknown
         }
     }
+
+    public var displayName: String {
+        switch self {
+        case .set: "set"
+        case .get: "get"
+        case .setGet: "setGet"
+        case .status: "status"
+        case .error: "error"
+        case .start: "start"
+        case .result: "result"
+        case .processing: "processing"
+        case .unknown(let rawValue): "unknown(\(rawValue))"
+        }
+    }
 }

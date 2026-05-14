@@ -13,10 +13,6 @@ let package = Package(
             targets: ["libbossApple"]
         ),
         .executable(
-            name: "bossctl",
-            targets: ["bossctl"]
-        ),
-        .executable(
             name: "boss-bootstrap",
             targets: ["boss-bootstrap"]
         ),
@@ -32,13 +28,6 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "bossctl",
-            dependencies: [
-                "libbossApple",
-                .product(name: "libboss", package: "libboss"),
-            ]
-        ),
-        .executableTarget(
             name: "boss-bootstrap",
             dependencies: [
                 "libbossApple",
@@ -47,10 +36,7 @@ let package = Package(
         ),
         .testTarget(
             name: "libbossAppleTests",
-            dependencies: [
-                "libbossApple",
-                .product(name: "libboss", package: "libboss"),
-            ]
+            dependencies: ["libbossApple"]
         ),
     ]
 )
