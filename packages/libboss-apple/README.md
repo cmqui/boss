@@ -8,6 +8,7 @@ Current scope:
 - Bose BMAP service and characteristic discovery
 - ATT-MTU-aware BLE writes
 - notification ingestion into `libboss` transport frames
+- reusable async controller APIs for macOS/iOS apps
 - executable bootstrap runner for live hardware validation
 
 Observed Bose QC Ultra 2 HP behavior on macOS:
@@ -31,6 +32,38 @@ Useful options:
 - `--identifier <uuid>` to target a specific peripheral
 - `--characteristic automatic|unsecure|secure` to override write-characteristic preference
 - `--timeout <seconds>` to adjust scan timeout
+
+## Programmatic API
+
+Use `BossAppleController` from a Swift app when you want typed async operations instead of CLI parsing:
+
+```swift
+import libboss
+import libbossApple
+
+let controller = BossAppleController(
+    connection: BossAppleConnectionOptions(nameContains: "Bose")
+)
+
+let device = try await controller.bootstrap()
+let modes = try await controller.displayableAudioModes()
+let currentMode = try await controller.currentAudioMode()
+let settings = try await controller.audioModeSettings()
+
+let result = try await controller.setAudioModeSettings(
+    BossAudioModeSettingsConfigPatch(cncLevel: 5, spatialAudioMode: .off)
+)
+```
+
+Convenience wrappers are available for the common GUI controls:
+
+- `setCNCLevel(_:)`
+- `setSpatialAudioMode(_:)`
+- `setWindBlockEnabled(_:)`
+- `setANCEnabled(_:)`
+- `setCurrentAudioMode(index:playVoicePrompt:)`
+
+`withConnectedLink(_:)` is also exposed as an escape hatch for app code that needs raw `BleBmapLink` access while new typed APIs are still being added.
 
 ## CLI
 

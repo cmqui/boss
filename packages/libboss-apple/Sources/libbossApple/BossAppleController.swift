@@ -1,0 +1,666 @@
+import Foundation
+import libboss
+
+public struct BossAppleConnectionOptions: Sendable, Equatable {
+    public let nameContains: String?
+    public let identifier: UUID?
+    public let scanTimeout: Duration
+    public let characteristicPreference: AppleBossCharacteristicPreference
+
+    public init(
+        nameContains: String? = nil,
+        identifier: UUID? = nil,
+        scanTimeout: Duration = .seconds(20),
+        characteristicPreference: AppleBossCharacteristicPreference = .automatic
+    ) {
+        self.nameContains = nameContains
+        self.identifier = identifier
+        self.scanTimeout = scanTimeout
+        self.characteristicPreference = characteristicPreference
+    }
+
+    public func withCharacteristicPreference(_ preference: AppleBossCharacteristicPreference) -> BossAppleConnectionOptions {
+        BossAppleConnectionOptions(
+            nameContains: nameContains,
+            identifier: identifier,
+            scanTimeout: scanTimeout,
+            characteristicPreference: preference
+        )
+    }
+
+    fileprivate var securePreferred: BossAppleConnectionOptions {
+        guard characteristicPreference == .automatic else {
+            return self
+        }
+        return withCharacteristicPreference(.secure)
+    }
+
+    fileprivate var scanFilter: AppleBossScanFilter {
+        AppleBossScanFilter(
+            peripheralIdentifier: identifier,
+            nameContains: nameContains,
+            scanTimeout: scanTimeout
+        )
+    }
+}
+
+public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConvertible {
+    case responseStreamEnded
+    case responseTimedOut(seconds: Int64)
+    case bmapErrorResponse(context: String, payloadHex: String)
+    case modeChangeNotObserved(targetIndex: Int, observedIndex: Int)
+    case settingsConfigNotObserved(expected: String, observed: String)
+
+    public var bmapErrorCode: BmapErrorCode? {
+        guard case .bmapErrorResponse(_, let payloadHex) = self else {
+            return nil
+        }
+        return Self.bmapErrorCode(from: payloadHex)
+    }
+
+    public var description: String {
+        switch self {
+        case .responseStreamEnded:
+            return "responseStreamEnded"
+        case .responseTimedOut(let seconds):
+            return "responseTimedOut(seconds: \(seconds))"
+        case .bmapErrorResponse(let context, let payloadHex):
+            if let code = bmapErrorCode {
+                return "bmapErrorResponse(context: \"\(context)\", payloadHex: \"\(payloadHex)\", code: \(code.description))"
+            }
+            return "bmapErrorResponse(context: \"\(context)\", payloadHex: \"\(payloadHex)\")"
+        case .modeChangeNotObserved(let targetIndex, let observedIndex):
+            return "modeChangeNotObserved(targetIndex: \(targetIndex), observedIndex: \(observedIndex))"
+        case .settingsConfigNotObserved(let expected, let observed):
+            return "settingsConfigNotObserved(expected: \"\(expected)\", observed: \"\(observed)\")"
+        }
+    }
+
+    private static func bmapErrorCode(from payloadHex: String) -> BmapErrorCode? {
+        guard payloadHex.count == 2, let rawValue = UInt8(payloadHex, radix: 16) else {
+            return nil
+        }
+        return BmapErrorCode(rawValue: rawValue)
+    }
+}
+
+public enum BossAppleAudioModeSettingsWriteResult: Sendable, Equatable {
+    case unchanged(BossAudioModeSettingsConfig)
+    case updated(BossAudioModeSettingsConfig)
+    case verificationInconclusive(BossAudioModeSettingsConfig)
+}
+
+public enum BossAppleCurrentAudioModeWriteResult: Sendable, Equatable {
+    case unchanged(Int)
+    case updated(Int)
+    case verificationInconclusive(targetIndex: Int)
+}
+
+public struct BossAppleController: Sendable {
+    public let connection: BossAppleConnectionOptions
+
+    public init(connection: BossAppleConnectionOptions = BossAppleConnectionOptions()) {
+        self.connection = connection
+    }
+
+    public func withConnectedLink<T: Sendable>(
+        _ operation: @escaping @Sendable (BleBmapLink) async throws -> T
+    ) async throws -> T {
+        try await Self.withConnectedLink(connection, operation: operation)
+    }
+
+    public func bootstrap() async throws -> BootstrappedDevice {
+        try await withConnectedLink { link in
+            try await BootstrapSession(link: link).bootstrap()
+        }
+    }
+
+    public func audioModes() async throws -> [BossAudioModeInfo] {
+        try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            try await Self.awaitAudioModeConfigs(on: link, timeout: .seconds(30))
+        }
+    }
+
+    public func displayableAudioModes() async throws -> [BossAudioModeInfo] {
+        try await audioModes().filter { mode in
+            !(mode.userConfigurable && !mode.userConfigured && mode.name == "None")
+        }
+    }
+
+    public func currentAudioMode() async throws -> Int {
+        try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            try await Self.requiredCurrentAudioMode(on: link, timeout: .seconds(5))
+        }
+    }
+
+    public func setCurrentAudioMode(index targetIndex: Int, playVoicePrompt: Bool = false) async throws -> BossAppleCurrentAudioModeWriteResult {
+        let commandConnection = connection.securePreferred
+        return try await Self.withConnectedLinkRetrying(commandConnection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            if let currentIndex = try await Self.currentAudioModeIfAvailable(on: link, timeout: .seconds(2)),
+               currentIndex == targetIndex {
+                return .unchanged(currentIndex)
+            }
+
+            do {
+                let response = try await Self.sendAndAwaitSameFunction(
+                    packet: BossAudioModesCodec.currentModeStartPacket(modeIndex: targetIndex, playVoicePrompt: playVoicePrompt),
+                    on: link,
+                    timeout: .seconds(5)
+                )
+                if response.operator == .result {
+                    if let responseModeIndex = response.payload.first {
+                        return .updated(Int(responseModeIndex))
+                    }
+                    let verified = try await Self.verifyCurrentAudioMode(
+                        on: link,
+                        targetIndex: targetIndex,
+                        timeoutPerAttempt: .seconds(2),
+                        attempts: 3,
+                        retryDelay: .milliseconds(500)
+                    )
+                    return .updated(verified)
+                }
+                return .updated(try BossAudioModesCodec.parseCurrentMode(from: response))
+            } catch {
+                guard Self.shouldFallbackForAudioModeWrite(error) else {
+                    throw error
+                }
+                do {
+                    let verified = try await Self.verifyCurrentAudioMode(
+                        on: link,
+                        targetIndex: targetIndex,
+                        timeoutPerAttempt: .seconds(3),
+                        attempts: 4,
+                        retryDelay: .seconds(1),
+                        fallbackError: error
+                    )
+                    return .updated(verified)
+                } catch {
+                    do {
+                        let verified = try await Self.verifyCurrentAudioModeAfterReconnect(
+                            connection: connection,
+                            targetIndex: targetIndex,
+                            fallbackError: error
+                        )
+                        return .updated(verified)
+                    } catch let reconnectError {
+                        if Self.isVerificationInconclusiveError(reconnectError) {
+                            return .verificationInconclusive(targetIndex: targetIndex)
+                        }
+                        throw reconnectError
+                    }
+                }
+            }
+        }
+    }
+
+    public func audioModeSettings() async throws -> BossAudioModeSettingsConfig {
+        try await Self.readAudioModeSettingsConfigAfterReconnect(connection: connection.securePreferred)
+    }
+
+    public func setAudioModeSettings(
+        _ update: BossAudioModeSettingsConfigPatch
+    ) async throws -> BossAppleAudioModeSettingsWriteResult {
+        try await Self.setAudioModeSettingsConfigWithVerification(update, connection: connection.securePreferred)
+    }
+
+    public func setCNCLevel(_ level: Int) async throws -> BossAppleAudioModeSettingsWriteResult {
+        try await setAudioModeSettings(BossAudioModeSettingsConfigPatch(cncLevel: level))
+    }
+
+    public func setSpatialAudioMode(_ mode: BossSpatialAudioMode) async throws -> BossAppleAudioModeSettingsWriteResult {
+        try await setAudioModeSettings(BossAudioModeSettingsConfigPatch(spatialAudioMode: mode))
+    }
+
+    public func setWindBlockEnabled(_ enabled: Bool) async throws -> BossAppleAudioModeSettingsWriteResult {
+        try await setAudioModeSettings(BossAudioModeSettingsConfigPatch(windBlockEnabled: enabled))
+    }
+
+    public func setANCEnabled(_ enabled: Bool) async throws -> BossAppleAudioModeSettingsWriteResult {
+        try await setAudioModeSettings(BossAudioModeSettingsConfigPatch(ancToggleEnabled: enabled))
+    }
+}
+
+extension BossAppleController {
+    static func withConnectedLink<T: Sendable>(
+        _ options: BossAppleConnectionOptions,
+        operation: @escaping @Sendable (BleBmapLink) async throws -> T
+    ) async throws -> T {
+        try await withConnectedLinkRetrying(options, shouldRetry: { _, _ in false }, operation: operation)
+    }
+
+    static func withConnectedLinkRetrying<T: Sendable>(
+        _ options: BossAppleConnectionOptions,
+        shouldRetry: @escaping @Sendable (Error, AppleBossCharacteristicPreference) -> Bool,
+        operation: @escaping @Sendable (BleBmapLink) async throws -> T
+    ) async throws -> T {
+        let preferences: [AppleBossCharacteristicPreference] = options.characteristicPreference == .automatic
+            ? [.unsecure, .secure]
+            : [options.characteristicPreference]
+        var lastError: Error?
+
+        for preference in preferences {
+            let attemptOptions = options.withCharacteristicPreference(preference)
+            do {
+                return try await withConnectedLinkOnce(attemptOptions, operation: operation)
+            } catch {
+                lastError = error
+                guard shouldRetry(error, preference) else {
+                    throw error
+                }
+            }
+        }
+
+        throw lastError ?? AppleBleBossTransportError.transportClosed
+    }
+
+    static func withConnectedLinkOnce<T: Sendable>(
+        _ options: BossAppleConnectionOptions,
+        operation: @escaping @Sendable (BleBmapLink) async throws -> T
+    ) async throws -> T {
+        let transport = try await AppleBleBossTransport.connect(
+            filter: options.scanFilter,
+            characteristicPreference: options.characteristicPreference
+        )
+        defer {
+            Task {
+                await transport.close()
+            }
+        }
+        let link = BleBmapLink(transport: transport)
+        return try await operation(link)
+    }
+
+    static func nextResponse(
+        from stream: AsyncThrowingStream<BmapPacket, Error>,
+        matching predicate: @escaping @Sendable (BmapPacket) -> Bool,
+        timeout: Duration
+    ) async throws -> BmapPacket {
+        try await withThrowingTaskGroup(of: BmapPacket.self) { group in
+            group.addTask {
+                for try await packet in stream {
+                    if predicate(packet) {
+                        return packet
+                    }
+                }
+                throw BossAppleControlError.responseStreamEnded
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                throw BossAppleControlError.responseTimedOut(seconds: timeout.components.seconds)
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
+    static func sendAndAwaitSameFunction(
+        packet: BmapPacket,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BmapPacket {
+        try await link.send(packet: packet)
+        let response = try await nextResponse(
+            from: link.packets,
+            matching: { incoming in
+                incoming.functionBlock == packet.functionBlock &&
+                incoming.function == packet.function &&
+                incoming.operator.type == .response
+            },
+            timeout: timeout
+        )
+        if response.operator == .error {
+            throw BossAppleControlError.bmapErrorResponse(
+                context: "\(packet.functionBlock.displayName).\(packet.function.name)",
+                payloadHex: hexString(response.payload)
+            )
+        }
+        return response
+    }
+}
+
+extension BossAppleController {
+    static func awaitAudioModeConfigs(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> [BossAudioModeInfo] {
+        try await link.send(packet: BossAudioModesCodec.modeConfigStartPacket())
+        return try await withThrowingTaskGroup(of: [BossAudioModeInfo].self) { group in
+            group.addTask {
+                var modesByIndex: [Int: BossAudioModeInfo] = [:]
+                for try await packet in link.packets {
+                    guard packet.functionBlock == .audioModes,
+                          packet.function.rawValue == BossAudioModesCodec.modeConfigFunctionRaw else {
+                        continue
+                    }
+                    if packet.operator == .error {
+                        throw BossAppleControlError.bmapErrorResponse(
+                            context: "audioModes.\(packet.function.name)",
+                            payloadHex: hexString(packet.payload)
+                        )
+                    }
+                    if packet.operator == .result {
+                        return modesByIndex.values.sorted { $0.modeIndex < $1.modeIndex }
+                    }
+                    guard packet.operator == .status else {
+                        continue
+                    }
+                    let mode = try BossAudioModesCodec.parseModeConfig(from: packet)
+                    modesByIndex[mode.modeIndex] = mode
+                }
+                throw BossAppleControlError.responseStreamEnded
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                throw BossAppleControlError.responseTimedOut(seconds: timeout.components.seconds)
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
+    static func currentAudioModeIfAvailable(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> Int? {
+        do {
+            let response = try await sendAndAwaitSameFunction(
+                packet: BossAudioModesCodec.currentModeGetPacket(),
+                on: link,
+                timeout: timeout
+            )
+            return try BossAudioModesCodec.parseCurrentMode(from: response)
+        } catch {
+            guard shouldFallbackForAudioModeWrite(error) else {
+                throw error
+            }
+            return nil
+        }
+    }
+
+    static func requiredCurrentAudioMode(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> Int {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossAudioModesCodec.currentModeGetPacket(),
+            on: link,
+            timeout: timeout
+        )
+        return try BossAudioModesCodec.parseCurrentMode(from: response)
+    }
+
+    static func requiredAudioModeSettingsConfig(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossAudioModeSettingsConfig {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossAudioModesCodec.settingsConfigGetPacket(),
+            on: link,
+            timeout: timeout
+        )
+        return try BossAudioModesCodec.parseSettingsConfig(from: response)
+    }
+
+    static func readAudioModeSettingsConfigAfterReconnect(
+        connection: BossAppleConnectionOptions,
+        attempts: Int = 3,
+        retryDelay: Duration = .milliseconds(750)
+    ) async throws -> BossAudioModeSettingsConfig {
+        var lastError: Error = BossAppleControlError.responseTimedOut(seconds: 5)
+        for attempt in 0..<attempts {
+            do {
+                return try await withConnectedLinkRetrying(connection, shouldRetry: retrySecureCharacteristicIfNeeded) { link in
+                    try await readAudioModeSettingsConfig(on: link, attempts: 2, timeoutPerAttempt: .seconds(5), retryDelay: .milliseconds(300))
+                }
+            } catch {
+                lastError = error
+                guard isRecoverableAudioModeSettingsConfigError(error), attempt < attempts - 1 else {
+                    throw error
+                }
+                try await Task.sleep(for: retryDelay)
+            }
+        }
+        throw lastError
+    }
+
+    static func readAudioModeSettingsConfig(
+        on link: BleBmapLink,
+        attempts: Int,
+        timeoutPerAttempt: Duration,
+        retryDelay: Duration
+    ) async throws -> BossAudioModeSettingsConfig {
+        var lastError: Error = BossAppleControlError.responseTimedOut(seconds: timeoutPerAttempt.components.seconds)
+        for attempt in 0..<attempts {
+            do {
+                return try await requiredAudioModeSettingsConfig(on: link, timeout: timeoutPerAttempt)
+            } catch {
+                lastError = error
+                guard isRecoverableAudioModeSettingsConfigError(error), attempt < attempts - 1 else {
+                    throw error
+                }
+                try await Task.sleep(for: retryDelay)
+            }
+        }
+        throw lastError
+    }
+
+    static func setAudioModeSettingsConfigWithVerification(
+        _ update: BossAudioModeSettingsConfigPatch,
+        connection: BossAppleConnectionOptions
+    ) async throws -> BossAppleAudioModeSettingsWriteResult {
+        let current = try await readAudioModeSettingsConfigAfterReconnect(connection: connection)
+        let target = update.merged(with: current)
+        guard target != current else {
+            return .unchanged(current)
+        }
+
+        var lastRecoverableError: Error?
+        for attempt in 0..<2 {
+            do {
+                let updated = try await withConnectedLinkRetrying(connection, shouldRetry: retrySecureCharacteristicIfNeeded) { link in
+                    try await sendAudioModeSettingsConfigSetGet(target, on: link, timeout: .seconds(5))
+                }
+                guard update.matches(updated) else {
+                    throw BossAppleControlError.settingsConfigNotObserved(
+                        expected: describe(target),
+                        observed: describe(updated)
+                    )
+                }
+                return .updated(updated)
+            } catch {
+                guard isRecoverableAudioModeSettingsConfigError(error) else {
+                    throw error
+                }
+                lastRecoverableError = error
+
+                do {
+                    let verified = try await readAudioModeSettingsConfigAfterReconnect(connection: connection, attempts: 3)
+                    if update.matches(verified) {
+                        return .updated(verified)
+                    }
+                } catch {
+                    lastRecoverableError = error
+                }
+
+                if attempt == 0 {
+                    try await Task.sleep(for: .seconds(1))
+                }
+            }
+        }
+
+        _ = lastRecoverableError
+        return .verificationInconclusive(target)
+    }
+
+    static func sendAudioModeSettingsConfigSetGet(
+        _ config: BossAudioModeSettingsConfig,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossAudioModeSettingsConfig {
+        let packet = try BossAudioModesCodec.settingsConfigSetGetPacket(config)
+        try await link.send(packet: packet)
+        let response = try await nextResponse(
+            from: link.packets,
+            matching: { incoming in
+                incoming.functionBlock == packet.functionBlock &&
+                incoming.function == packet.function &&
+                incoming.operator.type == .response
+            },
+            timeout: timeout
+        )
+        if response.operator == .error {
+            throw BossAppleControlError.bmapErrorResponse(
+                context: "\(packet.functionBlock.displayName).\(packet.function.name)",
+                payloadHex: hexString(response.payload)
+            )
+        }
+        return try BossAudioModesCodec.parseSettingsConfig(from: response)
+    }
+}
+
+extension BossAppleController {
+    static func verifyCurrentAudioMode(
+        on link: BleBmapLink,
+        targetIndex: Int,
+        timeoutPerAttempt: Duration,
+        attempts: Int,
+        retryDelay: Duration,
+        fallbackError: Error? = nil
+    ) async throws -> Int {
+        var lastError: Error = fallbackError ?? BossAppleControlError.responseTimedOut(seconds: timeoutPerAttempt.components.seconds)
+        var lastObservedIndex: Int?
+        for attempt in 0..<attempts {
+            do {
+                let currentIndex = try await requiredCurrentAudioMode(on: link, timeout: timeoutPerAttempt)
+                lastObservedIndex = currentIndex
+                if currentIndex == targetIndex {
+                    return currentIndex
+                }
+            } catch {
+                lastError = error
+            }
+            if attempt < attempts - 1 {
+                try await Task.sleep(for: retryDelay)
+            }
+        }
+        if let lastObservedIndex {
+            throw BossAppleControlError.modeChangeNotObserved(targetIndex: targetIndex, observedIndex: lastObservedIndex)
+        }
+        throw fallbackError ?? lastError
+    }
+
+    static func verifyCurrentAudioModeAfterReconnect(
+        connection: BossAppleConnectionOptions,
+        targetIndex: Int,
+        fallbackError: Error
+    ) async throws -> Int {
+        var lastError: Error = fallbackError
+        for attempt in 0..<4 {
+            do {
+                return try await withConnectedLinkRetrying(
+                    connection,
+                    shouldRetry: { error, preference in
+                        guard preference == .unsecure else {
+                            return false
+                        }
+                        return shouldFallbackForAudioModeWrite(error)
+                    }
+                ) { link in
+                    try await verifyCurrentAudioMode(
+                        on: link,
+                        targetIndex: targetIndex,
+                        timeoutPerAttempt: .seconds(3),
+                        attempts: 3,
+                        retryDelay: .milliseconds(750),
+                        fallbackError: fallbackError
+                    )
+                }
+            } catch {
+                lastError = error
+                if attempt < 3 {
+                    try await Task.sleep(for: .seconds(1))
+                }
+            }
+        }
+        throw lastError
+    }
+
+    static func shouldFallbackForAudioModeWrite(_ error: Error) -> Bool {
+        if let error = error as? BossAppleControlError {
+            switch error {
+            case .responseTimedOut, .responseStreamEnded:
+                return true
+            default:
+                return false
+            }
+        }
+        if let error = error as? BossLinkError, error == .unexpectedStreamTermination {
+            return true
+        }
+        return false
+    }
+
+    static func retrySecureCharacteristicIfNeeded(_ error: Error, _ preference: AppleBossCharacteristicPreference) -> Bool {
+        guard preference == .unsecure else {
+            return false
+        }
+        if case BossAppleControlError.responseTimedOut = error {
+            return true
+        }
+        if case BossAppleControlError.bmapErrorResponse(_, let payloadHex) = error,
+           bmapErrorCode(from: payloadHex) == .insecureTransport {
+            return true
+        }
+        return false
+    }
+
+    static func isRecoverableAudioModeSettingsConfigError(_ error: Error) -> Bool {
+        if shouldFallbackForAudioModeWrite(error) {
+            return true
+        }
+        if let error = error as? BossAppleControlError {
+            switch error {
+            case .bmapErrorResponse(_, let payloadHex):
+                return bmapErrorCode(from: payloadHex) == .insecureTransport ||
+                    bmapErrorCode(from: payloadHex) == .timeout ||
+                    bmapErrorCode(from: payloadHex) == .busy
+            default:
+                return false
+            }
+        }
+        return false
+    }
+
+    static func isVerificationInconclusiveError(_ error: Error) -> Bool {
+        if shouldFallbackForAudioModeWrite(error) {
+            return true
+        }
+        if let error = error as? BossAppleControlError {
+            switch error {
+            case .bmapErrorResponse(_, let payloadHex):
+                return bmapErrorCode(from: payloadHex) == .insecureTransport
+            default:
+                return false
+            }
+        }
+        return false
+    }
+
+    static func bmapErrorCode(from payloadHex: String) -> BmapErrorCode? {
+        guard payloadHex.count == 2, let rawValue = UInt8(payloadHex, radix: 16) else {
+            return nil
+        }
+        return BmapErrorCode(rawValue: rawValue)
+    }
+
+    static func describe(_ config: BossAudioModeSettingsConfig) -> String {
+        "cnc=\(config.cncLevel),autoCNC=\(config.autoCNCEnabled),spatial=\(config.spatialAudioMode.displayName),wind=\(config.windBlockEnabled),anc=\(config.ancToggleEnabled)"
+    }
+
+    static func hexString(_ data: Data) -> String {
+        data.map { String(format: "%02X", $0) }.joined()
+    }
+}

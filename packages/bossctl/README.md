@@ -5,7 +5,7 @@
 It depends on:
 
 - `libboss` for BMAP packets, sessions, and BLE frame handling
-- `libbossApple` for CoreBluetooth transport
+- `libbossApple` for CoreBluetooth transport and reusable async control APIs
 
 ## Running
 

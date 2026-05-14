@@ -1,5 +1,6 @@
 import Foundation
 import libboss
+import libbossApple
 
 extension BossctlCLI {
     static func printAudioModeSettingsConfig(_ config: BossAudioModeSettingsConfig) {
@@ -11,7 +12,7 @@ extension BossctlCLI {
     }
 
     static func printAudioModeSettingsConfigWriteResult(
-        _ result: AudioModeSettingsConfigWriteResult,
+        _ result: BossAppleAudioModeSettingsWriteResult,
         output: AudioModeSettingsOutput
     ) {
         let state: AudioModeSettingsWriteState

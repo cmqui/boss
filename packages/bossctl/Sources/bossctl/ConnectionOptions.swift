@@ -31,4 +31,13 @@ struct ConnectionOptions {
             characteristicPreference: preference
         )
     }
+
+    func appleConnectionOptions() -> BossAppleConnectionOptions {
+        BossAppleConnectionOptions(
+            nameContains: nameContains,
+            identifier: identifier,
+            scanTimeout: .seconds(timeoutSeconds),
+            characteristicPreference: characteristicPreference
+        )
+    }
 }

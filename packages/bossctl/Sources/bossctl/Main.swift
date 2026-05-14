@@ -1,5 +1,6 @@
 import Foundation
 import libboss
+import libbossApple
 
 @main
 struct BossctlCLI {
@@ -239,130 +240,46 @@ struct BossctlCLI {
             }
 
         case .audioMode(let command):
-            let connection = audioModeConnectionOptions(for: command)
+            let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
             switch command.action {
+            case .list:
+                let modes = try await controller.displayableAudioModes()
+                let currentIndex = try? await controller.currentAudioMode()
+                if let currentIndex {
+                    print("Current audio mode: \(currentIndex)")
+                } else {
+                    print("Current audio mode: unavailable")
+                }
+                print("Available audio modes:")
+                for mode in modes {
+                    let currentMarker = mode.modeIndex == currentIndex ? "*" : " "
+                    let favoriteMarker = mode.favorite ? " favorite" : ""
+                    let customMarker = mode.userConfigured ? " user-configured" : (mode.userConfigurable ? " user-configurable" : "")
+                    print("\(currentMarker) \(mode.modeIndex): \(mode.name)\(favoriteMarker)\(customMarker)")
+                }
+
+            case .getCurrent:
+                print("Current audio mode: \(try await controller.currentAudioMode())")
+
+            case .setCurrent(let selection, let playVoicePrompt):
+                let targetIndex = try await resolveAudioModeSelection(selection, controller: controller)
+                let result = try await controller.setCurrentAudioMode(index: targetIndex, playVoicePrompt: playVoicePrompt)
+                switch result {
+                case .unchanged(let modeIndex):
+                    print("Current audio mode unchanged: \(modeIndex)")
+                case .updated(let modeIndex):
+                    print("Current audio mode updated: \(modeIndex)")
+                case .verificationInconclusive(let targetIndex):
+                    print("Current audio mode switch sent; verification inconclusive for target \(targetIndex)")
+                }
+
             case .getSettingsConfig:
-                let config = try await readAudioModeSettingsConfigAfterReconnect(connection: connection)
+                let config = try await controller.audioModeSettings()
                 printAudioModeSettingsConfig(config)
-                return
 
             case .setSettingsConfig(let update, let output):
-                let result = try await setAudioModeSettingsConfigWithVerification(update, connection: connection)
+                let result = try await controller.setAudioModeSettings(update)
                 printAudioModeSettingsConfigWriteResult(result, output: output)
-                return
-
-            default:
-                break
-            }
-
-            try await withConnectedLinkRetrying(connection) { error, preference in
-                guard connection.characteristicPreference == .automatic,
-                      preference == .unsecure else {
-                    return false
-                }
-                if case BossctlError.responseTimedOut = error {
-                    return true
-                }
-                if case BossctlError.bmapErrorResponse(_, let payloadHex) = error,
-                   bmapErrorCode(from: payloadHex) == .insecureTransport {
-                    return true
-                }
-                return false
-            } operation: { link in
-                switch command.action {
-                case .list:
-                    let modes = try await awaitAudioModeConfigs(on: link, timeout: .seconds(30))
-                    let displayModes = displayableAudioModes(from: modes)
-                    let currentIndex = try await currentAudioModeIfAvailable(on: link, timeout: .seconds(2))
-                    if let currentIndex {
-                        print("Current audio mode: \(currentIndex)")
-                    } else {
-                        print("Current audio mode: unavailable")
-                    }
-                    print("Available audio modes:")
-                    for mode in displayModes {
-                        let currentMarker = mode.modeIndex == currentIndex ? "*" : " "
-                        let favoriteMarker = mode.favorite ? " favorite" : ""
-                        let customMarker = mode.userConfigured ? " user-configured" : (mode.userConfigurable ? " user-configurable" : "")
-                        print("\(currentMarker) \(mode.modeIndex): \(mode.name)\(favoriteMarker)\(customMarker)")
-                    }
-
-                case .getCurrent:
-                    let response = try await sendAndAwaitSameFunction(
-                        packet: BossAudioModesCodec.currentModeGetPacket(),
-                        on: link,
-                        timeout: .seconds(5)
-                    )
-                    print("Current audio mode: \(try BossAudioModesCodec.parseCurrentMode(from: response))")
-
-                case .getSettingsConfig:
-                    preconditionFailure("settings-config reads are handled by the hardened reconnect path")
-
-                case .setCurrent(let selection, let playVoicePrompt):
-                    let targetIndex = try await resolveAudioModeSelection(selection, on: link)
-                    if let currentIndex = try await currentAudioModeIfAvailable(on: link, timeout: .seconds(2)),
-                       currentIndex == targetIndex {
-                        print("Current audio mode unchanged: \(currentIndex)")
-                        return
-                    }
-                    let modeIndex: Int
-                    do {
-                        let response = try await sendAndAwaitSameFunction(
-                            packet: BossAudioModesCodec.currentModeStartPacket(modeIndex: targetIndex, playVoicePrompt: playVoicePrompt),
-                            on: link,
-                            timeout: .seconds(5)
-                        )
-                        if response.operator == .result {
-                            if let responseModeIndex = response.payload.first {
-                                modeIndex = Int(responseModeIndex)
-                            } else {
-                                modeIndex = try await verifyCurrentAudioMode(
-                                    on: link,
-                                    targetIndex: targetIndex,
-                                    timeoutPerAttempt: .seconds(2),
-                                    attempts: 3,
-                                    retryDelay: .milliseconds(500)
-                                )
-                            }
-                        } else {
-                            modeIndex = try BossAudioModesCodec.parseCurrentMode(from: response)
-                        }
-                    } catch {
-                        guard shouldFallbackForAudioModeWrite(error) else {
-                            throw error
-                        }
-                        debug("audio-mode set fallback triggered for target=\(targetIndex): \(error)")
-                        do {
-                            modeIndex = try await verifyCurrentAudioMode(
-                                on: link,
-                                targetIndex: targetIndex,
-                                timeoutPerAttempt: .seconds(3),
-                                attempts: 4,
-                                retryDelay: .seconds(1),
-                                fallbackError: error
-                            )
-                        } catch {
-                            debug("in-link verification failed for target=\(targetIndex): \(error)")
-                            do {
-                                modeIndex = try await verifyCurrentAudioModeAfterReconnect(
-                                    connection: command.connection,
-                                    targetIndex: targetIndex,
-                                    fallbackError: error
-                                )
-                            } catch let reconnectError {
-                                if isVerificationInconclusiveError(reconnectError) {
-                                    print("Current audio mode switch sent; verification inconclusive for target \(targetIndex)")
-                                    return
-                                }
-                                throw reconnectError
-                            }
-                        }
-                    }
-                    print("Current audio mode updated: \(modeIndex)")
-
-                case .setSettingsConfig:
-                    preconditionFailure("settings-config writes are handled by the hardened reconnect path")
-                }
             }
         }
     }

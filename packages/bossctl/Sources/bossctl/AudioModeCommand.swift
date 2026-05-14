@@ -111,12 +111,6 @@ enum AudioModeSelection {
     case name(String)
 }
 
-enum AudioModeSettingsConfigWriteResult {
-    case unchanged(BossAudioModeSettingsConfig)
-    case updated(BossAudioModeSettingsConfig)
-    case verificationInconclusive(BossAudioModeSettingsConfig)
-}
-
 enum AudioModeSettingsWriteState {
     case unchanged
     case updated
