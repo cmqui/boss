@@ -280,6 +280,19 @@ struct BossctlCLI {
             case .setSettingsConfig(let update, let output):
                 let result = try await controller.setAudioModeSettings(update)
                 printAudioModeSettingsConfigWriteResult(result, output: output)
+
+            case .getFavorites:
+                let favorites = try await controller.favoriteAudioModeIndices()
+                let modes = (try? await controller.displayableAudioModes()) ?? []
+                printFavoriteAudioModes(favorites, modes: modes)
+
+            case .setFavorite(let selection, let isFavorite):
+                let targetIndex = try await resolveAudioModeSelection(selection, controller: controller)
+                let favorites = try await controller.setAudioModeFavorite(index: targetIndex, isFavorite: isFavorite)
+                let modes = (try? await controller.displayableAudioModes()) ?? []
+                let action = isFavorite ? "favorited" : "unfavorited"
+                print("Audio mode \(targetIndex) \(action)")
+                printFavoriteAudioModes(favorites, modes: modes)
             }
         }
     }

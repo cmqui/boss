@@ -11,6 +11,22 @@ extension BossctlCLI {
         print("ANC toggle: \(config.ancToggleEnabled)")
     }
 
+    static func printFavoriteAudioModes(_ favorites: [Int], modes: [BossAudioModeInfo]) {
+        guard !favorites.isEmpty else {
+            print("Favorite audio modes: none")
+            return
+        }
+        let modesByIndex = Dictionary(uniqueKeysWithValues: modes.map { ($0.modeIndex, $0.name) })
+        print("Favorite audio modes:")
+        for index in favorites.sorted() {
+            if let name = modesByIndex[index] {
+                print("  \(index): \(name)")
+            } else {
+                print("  \(index)")
+            }
+        }
+    }
+
     static func printAudioModeSettingsConfigWriteResult(
         _ result: BossAppleAudioModeSettingsWriteResult,
         output: AudioModeSettingsOutput

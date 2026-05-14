@@ -151,6 +151,16 @@ public struct BossAudioModeConfig: Equatable, Sendable {
             userConfigured: userConfigured
         )
     }
+
+    public var deletedSettingsBaseline: BossAudioModeSettingsConfig {
+        BossAudioModeSettingsConfig(
+            cncLevel: 5,
+            autoCNCEnabled: settings.autoCNCEnabled,
+            spatialAudioMode: settings.spatialAudioMode,
+            windBlockEnabled: settings.windBlockEnabled,
+            ancToggleEnabled: settings.ancToggleEnabled
+        )
+    }
 }
 
 public enum BossSpatialAudioMode: UInt8, CaseIterable, Sendable {
@@ -274,6 +284,7 @@ public enum BossAudioModesCodec {
     public static let capabilitiesFunctionRaw: UInt8 = 0x02
     public static let currentModeFunctionRaw: UInt8 = 0x03
     public static let modeConfigFunctionRaw: UInt8 = 0x06
+    public static let favoritesFunctionRaw: UInt8 = 0x08
     public static let settingsConfigFunctionRaw: UInt8 = 0x0A
     public static let namesSupportedFunctionRaw: UInt8 = 0x0B
 
@@ -305,6 +316,18 @@ public enum BossAudioModesCodec {
 
     public static func modeConfigStartPacket() -> BmapPacket {
         packet(functionRaw: modeConfigFunctionRaw, operatorValue: .start)
+    }
+
+    public static func favoritesGetPacket() -> BmapPacket {
+        packet(functionRaw: favoritesFunctionRaw, operatorValue: .get)
+    }
+
+    public static func favoritesSetGetPacket(numberOfModes: Int, favoriteModeIndices: [Int]) throws -> BmapPacket {
+        try packet(
+            functionRaw: favoritesFunctionRaw,
+            operatorValue: .setGet,
+            payload: encodeFavorites(numberOfModes: numberOfModes, favoriteModeIndices: favoriteModeIndices)
+        )
     }
 
     public static func modeConfigSetGetPacket(
@@ -481,6 +504,50 @@ public enum BossAudioModesCodec {
             }
         }
         return prompts
+    }
+
+    public static func parseFavorites(from packet: BmapPacket) throws -> [Int] {
+        try requireStatus(packet)
+        let payload = Array(packet.payload)
+        guard let numberOfModesByte = payload.first else {
+            throw BossAudioModesCodecError.invalidPayload("Expected at least one payload byte for audio mode favorites")
+        }
+        let numberOfModes = Int(numberOfModesByte)
+        let bitmaskByteCount = Int(ceil(Double(numberOfModes) / 8.0))
+        guard payload.count >= bitmaskByteCount + 1 else {
+            throw BossAudioModesCodecError.invalidPayload("Expected \(bitmaskByteCount + 1) payload bytes for audio mode favorites")
+        }
+
+        var favorites: [Int] = []
+        for payloadIndex in stride(from: bitmaskByteCount, through: 1, by: -1) {
+            let byte = payload[payloadIndex]
+            for bitIndex in 0..<8 where ((byte >> UInt8(bitIndex)) & 1) == 1 {
+                let modeIndex = (bitmaskByteCount - payloadIndex) * 8 + bitIndex
+                if modeIndex < numberOfModes {
+                    favorites.append(modeIndex)
+                }
+            }
+        }
+        return favorites
+    }
+
+    public static func encodeFavorites(numberOfModes: Int, favoriteModeIndices: [Int]) throws -> Data {
+        guard (0...255).contains(numberOfModes) else {
+            throw BossAudioModesCodecError.invalidPayload("Number of audio modes must be in range 0...255")
+        }
+        let uniqueFavoriteIndices = Array(Set(favoriteModeIndices)).sorted()
+        guard uniqueFavoriteIndices.allSatisfy({ (0..<numberOfModes).contains($0) }) else {
+            throw BossAudioModesCodecError.invalidPayload("Favorite mode indices must be in range 0..<\(numberOfModes)")
+        }
+
+        let bitmaskByteCount = Int(ceil(Double(numberOfModes) / 8.0))
+        var payload = Data(repeating: 0, count: bitmaskByteCount + 1)
+        payload[0] = UInt8(numberOfModes)
+        for favoriteModeIndex in uniqueFavoriteIndices {
+            let bitmaskOffset = bitmaskByteCount - (favoriteModeIndex / 8)
+            payload[bitmaskOffset] |= UInt8(1 << (favoriteModeIndex % 8))
+        }
+        return payload
     }
 
     public static func parseVolumeControlStatus(from packet: BmapPacket) throws -> BossVolumeControlStatus {

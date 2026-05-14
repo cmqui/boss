@@ -59,20 +59,42 @@ struct ContentView: View {
                         .font(.headline)
 
                     ForEach(viewModel.visibleSidebarModes, id: \.modeIndex) { mode in
-                        Button {
-                            viewModel.selectAudioMode(mode.modeIndex)
-                        } label: {
-                            HStack {
-                                Text(viewModel.customProfileDisplayName(for: mode))
-                                Spacer()
-                                if viewModel.displayedCurrentAudioModeIndex == mode.modeIndex {
-                                    Image(systemName: "checkmark")
+                        HStack(spacing: 8) {
+                            Button {
+                                viewModel.selectAudioMode(mode.modeIndex)
+                            } label: {
+                                HStack {
+                                    Text(viewModel.customProfileDisplayName(for: mode))
+                                    Spacer()
+                                    if viewModel.displayedCurrentAudioModeIndex == mode.modeIndex {
+                                        Image(systemName: "checkmark")
+                                    }
                                 }
                             }
+                            .buttonStyle(.plain)
+                            .disabled(viewModel.isBusy)
+
+                            Button {
+                                viewModel.setFavorite(!mode.favorite, for: mode)
+                            } label: {
+                                Image(systemName: mode.favorite ? "star.fill" : "star")
+                                    .foregroundStyle(mode.favorite ? .yellow : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(viewModel.isBusy)
+
+                            if viewModel.canDelete(mode) {
+                                Button {
+                                    viewModel.deleteCustomProfile(mode)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(viewModel.isBusy)
+                            }
                         }
-                        .buttonStyle(.plain)
                         .padding(.vertical, 4)
-                        .disabled(viewModel.isBusy)
                     }
                 }
             }
@@ -251,6 +273,12 @@ private struct SaveCustomProfileSheet: View {
                 .onSubmit {
                     viewModel.confirmSavingCustomProfile()
                 }
+
+            Picker("Hardware Prompt", selection: $viewModel.selectedSaveProfilePromptName) {
+                ForEach(viewModel.selectableSaveProfilePrompts, id: \.name) { prompt in
+                    Text(prompt.name).tag(prompt.name)
+                }
+            }
 
             HStack {
                 Spacer()

@@ -22,6 +22,8 @@ final class BossMacOSViewModel: ObservableObject {
     @Published private(set) var hasDetachedSettingsDraft = false
     @Published var isPresentingSaveProfilePrompt = false
     @Published var pendingProfileName = ""
+    @Published private(set) var supportedPrompts: [BossAudioModePrompt] = []
+    @Published var selectedSaveProfilePromptName = "None"
 
     @Published var selectedAudioModeIndex: Int?
     @Published var cncLevel = 0
@@ -70,6 +72,11 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
+    var selectableSaveProfilePrompts: [BossAudioModePrompt] {
+        let nonNone = supportedPrompts.filter { $0 != .none }
+        return nonNone.isEmpty ? supportedPrompts : nonNone
+    }
+
     func refresh() {
         run("Connecting") {
             let controller = self.makeController()
@@ -110,6 +117,30 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
+    func setFavorite(_ isFavorite: Bool, for mode: BossAudioModeConfig) {
+        run(isFavorite ? "Adding favorite" : "Removing favorite") {
+            let controller = self.makeController()
+            if isFavorite {
+                _ = try await controller.favoriteAudioMode(index: mode.modeIndex)
+            } else {
+                _ = try await controller.unfavoriteAudioMode(index: mode.modeIndex)
+            }
+            try await self.reloadState(using: controller)
+            self.lastResultMessage = isFavorite
+                ? "Added \"\(self.customProfileDisplayName(for: mode))\" to favorites"
+                : "Removed \"\(self.customProfileDisplayName(for: mode))\" from favorites"
+        }
+    }
+
+    func deleteCustomProfile(_ mode: BossAudioModeConfig) {
+        run("Deleting custom profile") {
+            let controller = self.makeController()
+            _ = try await controller.deleteCustomAudioMode(slot: mode.modeIndex)
+            try await self.reloadState(using: controller)
+            self.lastResultMessage = "Deleted \"\(self.customProfileDisplayName(for: mode))\""
+        }
+    }
+
     func applySettings() {
         run("Applying settings") {
             let patch = BossAudioModeSettingsConfigPatch(
@@ -138,6 +169,7 @@ final class BossMacOSViewModel: ObservableObject {
             return
         }
         pendingProfileName = ""
+        selectedSaveProfilePromptName = defaultPromptForNewCustomProfile().name
         isPresentingSaveProfilePrompt = true
     }
 
@@ -154,7 +186,7 @@ final class BossMacOSViewModel: ObservableObject {
 
         isPresentingSaveProfilePrompt = false
         pendingProfileName = ""
-        saveCustomProfile(profileName: trimmedName)
+        saveCustomProfile(profileName: trimmedName, prompt: resolvedSavePrompt(for: trimmedName))
     }
 
     func setCNCLevelDraft(_ level: Int) {
@@ -191,14 +223,26 @@ final class BossMacOSViewModel: ObservableObject {
         async let modes = controller.audioModeConfigs()
         async let currentMode = controller.currentAudioMode()
         async let settings = controller.audioModeSettings()
-
         let snapshot = try await (modes, currentMode, settings)
         audioModes = snapshot.0
         customProfileModes = snapshot.0.filter(\.userConfigurable)
         currentAudioModeIndex = snapshot.1
         selectedAudioModeIndex = snapshot.1
         applySettingsSnapshot(snapshot.2)
+        supportedPrompts = await loadSupportedPrompts(using: controller)
         hasDetachedSettingsDraft = false
+    }
+
+    private func loadSupportedPrompts(using controller: BossAppleController) async -> [BossAudioModePrompt] {
+        do {
+            let prompts = try await controller.supportedAudioModePrompts()
+            return prompts.isEmpty ? fallbackSupportedPrompts : prompts
+        } catch let error as BossAppleControlError
+            where error.bmapErrorCode == .funcNotSupp {
+            return fallbackSupportedPrompts
+        } catch {
+            return supportedPrompts.isEmpty ? fallbackSupportedPrompts : supportedPrompts
+        }
     }
 
     private func applySettingsSnapshot(_ config: BossAudioModeSettingsConfig) {
@@ -230,17 +274,21 @@ final class BossMacOSViewModel: ObservableObject {
         displayName(for: mode)
     }
 
+    func canDelete(_ mode: BossAudioModeConfig) -> Bool {
+        mode.userConfigurable && mode.userConfigured && hasCustomProfileName(mode)
+    }
+
     private var hasAvailableCustomProfileSlot: Bool {
         customProfileModes.contains { !$0.userConfigured || !hasCustomProfileName($0) }
     }
 
-    private func saveCustomProfile(profileName: String) {
+    private func saveCustomProfile(profileName: String, prompt: BossAudioModePrompt) {
         run("Saving custom profile") {
             let controller = self.makeController()
             let saved = try await controller.saveCustomAudioMode(
                 name: profileName,
                 settings: self.currentDraftConfig(),
-                prompt: self.prompt(for: profileName)
+                prompt: prompt
             )
             try await self.reloadState(using: controller)
             self.currentAudioModeIndex = saved.modeIndex
@@ -265,9 +313,29 @@ final class BossMacOSViewModel: ObservableObject {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func prompt(for profileName: String) -> BossAudioModePrompt {
+    private func promptMatchingName(_ profileName: String) -> BossAudioModePrompt? {
         let normalizedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return BossAudioModePrompt.allKnown.first { $0.name.lowercased() == normalizedName } ?? .none
+        return BossAudioModePrompt.allKnown.first { $0.name.lowercased() == normalizedName }
+    }
+
+    private func defaultPromptForNewCustomProfile() -> BossAudioModePrompt {
+        selectableSaveProfilePrompts.first ?? .none
+    }
+
+    private var fallbackSupportedPrompts: [BossAudioModePrompt] {
+        BossAudioModePrompt.allKnown.filter { $0 != .none }
+    }
+
+    private func resolvedSavePrompt(for profileName: String) -> BossAudioModePrompt {
+        if let exactMatch = promptMatchingName(profileName),
+           supportedPrompts.contains(exactMatch) {
+            return exactMatch
+        }
+        if let selectedPrompt = selectableSaveProfilePrompts.first(where: { $0.name == selectedSaveProfilePromptName }),
+           selectedPrompt != .none {
+            return selectedPrompt
+        }
+        return defaultPromptForNewCustomProfile()
     }
 
     private func run(_ label: String, operation: @escaping () async throws -> Void) {

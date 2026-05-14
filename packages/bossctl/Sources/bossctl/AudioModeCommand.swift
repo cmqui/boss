@@ -92,6 +92,19 @@ struct AudioModeCommand {
                     output: .field(.ancToggle)
                 )
             )
+        case "favorites":
+            let connection = try ConnectionOptions.parse(arguments: args)
+            return AudioModeCommand(connection: connection, action: .getFavorites)
+        case "favorite":
+            var parser = ArgumentParser(arguments: args)
+            let selection = try parser.requiredAudioModeSelection()
+            let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
+            return AudioModeCommand(connection: connection, action: .setFavorite(selection: selection, isFavorite: true))
+        case "unfavorite":
+            var parser = ArgumentParser(arguments: args)
+            let selection = try parser.requiredAudioModeSelection()
+            let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
+            return AudioModeCommand(connection: connection, action: .setFavorite(selection: selection, isFavorite: false))
         default:
             throw UsageError(Command.usage)
         }
@@ -104,6 +117,8 @@ enum AudioModeAction {
     case setCurrent(selection: AudioModeSelection, playVoicePrompt: Bool)
     case getSettingsConfig
     case setSettingsConfig(BossAudioModeSettingsConfigPatch, output: AudioModeSettingsOutput)
+    case getFavorites
+    case setFavorite(selection: AudioModeSelection, isFavorite: Bool)
 }
 
 enum AudioModeSelection {

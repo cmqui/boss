@@ -195,6 +195,29 @@ final class BossSettingsSnapshotTests: XCTestCase {
         XCTAssertEqual(try BossAudioModesCodec.parseSupportedPrompts(from: packet), [.none, .quiet, .aware, .focus])
     }
 
+    func testAudioModeFavoritesParserReadsReversedBitmask() throws {
+        let packet = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.favoritesFunctionRaw),
+            operator: .status,
+            payload: Data([0x0B, 0b0000_0100, 0b0000_0101])
+        )
+
+        XCTAssertEqual(try BossAudioModesCodec.parseFavorites(from: packet), [0, 2, 10])
+    }
+
+    func testAudioModeFavoritesSetGetPacketEncodesReversedBitmask() throws {
+        let packet = try BossAudioModesCodec.favoritesSetGetPacket(
+            numberOfModes: 11,
+            favoriteModeIndices: [10, 0, 2, 2]
+        )
+
+        XCTAssertEqual(packet.functionBlock, .audioModes)
+        XCTAssertEqual(packet.function.rawValue, BossAudioModesCodec.favoritesFunctionRaw)
+        XCTAssertEqual(packet.operator, .setGet)
+        XCTAssertEqual(packet.payload, Data([0x0B, 0b0000_0100, 0b0000_0101]))
+    }
+
     func testAudioModeSettingsConfigParserReadsLiveSettings() throws {
         let packet = BmapPacket(
             functionBlock: .audioModes,
@@ -276,6 +299,35 @@ final class BossSettingsSnapshotTests: XCTestCase {
             function: BmapFunction(block: .settings, rawValue: functionRaw),
             operator: .status,
             payload: payload
+        )
+    }
+
+    func testDeletedSettingsBaselinePreservesNonNameSettingsAndResetsCNC() {
+        let config = BossAudioModeConfig(
+            modeIndex: 7,
+            prompt: .focus,
+            name: "Focus Work",
+            favorite: true,
+            userConfigurable: true,
+            userConfigured: true,
+            settings: BossAudioModeSettingsConfig(
+                cncLevel: 9,
+                autoCNCEnabled: true,
+                spatialAudioMode: .head,
+                windBlockEnabled: false,
+                ancToggleEnabled: true
+            )
+        )
+
+        XCTAssertEqual(
+            config.deletedSettingsBaseline,
+            BossAudioModeSettingsConfig(
+                cncLevel: 5,
+                autoCNCEnabled: true,
+                spatialAudioMode: .head,
+                windBlockEnabled: false,
+                ancToggleEnabled: true
+            )
         )
     }
 }

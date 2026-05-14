@@ -140,6 +140,12 @@ public struct BossAppleController: Sendable {
         }
     }
 
+    public func audioModeCapabilities() async throws -> BossAudioModesCapabilities {
+        try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            try await Self.requiredAudioModeCapabilities(on: link, timeout: .seconds(5))
+        }
+    }
+
     public func supportedAudioModePrompts() async throws -> [BossAudioModePrompt] {
         try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
             let response = try await Self.sendAndAwaitSameFunction(
@@ -149,6 +155,52 @@ public struct BossAppleController: Sendable {
             )
             return try BossAudioModesCodec.parseSupportedPrompts(from: response)
         }
+    }
+
+    public func favoriteAudioModeIndices() async throws -> [Int] {
+        try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            try await Self.requiredFavoriteAudioModeIndices(on: link, timeout: .seconds(5))
+        }
+    }
+
+    public func setFavoriteAudioModeIndices(
+        _ indices: [Int],
+        numberOfModes requestedNumberOfModes: Int? = nil
+    ) async throws -> [Int] {
+        let numberOfModes: Int
+        if let requestedNumberOfModes {
+            numberOfModes = requestedNumberOfModes
+        } else {
+            numberOfModes = try await audioModeCapabilities().totalModes
+        }
+
+        return try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            try await Self.sendAudioModeFavoritesSetGet(
+                numberOfModes: numberOfModes,
+                favoriteModeIndices: indices,
+                on: link,
+                timeout: .seconds(5)
+            )
+        }
+    }
+
+    public func setAudioModeFavorite(index: Int, isFavorite: Bool) async throws -> [Int] {
+        let numberOfModes = try await audioModeCapabilities().totalModes
+        var favorites = Set(try await favoriteAudioModeIndices())
+        if isFavorite {
+            favorites.insert(index)
+        } else {
+            favorites.remove(index)
+        }
+        return try await setFavoriteAudioModeIndices(Array(favorites).sorted(), numberOfModes: numberOfModes)
+    }
+
+    public func favoriteAudioMode(index: Int) async throws -> [Int] {
+        try await setAudioModeFavorite(index: index, isFavorite: true)
+    }
+
+    public func unfavoriteAudioMode(index: Int) async throws -> [Int] {
+        try await setAudioModeFavorite(index: index, isFavorite: false)
     }
 
     public func saveCustomAudioMode(
@@ -212,6 +264,29 @@ public struct BossAppleController: Sendable {
             settings: settings ?? existing.settings,
             prompt: prompt ?? existing.prompt
         )
+    }
+
+    public func deleteCustomAudioMode(slot: Int) async throws -> BossAudioModeConfig {
+        let configs = try await audioModeConfigs()
+        guard let existing = configs.first(where: { $0.modeIndex == slot }) else {
+            throw BossAppleControlError.customAudioModeSlotNotFound(slot)
+        }
+        guard existing.userConfigurable else {
+            throw BossAppleControlError.customAudioModeSlotNotEditable(slot)
+        }
+
+        if existing.favorite {
+            _ = try await unfavoriteAudioMode(index: slot)
+        }
+
+        let cleared = try await writeCustomAudioMode(
+            slot: slot,
+            name: "",
+            settings: existing.deletedSettingsBaseline,
+            prompt: .none
+        )
+
+        return cleared
     }
 
     public func currentAudioMode() async throws -> Int {
@@ -517,6 +592,30 @@ extension BossAppleController {
         return try BossAudioModesCodec.parseSettingsConfig(from: response)
     }
 
+    static func requiredFavoriteAudioModeIndices(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> [Int] {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossAudioModesCodec.favoritesGetPacket(),
+            on: link,
+            timeout: timeout
+        )
+        return try BossAudioModesCodec.parseFavorites(from: response)
+    }
+
+    static func requiredAudioModeCapabilities(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossAudioModesCapabilities {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossAudioModesCodec.capabilitiesGetPacket(),
+            on: link,
+            timeout: timeout
+        )
+        return try BossAudioModesCodec.parseCapabilities(from: response)
+    }
+
     static func readAudioModeSettingsConfigAfterReconnect(
         connection: BossAppleConnectionOptions,
         attempts: Int = 3,
@@ -649,6 +748,20 @@ extension BossAppleController {
         )
         let response = try await sendAndAwaitSameFunction(packet: packet, on: link, timeout: timeout)
         return try BossAudioModesCodec.parseModeConfigDetail(from: response)
+    }
+
+    static func sendAudioModeFavoritesSetGet(
+        numberOfModes: Int,
+        favoriteModeIndices: [Int],
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> [Int] {
+        let packet = try BossAudioModesCodec.favoritesSetGetPacket(
+            numberOfModes: numberOfModes,
+            favoriteModeIndices: favoriteModeIndices
+        )
+        let response = try await sendAndAwaitSameFunction(packet: packet, on: link, timeout: timeout)
+        return try BossAudioModesCodec.parseFavorites(from: response)
     }
 }
 

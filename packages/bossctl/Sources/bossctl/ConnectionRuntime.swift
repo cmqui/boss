@@ -12,9 +12,9 @@ extension BossctlCLI {
 
     static func audioModeConnectionOptions(for command: AudioModeCommand) -> ConnectionOptions {
         switch command.action {
-        case .setCurrent, .getSettingsConfig, .setSettingsConfig:
+        case .setCurrent, .getSettingsConfig, .setSettingsConfig, .setFavorite:
             return settingsConnectionOptions(for: command.connection)
-        case .list, .getCurrent:
+        case .list, .getCurrent, .getFavorites:
             return command.connection
         }
     }
