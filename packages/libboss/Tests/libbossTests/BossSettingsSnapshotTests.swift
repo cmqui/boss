@@ -88,11 +88,17 @@ final class BossSettingsSnapshotTests: XCTestCase {
     }
 
     func testAudioModeConfigParserReadsIndexNameAndFlags() throws {
-        var payload = Data(repeating: 0, count: 44)
+        var payload = Data(repeating: 0, count: 48)
         payload[0] = 0x02
+        payload[1] = 0x00
+        payload[2] = 0x22
         payload[3] = 0x01
         payload[4] = 0x00
         payload[5] = 0x01
+        payload[42] = 0x05
+        payload[44] = 0x02
+        payload[45] = 0x01
+        payload[47] = 0x01
         let nameBytes = Array("Immersion".utf8)
         payload.replaceSubrange(6..<(6 + nameBytes.count), with: nameBytes)
         let packet = BmapPacket(
@@ -108,6 +114,85 @@ final class BossSettingsSnapshotTests: XCTestCase {
         XCTAssertTrue(mode.favorite)
         XCTAssertTrue(mode.userConfigurable)
         XCTAssertFalse(mode.userConfigured)
+
+        let detail = try BossAudioModesCodec.parseModeConfigDetail(from: packet)
+        XCTAssertEqual(detail.prompt, .immersion)
+        XCTAssertEqual(detail.settings.cncLevel, 5)
+        XCTAssertEqual(detail.settings.spatialAudioMode, .head)
+        XCTAssertTrue(detail.settings.windBlockEnabled)
+        XCTAssertTrue(detail.settings.ancToggleEnabled)
+    }
+
+    func testAudioModeConfigSetGetPacketEncodesProfileNamePromptAndSettings() throws {
+        let settings = BossAudioModeSettingsConfig(
+            cncLevel: 7,
+            autoCNCEnabled: false,
+            spatialAudioMode: .head,
+            windBlockEnabled: true,
+            ancToggleEnabled: true
+        )
+
+        let packet = try BossAudioModesCodec.modeConfigSetGetPacket(
+            modeIndex: 5,
+            prompt: .focus,
+            name: "Deep Work",
+            settings: settings
+        )
+
+        XCTAssertEqual(packet.functionBlock, .audioModes)
+        XCTAssertEqual(packet.function.rawValue, BossAudioModesCodec.modeConfigFunctionRaw)
+        XCTAssertEqual(packet.operator, .setGet)
+        XCTAssertEqual(packet.payload.count, 40)
+        XCTAssertEqual(packet.payload[0], 5)
+        XCTAssertEqual(packet.payload[1], 0)
+        XCTAssertEqual(packet.payload[2], 13)
+        XCTAssertEqual(String(data: packet.payload[3..<12], encoding: .utf8), "Deep Work")
+        XCTAssertEqual(packet.payload[35], 7)
+        XCTAssertEqual(packet.payload[36], 0)
+        XCTAssertEqual(packet.payload[37], 2)
+        XCTAssertEqual(packet.payload[38], 1)
+        XCTAssertEqual(packet.payload[39], 1)
+    }
+
+    func testAudioModeConfigParserReadsSetGetEchoPayload() throws {
+        let settings = BossAudioModeSettingsConfig(
+            cncLevel: 4,
+            autoCNCEnabled: true,
+            spatialAudioMode: .room,
+            windBlockEnabled: false,
+            ancToggleEnabled: true
+        )
+        let payload = try BossAudioModesCodec.encodeModeConfigSetGetPayload(
+            modeIndex: 6,
+            prompt: .home,
+            name: "Home Office",
+            settings: settings
+        )
+        let packet = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.modeConfigFunctionRaw),
+            operator: .status,
+            payload: payload
+        )
+
+        let mode = try BossAudioModesCodec.parseModeConfigDetail(from: packet)
+        XCTAssertEqual(mode.modeIndex, 6)
+        XCTAssertEqual(mode.prompt, .home)
+        XCTAssertEqual(mode.name, "Home Office")
+        XCTAssertTrue(mode.userConfigurable)
+        XCTAssertTrue(mode.userConfigured)
+        XCTAssertEqual(mode.settings, settings)
+    }
+
+    func testSupportedAudioModePromptParserReadsBitmask() throws {
+        let packet = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.namesSupportedFunctionRaw),
+            operator: .status,
+            payload: Data([0b0000_0111, 0b0010_0000])
+        )
+
+        XCTAssertEqual(try BossAudioModesCodec.parseSupportedPrompts(from: packet), [.none, .quiet, .aware, .focus])
     }
 
     func testAudioModeSettingsConfigParserReadsLiveSettings() throws {

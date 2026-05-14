@@ -50,6 +50,9 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
     case bmapErrorResponse(context: String, payloadHex: String)
     case modeChangeNotObserved(targetIndex: Int, observedIndex: Int)
     case settingsConfigNotObserved(expected: String, observed: String)
+    case noFreeCustomAudioModeSlot
+    case customAudioModeSlotNotEditable(Int)
+    case customAudioModeSlotNotFound(Int)
 
     public var bmapErrorCode: BmapErrorCode? {
         guard case .bmapErrorResponse(_, let payloadHex) = self else {
@@ -73,6 +76,12 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
             return "modeChangeNotObserved(targetIndex: \(targetIndex), observedIndex: \(observedIndex))"
         case .settingsConfigNotObserved(let expected, let observed):
             return "settingsConfigNotObserved(expected: \"\(expected)\", observed: \"\(observed)\")"
+        case .noFreeCustomAudioModeSlot:
+            return "noFreeCustomAudioModeSlot"
+        case .customAudioModeSlotNotEditable(let slot):
+            return "customAudioModeSlotNotEditable(\(slot))"
+        case .customAudioModeSlotNotFound(let slot):
+            return "customAudioModeSlotNotFound(\(slot))"
         }
     }
 
@@ -116,6 +125,10 @@ public struct BossAppleController: Sendable {
     }
 
     public func audioModes() async throws -> [BossAudioModeInfo] {
+        try await audioModeConfigs().map(\.info)
+    }
+
+    public func audioModeConfigs() async throws -> [BossAudioModeConfig] {
         try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
             try await Self.awaitAudioModeConfigs(on: link, timeout: .seconds(30))
         }
@@ -125,6 +138,80 @@ public struct BossAppleController: Sendable {
         try await audioModes().filter { mode in
             !(mode.userConfigurable && !mode.userConfigured && mode.name == "None")
         }
+    }
+
+    public func supportedAudioModePrompts() async throws -> [BossAudioModePrompt] {
+        try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            let response = try await Self.sendAndAwaitSameFunction(
+                packet: BossAudioModesCodec.namesSupportedGetPacket(),
+                on: link,
+                timeout: .seconds(5)
+            )
+            return try BossAudioModesCodec.parseSupportedPrompts(from: response)
+        }
+    }
+
+    public func saveCustomAudioMode(
+        name: String,
+        settings: BossAudioModeSettingsConfig,
+        prompt: BossAudioModePrompt = .none,
+        slot requestedSlot: Int? = nil
+    ) async throws -> BossAudioModeConfig {
+        let configs = try await audioModeConfigs()
+        let slot: Int
+        if let requestedSlot {
+            guard configs.first(where: { $0.modeIndex == requestedSlot })?.userConfigurable == true else {
+                throw BossAppleControlError.customAudioModeSlotNotEditable(requestedSlot)
+            }
+            slot = requestedSlot
+        } else {
+            guard let freeSlot = Self.firstFreeCustomAudioModeSlot(in: configs) else {
+                throw BossAppleControlError.noFreeCustomAudioModeSlot
+            }
+            slot = freeSlot
+        }
+        return try await writeCustomAudioMode(slot: slot, name: name, settings: settings, prompt: prompt)
+    }
+
+    public func renameCustomAudioMode(
+        slot: Int,
+        name: String,
+        prompt: BossAudioModePrompt? = nil
+    ) async throws -> BossAudioModeConfig {
+        let configs = try await audioModeConfigs()
+        guard let existing = configs.first(where: { $0.modeIndex == slot }) else {
+            throw BossAppleControlError.customAudioModeSlotNotFound(slot)
+        }
+        guard existing.userConfigurable else {
+            throw BossAppleControlError.customAudioModeSlotNotEditable(slot)
+        }
+        return try await writeCustomAudioMode(
+            slot: slot,
+            name: name,
+            settings: existing.settings,
+            prompt: prompt ?? existing.prompt
+        )
+    }
+
+    public func updateCustomAudioMode(
+        slot: Int,
+        name: String? = nil,
+        settings: BossAudioModeSettingsConfig? = nil,
+        prompt: BossAudioModePrompt? = nil
+    ) async throws -> BossAudioModeConfig {
+        let configs = try await audioModeConfigs()
+        guard let existing = configs.first(where: { $0.modeIndex == slot }) else {
+            throw BossAppleControlError.customAudioModeSlotNotFound(slot)
+        }
+        guard existing.userConfigurable else {
+            throw BossAppleControlError.customAudioModeSlotNotEditable(slot)
+        }
+        return try await writeCustomAudioMode(
+            slot: slot,
+            name: name ?? existing.name,
+            settings: settings ?? existing.settings,
+            prompt: prompt ?? existing.prompt
+        )
     }
 
     public func currentAudioMode() async throws -> Int {
@@ -218,6 +305,24 @@ public struct BossAppleController: Sendable {
 
     public func setANCEnabled(_ enabled: Bool) async throws -> BossAppleAudioModeSettingsWriteResult {
         try await setAudioModeSettings(BossAudioModeSettingsConfigPatch(ancToggleEnabled: enabled))
+    }
+
+    private func writeCustomAudioMode(
+        slot: Int,
+        name: String,
+        settings: BossAudioModeSettingsConfig,
+        prompt: BossAudioModePrompt
+    ) async throws -> BossAudioModeConfig {
+        try await Self.withConnectedLinkRetrying(connection.securePreferred, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            try await Self.sendAudioModeConfigSetGet(
+                modeIndex: slot,
+                prompt: prompt,
+                name: name,
+                settings: settings,
+                on: link,
+                timeout: .seconds(5)
+            )
+        }
     }
 }
 
@@ -324,11 +429,11 @@ extension BossAppleController {
     static func awaitAudioModeConfigs(
         on link: BleBmapLink,
         timeout: Duration
-    ) async throws -> [BossAudioModeInfo] {
+    ) async throws -> [BossAudioModeConfig] {
         try await link.send(packet: BossAudioModesCodec.modeConfigStartPacket())
-        return try await withThrowingTaskGroup(of: [BossAudioModeInfo].self) { group in
+        return try await withThrowingTaskGroup(of: [BossAudioModeConfig].self) { group in
             group.addTask {
-                var modesByIndex: [Int: BossAudioModeInfo] = [:]
+                var modesByIndex: [Int: BossAudioModeConfig] = [:]
                 for try await packet in link.packets {
                     guard packet.functionBlock == .audioModes,
                           packet.function.rawValue == BossAudioModesCodec.modeConfigFunctionRaw else {
@@ -346,7 +451,7 @@ extension BossAppleController {
                     guard packet.operator == .status else {
                         continue
                     }
-                    let mode = try BossAudioModesCodec.parseModeConfig(from: packet)
+                    let mode = try BossAudioModesCodec.parseModeConfigDetail(from: packet)
                     modesByIndex[mode.modeIndex] = mode
                 }
                 throw BossAppleControlError.responseStreamEnded
@@ -359,6 +464,14 @@ extension BossAppleController {
             group.cancelAll()
             return result
         }
+    }
+
+    static func firstFreeCustomAudioModeSlot(in configs: [BossAudioModeConfig]) -> Int? {
+        configs
+            .filter { $0.userConfigurable && !$0.userConfigured }
+            .sorted { $0.modeIndex < $1.modeIndex }
+            .first(where: { $0.name.isEmpty || $0.name.caseInsensitiveCompare("None") == .orderedSame })?
+            .modeIndex
     }
 
     static func currentAudioModeIfAvailable(
@@ -519,6 +632,24 @@ extension BossAppleController {
         }
         return try BossAudioModesCodec.parseSettingsConfig(from: response)
     }
+
+    static func sendAudioModeConfigSetGet(
+        modeIndex: Int,
+        prompt: BossAudioModePrompt,
+        name: String,
+        settings: BossAudioModeSettingsConfig,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossAudioModeConfig {
+        let packet = try BossAudioModesCodec.modeConfigSetGetPacket(
+            modeIndex: modeIndex,
+            prompt: prompt,
+            name: name,
+            settings: settings
+        )
+        let response = try await sendAndAwaitSameFunction(packet: packet, on: link, timeout: timeout)
+        return try BossAudioModesCodec.parseModeConfigDetail(from: response)
+    }
 }
 
 extension BossAppleController {
@@ -623,6 +754,8 @@ extension BossAppleController {
         }
         if let error = error as? BossAppleControlError {
             switch error {
+            case .settingsConfigNotObserved:
+                return true
             case .bmapErrorResponse(_, let payloadHex):
                 return bmapErrorCode(from: payloadHex) == .insecureTransport ||
                     bmapErrorCode(from: payloadHex) == .timeout ||
