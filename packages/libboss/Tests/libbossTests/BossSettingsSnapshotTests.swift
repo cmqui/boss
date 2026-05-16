@@ -51,6 +51,48 @@ final class BossSettingsSnapshotTests: XCTestCase {
         XCTAssertNil(try snapshot.autoAnswer())
     }
 
+    func testOnHeadDetectionSetGetPacketEncodesExpectedTwoBytePayload() {
+        let packet = BossSettingsCodec.onHeadDetectionSetGetPacket(
+            BossOnHeadDetectionValue(
+                isEnabled: true,
+                isAutoPlayEnabled: true,
+                isAutoAnswerEnabled: false,
+                isAutoTransparencyEnabled: true
+            )
+        )
+
+        XCTAssertEqual(packet.functionBlock, .settings)
+        XCTAssertEqual(packet.function.rawValue, BossSettingsCodec.onHeadDetectionFunctionRaw)
+        XCTAssertEqual(packet.operator, .setGet)
+        XCTAssertEqual(packet.payload, Data([0x01, 0x05]))
+    }
+
+    func testOnHeadDetectionPatchPreservesUnspecifiedFields() {
+        let current = BossOnHeadDetectionValue(
+            isEnabled: true,
+            isAutoPlayEnabled: true,
+            isAutoAnswerEnabled: false,
+            isAutoTransparencyEnabled: nil
+        )
+        let patch = BossOnHeadDetectionPatch(
+            isEnabled: false,
+            isAutoAnswerEnabled: true
+        )
+
+        let merged = patch.merged(with: current)
+        XCTAssertEqual(
+            merged,
+            BossOnHeadDetectionValue(
+                isEnabled: false,
+                isAutoPlayEnabled: true,
+                isAutoAnswerEnabled: true,
+                isAutoTransparencyEnabled: nil
+            )
+        )
+        XCTAssertFalse(patch.isEmpty)
+        XCTAssertTrue(BossOnHeadDetectionPatch().isEmpty)
+    }
+
     func testVolumeControlResolvesFromSnapshotPacket() throws {
         let snapshot = BossSettingsSnapshot(packetsByFunctionRaw: [
             BossSettingsCodec.volumeControlFunctionRaw: settingsPacket(
@@ -60,6 +102,49 @@ final class BossSettingsSnapshotTests: XCTestCase {
         ])
 
         XCTAssertEqual(try snapshot.volumeControl()?.value, .capTouch)
+        XCTAssertEqual(try snapshot.volumeControl()?.supportedValues, [])
+    }
+
+    func testVolumeControlSupportBitmaskResolvesFromSnapshotPacket() throws {
+        let snapshot = BossSettingsSnapshot(packetsByFunctionRaw: [
+            BossSettingsCodec.volumeControlFunctionRaw: settingsPacket(
+                functionRaw: BossSettingsCodec.volumeControlFunctionRaw,
+                payload: Data([BossVolumeControlValue.capTouch.rawValue, 0x03])
+            )
+        ])
+
+        XCTAssertEqual(try snapshot.volumeControl()?.value, .capTouch)
+        XCTAssertEqual(try snapshot.volumeControl()?.supportedValues, [.button, .capTouch])
+    }
+
+    func testDeviceSettingsAggregatesSnapshotValues() throws {
+        let snapshot = BossSettingsSnapshot(packetsByFunctionRaw: [
+            BossSettingsCodec.onHeadDetectionFunctionRaw: settingsPacket(
+                functionRaw: BossSettingsCodec.onHeadDetectionFunctionRaw,
+                payload: Data([0x07, 0x03])
+            ),
+            BossSettingsCodec.autoAwareFunctionRaw: settingsPacket(
+                functionRaw: BossSettingsCodec.autoAwareFunctionRaw,
+                payload: Data([0x01])
+            ),
+            BossSettingsCodec.autoPlayPauseFunctionRaw: settingsPacket(
+                functionRaw: BossSettingsCodec.autoPlayPauseFunctionRaw,
+                payload: Data([0x00])
+            ),
+            BossSettingsCodec.volumeControlFunctionRaw: settingsPacket(
+                functionRaw: BossSettingsCodec.volumeControlFunctionRaw,
+                payload: Data([BossVolumeControlValue.button.rawValue, 0x00])
+            )
+        ])
+
+        let settings = try snapshot.deviceSettings()
+        XCTAssertEqual(settings.wearDetection?.isEnabled, true)
+        XCTAssertEqual(settings.wearDetection?.isAutoPlayEnabled, true)
+        XCTAssertEqual(settings.wearDetection?.isAutoAnswerEnabled, true)
+        XCTAssertEqual(settings.autoAwareEnabled, true)
+        XCTAssertEqual(settings.autoPlayPauseEnabled, false)
+        XCTAssertEqual(settings.autoAnswerEnabled, true)
+        XCTAssertEqual(settings.volumeControl?.value, .button)
     }
 
     func testCurrentAudioModeParserReadsModeIndex() throws {

@@ -260,9 +260,14 @@ public struct BossAudioModeSettingsConfigPatch: Equatable, Sendable {
 
 public struct BossVolumeControlStatus: Equatable, Sendable {
     public let value: BossVolumeControlValue
+    public let supportedValues: [BossVolumeControlValue]?
 
-    public init(value: BossVolumeControlValue) {
+    public init(
+        value: BossVolumeControlValue,
+        supportedValues: [BossVolumeControlValue]? = nil
+    ) {
         self.value = value
+        self.supportedValues = supportedValues
     }
 }
 
@@ -556,7 +561,18 @@ public enum BossAudioModesCodec {
             throw BossAudioModesCodecError.invalidPayload("Expected at least one payload byte for volume control")
         }
         let value = BossVolumeControlValue(rawValue: first) ?? .disabled
-        return BossVolumeControlStatus(value: value)
+        let supportedValues: [BossVolumeControlValue]?
+        if packet.payload.count > 1 {
+            let bitmask = packet.payload[1]
+            supportedValues = [
+                (bitmask & 0x01) == 0x01 ? BossVolumeControlValue.button : nil,
+                (bitmask & 0x02) == 0x02 ? BossVolumeControlValue.capTouch : nil,
+                (bitmask & 0x04) == 0x04 ? BossVolumeControlValue.imu : nil,
+            ].compactMap { $0 }
+        } else {
+            supportedValues = nil
+        }
+        return BossVolumeControlStatus(value: value, supportedValues: supportedValues)
     }
 
     private static func requireStatus(_ packet: BmapPacket) throws {

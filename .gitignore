@@ -1,7 +1,9 @@
-decomp/
-docs/
 .DS_Store
-.build/
-.env*
 .tmp/
 .vscode/
+
+.env*
+.build/
+docs/
+decomp/
+dist/

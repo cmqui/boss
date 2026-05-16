@@ -3,6 +3,80 @@ import libboss
 import libbossApple
 
 extension BossctlCLI {
+    static func printWearDetectionFallbackPaths(for patch: BossOnHeadDetectionPatch) {
+        if patch.isAutoPlayEnabled != nil {
+            print("Applied subordinate setting path: auto-play-pause (settings 0x18)")
+        }
+        if patch.isAutoAnswerEnabled != nil {
+            print("Applied subordinate setting path: auto-answer (settings 0x1B)")
+        }
+        if patch.isAutoTransparencyEnabled != nil {
+            print("Applied subordinate setting path: auto-aware / auto-transparency (settings 0x1D)")
+        }
+    }
+
+    static func printOnHeadDetection(_ value: BossOnHeadDetectionValue) {
+        print("On-head detection: \(value.isEnabled)")
+        print("Auto-play: \(formatOptionalBool(value.isAutoPlayEnabled))")
+        print("Auto-answer: \(formatOptionalBool(value.isAutoAnswerEnabled))")
+        print("Auto-transparency: \(formatOptionalBool(value.isAutoTransparencyEnabled))")
+    }
+
+    static func printWearDetectionSettingsReport(_ report: BossAppleDeviceSettingsReport) {
+        if let wearDetection = report.wearDetection.value {
+            print("On-head detection: \(wearDetection.isEnabled) [\(describe(report.wearDetection))]")
+        } else {
+            print("On-head detection: unavailable [\(describe(report.wearDetection))]")
+        }
+
+        let autoPlay = report.wearDetection.value?.isAutoPlayEnabled ?? report.autoPlayPauseEnabled.value
+        let autoAnswer = report.wearDetection.value?.isAutoAnswerEnabled ?? report.autoAnswerEnabled.value
+        let autoTransparency = report.wearDetection.value?.isAutoTransparencyEnabled ?? report.autoAwareEnabled.value
+
+        print("Auto-play: \(formatOptionalBool(autoPlay))")
+        print("Auto-answer: \(formatOptionalBool(autoAnswer))")
+        print("Auto-transparency: \(formatOptionalBool(autoTransparency))")
+    }
+
+    static func printDeviceSettingsReport(_ report: BossAppleDeviceSettingsReport) {
+        if let wearDetection = report.wearDetection.value {
+            print("Wear detection: \(wearDetection.isEnabled) [\(describe(report.wearDetection))]")
+            print("Auto-play: \(formatOptionalBool(wearDetection.isAutoPlayEnabled))")
+            print("Auto-answer: \(formatOptionalBool(wearDetection.isAutoAnswerEnabled))")
+            print("Auto-transparency: \(formatOptionalBool(wearDetection.isAutoTransparencyEnabled))")
+        } else {
+            print("Wear detection: unavailable [\(describe(report.wearDetection))]")
+        }
+
+        if let autoAwareEnabled = report.autoAwareEnabled.value {
+            print("Auto-aware: \(autoAwareEnabled) [\(describe(report.autoAwareEnabled))]")
+        } else {
+            print("Auto-aware: unavailable [\(describe(report.autoAwareEnabled))]")
+        }
+
+        if let autoPlayPauseEnabled = report.autoPlayPauseEnabled.value {
+            print("Auto-play-pause: \(autoPlayPauseEnabled) [\(describe(report.autoPlayPauseEnabled))]")
+        } else {
+            print("Auto-play-pause: unavailable [\(describe(report.autoPlayPauseEnabled))]")
+        }
+
+        if let autoAnswerEnabled = report.autoAnswerEnabled.value {
+            print("Auto-answer: \(autoAnswerEnabled) [\(describe(report.autoAnswerEnabled))]")
+        } else {
+            print("Auto-answer: unavailable [\(describe(report.autoAnswerEnabled))]")
+        }
+
+        if let volumeControl = report.volumeControl.value {
+            print("Volume control: \(volumeControl.value.displayName) [\(describe(report.volumeControl))]")
+            if let supportedValues = volumeControl.supportedValues, !supportedValues.isEmpty {
+                let supportedModes = supportedValues.map(\.displayName).joined(separator: ", ")
+                print("Volume control supported modes: \(supportedModes)")
+            }
+        } else {
+            print("Volume control: unavailable [\(describe(report.volumeControl))]")
+        }
+    }
+
     static func printAudioModeSettingsConfig(_ config: BossAudioModeSettingsConfig) {
         print("CNC level: \(config.cncLevel) (0=max ANC, 10=most ambient)")
         print("Auto CNC: \(config.autoCNCEnabled)")
@@ -102,5 +176,15 @@ extension BossctlCLI {
 
     static func describe(_ config: BossAudioModeSettingsConfig) -> String {
         "cnc=\(config.cncLevel),autoCNC=\(config.autoCNCEnabled),spatial=\(config.spatialAudioMode.displayName),wind=\(config.windBlockEnabled),anc=\(config.ancToggleEnabled)"
+    }
+
+    static func describe<Value: Sendable & Equatable>(_ observed: BossAppleObservedSetting<Value>) -> String {
+        if let source = observed.source {
+            return source.rawValue
+        }
+        if let reason = observed.unavailableReason {
+            return reason.description
+        }
+        return "unknown"
     }
 }

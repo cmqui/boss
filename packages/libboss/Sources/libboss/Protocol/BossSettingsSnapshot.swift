@@ -29,6 +29,63 @@ public struct BossOnHeadDetectionValue: Equatable, Sendable {
     }
 }
 
+public struct BossOnHeadDetectionPatch: Equatable, Sendable {
+    public let isEnabled: Bool?
+    public let isAutoPlayEnabled: Bool?
+    public let isAutoAnswerEnabled: Bool?
+    public let isAutoTransparencyEnabled: Bool?
+
+    public init(
+        isEnabled: Bool? = nil,
+        isAutoPlayEnabled: Bool? = nil,
+        isAutoAnswerEnabled: Bool? = nil,
+        isAutoTransparencyEnabled: Bool? = nil
+    ) {
+        self.isEnabled = isEnabled
+        self.isAutoPlayEnabled = isAutoPlayEnabled
+        self.isAutoAnswerEnabled = isAutoAnswerEnabled
+        self.isAutoTransparencyEnabled = isAutoTransparencyEnabled
+    }
+
+    public var isEmpty: Bool {
+        isEnabled == nil &&
+            isAutoPlayEnabled == nil &&
+            isAutoAnswerEnabled == nil &&
+            isAutoTransparencyEnabled == nil
+    }
+
+    public func merged(with current: BossOnHeadDetectionValue) -> BossOnHeadDetectionValue {
+        BossOnHeadDetectionValue(
+            isEnabled: isEnabled ?? current.isEnabled,
+            isAutoPlayEnabled: isAutoPlayEnabled ?? current.isAutoPlayEnabled,
+            isAutoAnswerEnabled: isAutoAnswerEnabled ?? current.isAutoAnswerEnabled,
+            isAutoTransparencyEnabled: isAutoTransparencyEnabled ?? current.isAutoTransparencyEnabled
+        )
+    }
+}
+
+public struct BossDeviceSettings: Equatable, Sendable {
+    public let wearDetection: BossOnHeadDetectionValue?
+    public let autoAwareEnabled: Bool?
+    public let autoPlayPauseEnabled: Bool?
+    public let autoAnswerEnabled: Bool?
+    public let volumeControl: BossVolumeControlStatus?
+
+    public init(
+        wearDetection: BossOnHeadDetectionValue?,
+        autoAwareEnabled: Bool?,
+        autoPlayPauseEnabled: Bool?,
+        autoAnswerEnabled: Bool?,
+        volumeControl: BossVolumeControlStatus?
+    ) {
+        self.wearDetection = wearDetection
+        self.autoAwareEnabled = autoAwareEnabled
+        self.autoPlayPauseEnabled = autoPlayPauseEnabled
+        self.autoAnswerEnabled = autoAnswerEnabled
+        self.volumeControl = volumeControl
+    }
+}
+
 public enum BossSettingsCodecError: LocalizedError, Equatable {
     case unexpectedOperator(expected: BmapOperator, actual: BmapOperator)
     case invalidPayload(String)
@@ -63,6 +120,18 @@ public enum BossSettingsCodec {
             function: BmapFunction(block: block, rawValue: functionRaw),
             operator: operatorValue,
             payload: payload
+        )
+    }
+
+    public static func onHeadDetectionGetPacket() -> BmapPacket {
+        settingsPacket(functionRaw: onHeadDetectionFunctionRaw, operatorValue: .get)
+    }
+
+    public static func onHeadDetectionSetGetPacket(_ value: BossOnHeadDetectionValue) -> BmapPacket {
+        settingsPacket(
+            functionRaw: onHeadDetectionFunctionRaw,
+            operatorValue: .setGet,
+            payload: encodeOnHeadDetection(value)
         )
     }
 
@@ -110,6 +179,15 @@ public enum BossSettingsCodec {
             isAutoAnswerEnabled: (flags & 0x04) == 0x04 ? ((values & 0x02) == 0x02) : nil,
             isAutoTransparencyEnabled: (flags & 0x08) == 0x08 ? ((values & 0x04) == 0x04) : nil
         )
+    }
+
+    public static func encodeOnHeadDetection(_ value: BossOnHeadDetectionValue) -> Data {
+        Data([
+            value.isEnabled ? 0x01 : 0x00,
+            (value.isAutoPlayEnabled == true ? 0x01 : 0x00) |
+                (value.isAutoAnswerEnabled == true ? 0x02 : 0x00) |
+                (value.isAutoTransparencyEnabled == true ? 0x04 : 0x00)
+        ])
     }
 
     private static func requireStatus(_ packet: BmapPacket) throws {
@@ -170,5 +248,15 @@ public struct BossSettingsSnapshot: Sendable {
             return nil
         }
         return try BossAudioModesCodec.parseVolumeControlStatus(from: packet)
+    }
+
+    public func deviceSettings() throws -> BossDeviceSettings {
+        try BossDeviceSettings(
+            wearDetection: onHeadDetection(),
+            autoAwareEnabled: autoAware(),
+            autoPlayPauseEnabled: autoPlayPause(),
+            autoAnswerEnabled: autoAnswer(),
+            volumeControl: volumeControl()
+        )
     }
 }

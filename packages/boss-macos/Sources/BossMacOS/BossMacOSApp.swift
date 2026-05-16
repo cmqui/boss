@@ -2,12 +2,12 @@ import AppKit
 import SwiftUI
 
 @main
-struct BossMacOSApp: App {
+struct BossApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var viewModel = BossMacOSViewModel()
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup("Boss") {
             ContentView(viewModel: viewModel)
                 .frame(minWidth: 760, minHeight: 560)
                 .onAppear {

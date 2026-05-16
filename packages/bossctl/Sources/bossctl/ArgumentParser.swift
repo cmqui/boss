@@ -107,6 +107,23 @@ struct ArgumentParser {
         }
     }
 
+    mutating func onHeadDetectionPatch() throws -> BossOnHeadDetectionPatch {
+        let isEnabled = try optionalBool(for: "--enabled")
+        let isAutoPlayEnabled = try optionalBool(for: "--auto-play")
+        let isAutoAnswerEnabled = try optionalBool(for: "--auto-answer")
+        let isAutoTransparencyEnabled = try optionalBool(for: "--auto-transparency")
+        let patch = BossOnHeadDetectionPatch(
+            isEnabled: isEnabled,
+            isAutoPlayEnabled: isAutoPlayEnabled,
+            isAutoAnswerEnabled: isAutoAnswerEnabled,
+            isAutoTransparencyEnabled: isAutoTransparencyEnabled
+        )
+        guard !patch.isEmpty else {
+            throw UsageError("Specify at least one on-head-detection option")
+        }
+        return patch
+    }
+
     mutating func audioModeSettingsConfigUpdate() throws -> BossAudioModeSettingsConfigPatch {
         let cncLevel = try optionalInt(for: "--cnc")
         if let cncLevel, !(0...10).contains(cncLevel) {

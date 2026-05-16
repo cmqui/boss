@@ -18,6 +18,8 @@ struct SettingsCommand {
             let key = args.removeFirst()
             let connection = try ConnectionOptions.parse(arguments: args)
             switch key {
+            case "all":
+                return SettingsCommand(connection: connection, action: .getAll)
             case "standby-timer":
                 return SettingsCommand(connection: connection, action: .getStandbyTimer)
             case "auto-aware":
@@ -46,6 +48,10 @@ struct SettingsCommand {
                 let enabled = try parser.requiredBool(for: "--enabled")
                 let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
                 return SettingsCommand(connection: connection, action: .setAutoAware(enabled))
+            case "on-head-detection":
+                let patch = try parser.onHeadDetectionPatch()
+                let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
+                return SettingsCommand(connection: connection, action: .setOnHeadDetection(patch))
             case "auto-play-pause":
                 let enabled = try parser.requiredBool(for: "--enabled")
                 let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
@@ -68,11 +74,13 @@ struct SettingsCommand {
 }
 
 enum SettingsAction {
+    case getAll
     case getStandbyTimer
     case setStandbyTimer(Int)
     case getAutoAware
     case setAutoAware(Bool)
     case getOnHeadDetection
+    case setOnHeadDetection(BossOnHeadDetectionPatch)
     case getAutoPlayPause
     case setAutoPlayPause(Bool)
     case getAutoAnswer

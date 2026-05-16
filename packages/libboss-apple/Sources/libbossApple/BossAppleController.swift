@@ -48,6 +48,7 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
     case responseStreamEnded
     case responseTimedOut(seconds: Int64)
     case bmapErrorResponse(context: String, payloadHex: String)
+    case unsupportedOperation(String)
     case modeChangeNotObserved(targetIndex: Int, observedIndex: Int)
     case settingsConfigNotObserved(expected: String, observed: String)
     case noFreeCustomAudioModeSlot
@@ -72,6 +73,8 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
                 return "bmapErrorResponse(context: \"\(context)\", payloadHex: \"\(payloadHex)\", code: \(code.description))"
             }
             return "bmapErrorResponse(context: \"\(context)\", payloadHex: \"\(payloadHex)\")"
+        case .unsupportedOperation(let message):
+            return "unsupportedOperation(\"\(message)\")"
         case .modeChangeNotObserved(let targetIndex, let observedIndex):
             return "modeChangeNotObserved(targetIndex: \(targetIndex), observedIndex: \(observedIndex))"
         case .settingsConfigNotObserved(let expected, let observed):
@@ -105,6 +108,102 @@ public enum BossAppleCurrentAudioModeWriteResult: Sendable, Equatable {
     case verificationInconclusive(targetIndex: Int)
 }
 
+public enum BossAppleSettingSource: String, Sendable, Equatable {
+    case snapshot
+    case compositeSnapshot
+    case directGet
+}
+
+public enum BossAppleSettingUnavailableReason: Sendable, Equatable, CustomStringConvertible {
+    case missingFromSnapshot
+    case timedOut
+    case responseStreamEnded
+    case functionUnsupported
+    case operatorUnsupported
+    case dataUnavailable
+    case insecureTransport
+    case unexpectedStreamTermination
+    case bmapError(BmapErrorCode?)
+
+    public var description: String {
+        switch self {
+        case .missingFromSnapshot:
+            return "missing from snapshot"
+        case .timedOut:
+            return "timed out"
+        case .responseStreamEnded:
+            return "response stream ended"
+        case .functionUnsupported:
+            return "function unsupported"
+        case .operatorUnsupported:
+            return "operator unsupported"
+        case .dataUnavailable:
+            return "data unavailable"
+        case .insecureTransport:
+            return "insecure transport"
+        case .unexpectedStreamTermination:
+            return "unexpected stream termination"
+        case .bmapError(let code):
+            if let code {
+                return "BMAP error: \(code.description)"
+            }
+            return "unknown BMAP error"
+        }
+    }
+}
+
+public struct BossAppleObservedSetting<Value: Sendable & Equatable>: Sendable, Equatable {
+    public let value: Value?
+    public let source: BossAppleSettingSource?
+    public let unavailableReason: BossAppleSettingUnavailableReason?
+
+    public init(
+        value: Value?,
+        source: BossAppleSettingSource? = nil,
+        unavailableReason: BossAppleSettingUnavailableReason? = nil
+    ) {
+        self.value = value
+        self.source = source
+        self.unavailableReason = unavailableReason
+    }
+
+    public var isAvailable: Bool {
+        value != nil
+    }
+}
+
+public struct BossAppleDeviceSettingsReport: Sendable, Equatable {
+    public let wearDetection: BossAppleObservedSetting<BossOnHeadDetectionValue>
+    public let autoAwareEnabled: BossAppleObservedSetting<Bool>
+    public let autoPlayPauseEnabled: BossAppleObservedSetting<Bool>
+    public let autoAnswerEnabled: BossAppleObservedSetting<Bool>
+    public let volumeControl: BossAppleObservedSetting<BossVolumeControlStatus>
+
+    public init(
+        wearDetection: BossAppleObservedSetting<BossOnHeadDetectionValue>,
+        autoAwareEnabled: BossAppleObservedSetting<Bool>,
+        autoPlayPauseEnabled: BossAppleObservedSetting<Bool>,
+        autoAnswerEnabled: BossAppleObservedSetting<Bool>,
+        volumeControl: BossAppleObservedSetting<BossVolumeControlStatus>
+    ) {
+        self.wearDetection = wearDetection
+        self.autoAwareEnabled = autoAwareEnabled
+        self.autoPlayPauseEnabled = autoPlayPauseEnabled
+        self.autoAnswerEnabled = autoAnswerEnabled
+        self.volumeControl = volumeControl
+    }
+
+    public var settings: BossDeviceSettings {
+        BossDeviceSettings(
+            wearDetection: wearDetection.value,
+            autoAwareEnabled: autoAwareEnabled.value,
+            autoPlayPauseEnabled: autoPlayPauseEnabled.value,
+            autoAnswerEnabled: autoAnswerEnabled.value,
+            volumeControl: volumeControl.value
+        )
+    }
+}
+
 public struct BossAppleController: Sendable {
     public let connection: BossAppleConnectionOptions
 
@@ -121,6 +220,249 @@ public struct BossAppleController: Sendable {
     public func bootstrap() async throws -> BootstrappedDevice {
         try await withConnectedLink { link in
             try await BootstrapSession(link: link).bootstrap()
+        }
+    }
+
+    public func settingsSnapshot() async throws -> BossSettingsSnapshot {
+        try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            try await Self.awaitSettingsSnapshot(on: link, timeout: .seconds(5))
+        }
+    }
+
+    public func deviceSettings() async throws -> BossDeviceSettings {
+        try await deviceSettingsReport().settings
+    }
+
+    public func deviceSettingsReport() async throws -> BossAppleDeviceSettingsReport {
+        let secureReadConnection = connection.securePreferred
+        return try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            let snapshot = try await Self.awaitSettingsSnapshot(on: link, timeout: .seconds(5))
+            let wearDetection = try await Self.observedWearDetection(
+                from: snapshot,
+                fallbackConnection: secureReadConnection,
+                timeout: .seconds(5)
+            )
+            let autoAwareEnabled = try await Self.observedEnabledSetting(
+                functionRaw: BossSettingsCodec.autoAwareFunctionRaw,
+                snapshotValue: try snapshot.autoAware(),
+                snapshotPacketExists: snapshot.packet(functionRaw: BossSettingsCodec.autoAwareFunctionRaw) != nil,
+                fallbackConnection: secureReadConnection,
+                timeout: .seconds(5)
+            )
+            let autoPlayPauseEnabled = try await Self.observedEnabledSetting(
+                functionRaw: BossSettingsCodec.autoPlayPauseFunctionRaw,
+                snapshotValue: try snapshot.autoPlayPause(),
+                snapshotPacketExists: snapshot.packet(functionRaw: BossSettingsCodec.autoPlayPauseFunctionRaw) != nil,
+                fallbackConnection: secureReadConnection,
+                timeout: .seconds(5)
+            )
+            let autoAnswerEnabled = try await Self.observedAutoAnswer(
+                from: snapshot,
+                fallbackConnection: secureReadConnection,
+                timeout: .seconds(5)
+            )
+            let volumeControl = try await Self.observedVolumeControl(
+                from: snapshot,
+                fallbackConnection: secureReadConnection,
+                timeout: .seconds(5)
+            )
+
+            return BossAppleDeviceSettingsReport(
+                wearDetection: wearDetection,
+                autoAwareEnabled: autoAwareEnabled,
+                autoPlayPauseEnabled: autoPlayPauseEnabled,
+                autoAnswerEnabled: autoAnswerEnabled,
+                volumeControl: volumeControl
+            )
+        }
+    }
+
+    public func standbyTimer() async throws -> BossStandbyTimerValue? {
+        try await settingsSnapshot().standbyTimer()
+    }
+
+    public func setStandbyTimer(minutes: Int) async throws -> BossStandbyTimerValue {
+        try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            let response = try await Self.sendAndAwaitSameFunction(
+                packet: BossSettingsCodec.settingsPacket(
+                    functionRaw: BossSettingsCodec.standbyTimerFunctionRaw,
+                    operatorValue: .setGet,
+                    payload: BossSettingsCodec.encodeStandbyTimerMinutes(minutes)
+                ),
+                on: link,
+                timeout: .seconds(5)
+            )
+            return try BossSettingsCodec.parseStandbyTimer(from: response)
+        }
+    }
+
+    public func autoAware() async throws -> Bool? {
+        if let value = try await settingsSnapshot().autoAware() {
+            return value
+        }
+        return try await Self.readEnabledSetting(
+            functionRaw: BossSettingsCodec.autoAwareFunctionRaw,
+            connection: connection.securePreferred
+        )
+    }
+
+    public func setAutoAware(_ enabled: Bool) async throws -> Bool {
+        try await Self.setEnabledSetting(
+            functionRaw: BossSettingsCodec.autoAwareFunctionRaw,
+            enabled: enabled,
+            connection: connection.securePreferred
+        )
+    }
+
+    public func onHeadDetection() async throws -> BossOnHeadDetectionValue? {
+        if let value = try await settingsSnapshot().onHeadDetection() {
+            return value
+        }
+        return try await Self.readOnHeadDetection(connection: connection.securePreferred)
+    }
+
+    public func wearDetection() async throws -> BossOnHeadDetectionValue? {
+        try await onHeadDetection()
+    }
+
+    public func setWearDetection(_ value: BossOnHeadDetectionValue) async throws -> BossOnHeadDetectionValue {
+        try await Self.withConnectedLinkRetrying(connection.securePreferred, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            let response = try await Self.sendAndAwaitSameFunction(
+                packet: BossSettingsCodec.onHeadDetectionSetGetPacket(value),
+                on: link,
+                timeout: .seconds(5)
+            )
+            return try BossSettingsCodec.parseOnHeadDetection(from: response)
+        }
+    }
+
+    public func setWearDetection(_ patch: BossOnHeadDetectionPatch) async throws -> BossOnHeadDetectionValue {
+        guard !patch.isEmpty else {
+            guard let current = try await wearDetection() else {
+                throw BossAppleControlError.unsupportedOperation("Wear detection is not exposed by this device/session")
+            }
+            return current
+        }
+
+        do {
+            let current = try await wearDetection() ?? BossOnHeadDetectionValue(
+                isEnabled: false,
+                isAutoPlayEnabled: nil,
+                isAutoAnswerEnabled: nil,
+                isAutoTransparencyEnabled: nil
+            )
+            return try await setWearDetection(patch.merged(with: current))
+        } catch {
+            guard Self.isCompositeInPlaceDetectionUnsupported(error) else {
+                throw error
+            }
+        }
+
+        guard patch.isEnabled == nil else {
+            throw BossAppleControlError.unsupportedOperation(
+                "This device does not expose the master wear-detection toggle over BMAP; only auto-play, auto-answer, and auto-transparency subsettings are writable"
+            )
+        }
+
+        throw BossAppleControlError.unsupportedOperation(
+            "This device does not expose a composite wear-detection state over BMAP; use updateWearDetectionRelatedSettings(_:) for subordinate auto-play, auto-answer, and auto-transparency writes"
+        )
+    }
+
+    public func updateWearDetectionRelatedSettings(_ patch: BossOnHeadDetectionPatch) async throws -> BossAppleDeviceSettingsReport {
+        if patch.isEmpty {
+            return try await deviceSettingsReport()
+        }
+        do {
+            let current = try await wearDetection() ?? BossOnHeadDetectionValue(
+                isEnabled: false,
+                isAutoPlayEnabled: nil,
+                isAutoAnswerEnabled: nil,
+                isAutoTransparencyEnabled: nil
+            )
+            _ = try await setWearDetection(patch.merged(with: current))
+            return try await deviceSettingsReport()
+        } catch {
+            guard Self.isCompositeInPlaceDetectionUnsupported(error) else {
+                throw error
+            }
+        }
+
+        guard patch.isEnabled == nil else {
+            throw BossAppleControlError.unsupportedOperation(
+                "This device does not expose the master wear-detection toggle over BMAP; only auto-play, auto-answer, and auto-transparency subsettings are writable"
+            )
+        }
+
+        if let enabled = patch.isAutoPlayEnabled {
+            _ = try await setAutoPlayPause(enabled)
+        }
+        if let enabled = patch.isAutoAnswerEnabled {
+            _ = try await setAutoAnswer(enabled)
+        }
+        if let enabled = patch.isAutoTransparencyEnabled {
+            do {
+                _ = try await setAutoAware(enabled)
+            } catch {
+                if Self.isCompositeInPlaceDetectionUnsupported(error) || Self.isUnavailableSettingReadError(error) {
+                    throw BossAppleControlError.unsupportedOperation(
+                        "Auto-transparency is not exposed by this device/session over the standalone auto-aware setting path"
+                    )
+                }
+                throw error
+            }
+        }
+
+        return try await deviceSettingsReport()
+    }
+
+    public func setWearDetectionEnabled(_ enabled: Bool) async throws -> BossOnHeadDetectionValue {
+        try await setWearDetection(BossOnHeadDetectionPatch(isEnabled: enabled))
+    }
+
+    public func autoPlayPause() async throws -> Bool? {
+        try await settingsSnapshot().autoPlayPause()
+    }
+
+    public func setAutoPlayPause(_ enabled: Bool) async throws -> Bool {
+        try await Self.setEnabledSetting(
+            functionRaw: BossSettingsCodec.autoPlayPauseFunctionRaw,
+            enabled: enabled,
+            connection: connection
+        )
+    }
+
+    public func autoAnswer() async throws -> Bool? {
+        try await settingsSnapshot().autoAnswer()
+    }
+
+    public func setAutoAnswer(_ enabled: Bool) async throws -> Bool {
+        try await Self.setEnabledSetting(
+            functionRaw: BossSettingsCodec.autoAnswerFunctionRaw,
+            enabled: enabled,
+            connection: connection
+        )
+    }
+
+    public func volumeControl() async throws -> BossVolumeControlStatus? {
+        if let value = try await settingsSnapshot().volumeControl() {
+            return value
+        }
+        return try await Self.readVolumeControl(connection: connection.securePreferred)
+    }
+
+    public func setVolumeControl(_ value: BossVolumeControlValue) async throws -> BossVolumeControlStatus {
+        try await Self.withConnectedLinkRetrying(connection.securePreferred, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
+            let response = try await Self.sendAndAwaitSameFunction(
+                packet: BossSettingsCodec.settingsPacket(
+                    functionRaw: BossSettingsCodec.volumeControlFunctionRaw,
+                    operatorValue: .setGet,
+                    payload: Data([value.rawValue])
+                ),
+                on: link,
+                timeout: .seconds(5)
+            )
+            return try BossAudioModesCodec.parseVolumeControlStatus(from: response)
         }
     }
 
@@ -402,6 +744,48 @@ public struct BossAppleController: Sendable {
 }
 
 extension BossAppleController {
+    static func awaitSettingsSnapshot(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossSettingsSnapshot {
+        try await link.send(packet: BossSettingsCodec.settingsPacket(
+            functionRaw: BossSettingsCodec.settingsGetAllFunctionRaw,
+            operatorValue: .start
+        ))
+        return try await withThrowingTaskGroup(of: BossSettingsSnapshot.self) { group in
+            group.addTask {
+                var snapshot: [UInt8: BmapPacket] = [:]
+                for try await packet in link.packets {
+                    guard packet.functionBlock == .settings else {
+                        continue
+                    }
+                    let rawFunction = packet.function.rawValue
+                    if rawFunction == BossSettingsCodec.settingsGetAllFunctionRaw, packet.operator == .error {
+                        throw BossAppleControlError.bmapErrorResponse(
+                            context: "settings.SettingsGetAll",
+                            payloadHex: hexString(packet.payload)
+                        )
+                    }
+                    if rawFunction == BossSettingsCodec.settingsGetAllFunctionRaw, packet.operator == .result {
+                        return BossSettingsSnapshot(packetsByFunctionRaw: snapshot)
+                    }
+                    guard packet.operator == .status else {
+                        continue
+                    }
+                    snapshot[rawFunction] = packet
+                }
+                throw BossAppleControlError.responseStreamEnded
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                throw BossAppleControlError.responseTimedOut(seconds: timeout.components.seconds)
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
     static func withConnectedLink<T: Sendable>(
         _ options: BossAppleConnectionOptions,
         operation: @escaping @Sendable (BleBmapLink) async throws -> T
@@ -763,6 +1147,193 @@ extension BossAppleController {
         let response = try await sendAndAwaitSameFunction(packet: packet, on: link, timeout: timeout)
         return try BossAudioModesCodec.parseFavorites(from: response)
     }
+
+    static func observedWearDetection(
+        from snapshot: BossSettingsSnapshot,
+        fallbackConnection: BossAppleConnectionOptions,
+        timeout: Duration
+    ) async throws -> BossAppleObservedSetting<BossOnHeadDetectionValue> {
+        if let value = try snapshot.onHeadDetection() {
+            return BossAppleObservedSetting(value: value, source: .snapshot)
+        }
+        return try await observeSettingAfterDirectRead(
+            initialUnavailableReason: .missingFromSnapshot,
+            read: {
+                try await readOnHeadDetection(connection: fallbackConnection, timeout: timeout)
+            }
+        )
+    }
+
+    static func observedEnabledSetting(
+        functionRaw: UInt8,
+        snapshotValue: Bool?,
+        snapshotPacketExists: Bool,
+        fallbackConnection: BossAppleConnectionOptions,
+        timeout: Duration
+    ) async throws -> BossAppleObservedSetting<Bool> {
+        if let snapshotValue {
+            return BossAppleObservedSetting(value: snapshotValue, source: .snapshot)
+        }
+        return try await observeSettingAfterDirectRead(
+            initialUnavailableReason: snapshotPacketExists ? .dataUnavailable : .missingFromSnapshot,
+            read: {
+                try await readEnabledSetting(
+                    functionRaw: functionRaw,
+                    connection: fallbackConnection,
+                    timeout: timeout
+                )
+            }
+        )
+    }
+
+    static func observedAutoAnswer(
+        from snapshot: BossSettingsSnapshot,
+        fallbackConnection: BossAppleConnectionOptions,
+        timeout: Duration
+    ) async throws -> BossAppleObservedSetting<Bool> {
+        if let packet = snapshot.packet(functionRaw: BossSettingsCodec.autoAnswerFunctionRaw) {
+            return BossAppleObservedSetting(
+                value: try BossSettingsCodec.parseEnabledFlag(from: packet),
+                source: .snapshot
+            )
+        }
+        if let derived = try snapshot.onHeadDetection()?.isAutoAnswerEnabled {
+            return BossAppleObservedSetting(value: derived, source: .compositeSnapshot)
+        }
+        return try await observeSettingAfterDirectRead(
+            initialUnavailableReason: .missingFromSnapshot,
+            read: {
+                try await readEnabledSetting(
+                    functionRaw: BossSettingsCodec.autoAnswerFunctionRaw,
+                    connection: fallbackConnection,
+                    timeout: timeout
+                )
+            }
+        )
+    }
+
+    static func observedVolumeControl(
+        from snapshot: BossSettingsSnapshot,
+        fallbackConnection: BossAppleConnectionOptions,
+        timeout: Duration
+    ) async throws -> BossAppleObservedSetting<BossVolumeControlStatus> {
+        if let value = try snapshot.volumeControl() {
+            return BossAppleObservedSetting(value: value, source: .snapshot)
+        }
+        return try await observeSettingAfterDirectRead(
+            initialUnavailableReason: .missingFromSnapshot,
+            read: {
+                try await readVolumeControl(connection: fallbackConnection, timeout: timeout)
+            }
+        )
+    }
+
+    static func observeSettingAfterDirectRead<Value: Sendable & Equatable>(
+        initialUnavailableReason: BossAppleSettingUnavailableReason,
+        read: @escaping @Sendable () async throws -> Value?
+    ) async throws -> BossAppleObservedSetting<Value> {
+        do {
+            if let value = try await read() {
+                return BossAppleObservedSetting(value: value, source: .directGet)
+            }
+            return BossAppleObservedSetting(value: nil, unavailableReason: initialUnavailableReason)
+        } catch {
+            if let reason = unavailableSettingReason(error) {
+                return BossAppleObservedSetting(value: nil, unavailableReason: reason)
+            }
+            throw error
+        }
+    }
+
+    static func readOnHeadDetection(
+        connection: BossAppleConnectionOptions,
+        timeout: Duration = .seconds(5)
+    ) async throws -> BossOnHeadDetectionValue? {
+        try await withConnectedLinkRetrying(connection, shouldRetry: retrySecureCharacteristicIfNeeded) { link in
+            try await onHeadDetectionIfAvailable(on: link, timeout: timeout)
+        }
+    }
+
+    static func readEnabledSetting(
+        functionRaw: UInt8,
+        connection: BossAppleConnectionOptions,
+        timeout: Duration = .seconds(5)
+    ) async throws -> Bool? {
+        try await withConnectedLinkRetrying(connection, shouldRetry: retrySecureCharacteristicIfNeeded) { link in
+            try await enabledSettingIfAvailable(functionRaw: functionRaw, on: link, timeout: timeout)
+        }
+    }
+
+    static func readVolumeControl(
+        connection: BossAppleConnectionOptions,
+        timeout: Duration = .seconds(5)
+    ) async throws -> BossVolumeControlStatus? {
+        try await withConnectedLinkRetrying(connection, shouldRetry: retrySecureCharacteristicIfNeeded) { link in
+            try await volumeControlIfAvailable(on: link, timeout: timeout)
+        }
+    }
+
+    static func onHeadDetectionIfAvailable(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossOnHeadDetectionValue? {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossSettingsCodec.onHeadDetectionGetPacket(),
+            on: link,
+            timeout: timeout
+        )
+        return try BossSettingsCodec.parseOnHeadDetection(from: response)
+    }
+
+    static func enabledSettingIfAvailable(
+        functionRaw: UInt8,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> Bool? {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossSettingsCodec.settingsPacket(
+                functionRaw: functionRaw,
+                operatorValue: .get
+            ),
+            on: link,
+            timeout: timeout
+        )
+        return try BossSettingsCodec.parseEnabledFlag(from: response)
+    }
+
+    static func volumeControlIfAvailable(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossVolumeControlStatus? {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossSettingsCodec.settingsPacket(
+                functionRaw: BossSettingsCodec.volumeControlFunctionRaw,
+                operatorValue: .get
+            ),
+            on: link,
+            timeout: timeout
+        )
+        return try BossAudioModesCodec.parseVolumeControlStatus(from: response)
+    }
+
+    static func setEnabledSetting(
+        functionRaw: UInt8,
+        enabled: Bool,
+        connection: BossAppleConnectionOptions
+    ) async throws -> Bool {
+        try await withConnectedLinkRetrying(connection, shouldRetry: retrySecureCharacteristicIfNeeded) { link in
+            let response = try await sendAndAwaitSameFunction(
+                packet: BossSettingsCodec.settingsPacket(
+                    functionRaw: functionRaw,
+                    operatorValue: .setGet,
+                    payload: Data([enabled ? 0x01 : 0x00])
+                ),
+                on: link,
+                timeout: .seconds(5)
+            )
+            return try BossSettingsCodec.parseEnabledFlag(from: response)
+        }
+    }
 }
 
 extension BossAppleController {
@@ -893,6 +1464,52 @@ extension BossAppleController {
             }
         }
         return false
+    }
+
+    static func isCompositeInPlaceDetectionUnsupported(_ error: Error) -> Bool {
+        guard let error = unavailableSettingReason(error) else {
+            return false
+        }
+        switch error {
+        case .functionUnsupported, .operatorUnsupported:
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func unavailableSettingReason(_ error: Error) -> BossAppleSettingUnavailableReason? {
+        if let error = error as? BossAppleControlError {
+            switch error {
+            case .responseTimedOut:
+                return .timedOut
+            case .responseStreamEnded:
+                return .responseStreamEnded
+            case .bmapErrorResponse(_, let payloadHex):
+                switch bmapErrorCode(from: payloadHex) {
+                case .fblockNotSupp?, .funcNotSupp?:
+                    return .functionUnsupported
+                case .opNotSupp?:
+                    return .operatorUnsupported
+                case .dataUnavailable?:
+                    return .dataUnavailable
+                case .insecureTransport?:
+                    return .insecureTransport
+                case let code:
+                    return .bmapError(code)
+                }
+            default:
+                return nil
+            }
+        }
+        if let error = error as? BossLinkError, error == .unexpectedStreamTermination {
+            return .unexpectedStreamTermination
+        }
+        return nil
+    }
+
+    static func isUnavailableSettingReadError(_ error: Error) -> Bool {
+        unavailableSettingReason(error) != nil
     }
 
     static func bmapErrorCode(from payloadHex: String) -> BmapErrorCode? {

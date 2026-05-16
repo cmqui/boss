@@ -8,8 +8,8 @@ let package = Package(
     ],
     products: [
         .executable(
-            name: "boss-macos",
-            targets: ["BossMacOS"]
+            name: "Boss",
+            targets: ["Boss"]
         ),
     ],
     dependencies: [
@@ -18,11 +18,12 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "BossMacOS",
+            name: "Boss",
             dependencies: [
                 .product(name: "libboss", package: "libboss"),
                 .product(name: "libbossApple", package: "libboss-apple"),
-            ]
+            ],
+            path: "Sources/BossMacOS"
         ),
     ]
 )

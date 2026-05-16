@@ -18,6 +18,13 @@ final class BossMacOSViewModel: ObservableObject {
     @Published private(set) var customProfileModes: [BossAudioModeConfig] = []
     @Published private(set) var currentAudioModeIndex: Int?
     @Published private(set) var settings: BossAudioModeSettingsConfig?
+    @Published private(set) var deviceName = "Bose Device"
+    @Published private(set) var deviceVariantName: String?
+    @Published private(set) var wearDetectionEnabled: Bool?
+    @Published private(set) var autoAwareEnabled: Bool?
+    @Published private(set) var autoPlayPauseEnabled: Bool?
+    @Published private(set) var autoAnswerEnabled: Bool?
+    @Published private(set) var volumeControlValue: BossVolumeControlValue?
     @Published private(set) var lastResultMessage: String?
     @Published private(set) var hasDetachedSettingsDraft = false
     @Published var isPresentingSaveProfilePrompt = false
@@ -63,7 +70,7 @@ final class BossMacOSViewModel: ObservableObject {
         settings != nil && hasDetachedSettingsDraft && hasAvailableCustomProfileSlot && !isBusy
     }
 
-    var visibleSidebarModes: [BossAudioModeConfig] {
+    var selectableAudioModes: [BossAudioModeConfig] {
         audioModes.filter { mode in
             if mode.userConfigurable {
                 return mode.userConfigured && hasCustomProfileName(mode)
@@ -209,6 +216,96 @@ final class BossMacOSViewModel: ObservableObject {
         noteManualSettingsEdit()
     }
 
+    func setWearDetectionEnabled(_ enabled: Bool) {
+        guard let previousValue = wearDetectionEnabled else {
+            return
+        }
+        wearDetectionEnabled = enabled
+        run("Updating Wear Detection") {
+            let controller = self.makeController()
+            do {
+                _ = try await controller.setWearDetectionEnabled(enabled)
+                try await self.reloadState(using: controller)
+                self.lastResultMessage = "Wear detection updated"
+            } catch {
+                self.wearDetectionEnabled = previousValue
+                throw error
+            }
+        }
+    }
+
+    func setAutoAwareEnabled(_ enabled: Bool) {
+        guard let previousValue = autoAwareEnabled else {
+            return
+        }
+        autoAwareEnabled = enabled
+        run("Updating Auto-Aware") {
+            let controller = self.makeController()
+            do {
+                _ = try await controller.setAutoAware(enabled)
+                try await self.reloadState(using: controller)
+                self.lastResultMessage = "Auto-Aware updated"
+            } catch {
+                self.autoAwareEnabled = previousValue
+                throw error
+            }
+        }
+    }
+
+    func setAutoPlayPauseEnabled(_ enabled: Bool) {
+        guard let previousValue = autoPlayPauseEnabled else {
+            return
+        }
+        autoPlayPauseEnabled = enabled
+        run("Updating Auto-Play/Pause") {
+            let controller = self.makeController()
+            do {
+                _ = try await controller.setAutoPlayPause(enabled)
+                try await self.reloadState(using: controller)
+                self.lastResultMessage = "Auto-Play/Pause updated"
+            } catch {
+                self.autoPlayPauseEnabled = previousValue
+                throw error
+            }
+        }
+    }
+
+    func setAutoAnswerEnabled(_ enabled: Bool) {
+        guard let previousValue = autoAnswerEnabled else {
+            return
+        }
+        autoAnswerEnabled = enabled
+        run("Updating Auto-Answer") {
+            let controller = self.makeController()
+            do {
+                _ = try await controller.setAutoAnswer(enabled)
+                try await self.reloadState(using: controller)
+                self.lastResultMessage = "Auto-Answer updated"
+            } catch {
+                self.autoAnswerEnabled = previousValue
+                throw error
+            }
+        }
+    }
+
+    func setVolumeControl(_ value: BossVolumeControlValue) {
+        guard let previousValue = volumeControlValue else {
+            return
+        }
+        volumeControlValue = value
+        run("Updating Volume Control") {
+            let controller = self.makeController()
+            do {
+                _ = try await controller.setVolumeControl(value)
+                try await self.reloadState(using: controller)
+                self.lastResultMessage = "Volume control updated"
+            } catch {
+                self.volumeControlValue = previousValue
+                throw error
+            }
+        }
+    }
+
     private func makeController() -> BossAppleController {
         let trimmedNameFilter = nameFilter.trimmingCharacters(in: .whitespacesAndNewlines)
         return BossAppleController(
@@ -220,15 +317,20 @@ final class BossMacOSViewModel: ObservableObject {
     }
 
     private func reloadState(using controller: BossAppleController) async throws {
+        async let bootstrappedDevice = controller.bootstrap()
         async let modes = controller.audioModeConfigs()
         async let currentMode = controller.currentAudioMode()
         async let settings = controller.audioModeSettings()
-        let snapshot = try await (modes, currentMode, settings)
-        audioModes = snapshot.0
-        customProfileModes = snapshot.0.filter(\.userConfigurable)
-        currentAudioModeIndex = snapshot.1
-        selectedAudioModeIndex = snapshot.1
-        applySettingsSnapshot(snapshot.2)
+        async let deviceSettings = controller.deviceSettings()
+        let snapshot = try await (bootstrappedDevice, modes, currentMode, settings, deviceSettings)
+        deviceName = snapshot.0.productName
+        deviceVariantName = snapshot.0.productVariant.variantName
+        audioModes = snapshot.1
+        customProfileModes = snapshot.1.filter(\.userConfigurable)
+        currentAudioModeIndex = snapshot.2
+        selectedAudioModeIndex = snapshot.2
+        applySettingsSnapshot(snapshot.3)
+        applyDeviceSettings(snapshot.4)
         supportedPrompts = await loadSupportedPrompts(using: controller)
         hasDetachedSettingsDraft = false
     }
@@ -251,6 +353,14 @@ final class BossMacOSViewModel: ObservableObject {
         spatialAudioMode = config.spatialAudioMode
         windBlockEnabled = config.windBlockEnabled
         ancToggleEnabled = config.ancToggleEnabled
+    }
+
+    private func applyDeviceSettings(_ deviceSettings: BossDeviceSettings) {
+        wearDetectionEnabled = deviceSettings.wearDetection?.isEnabled
+        autoAwareEnabled = deviceSettings.autoAwareEnabled
+        autoPlayPauseEnabled = deviceSettings.autoPlayPauseEnabled ?? deviceSettings.wearDetection?.isAutoPlayEnabled
+        autoAnswerEnabled = deviceSettings.autoAnswerEnabled ?? deviceSettings.wearDetection?.isAutoAnswerEnabled
+        volumeControlValue = deviceSettings.volumeControl?.value
     }
 
     private func noteManualSettingsEdit() {
@@ -340,9 +450,11 @@ final class BossMacOSViewModel: ObservableObject {
 
     private func run(_ label: String, operation: @escaping () async throws -> Void) {
         guard !isBusy else {
+            Self.log("Ignoring operation while busy: \(label)")
             return
         }
 
+        Self.log("Starting: \(label)")
         loadState = .loading(label)
         lastResultMessage = nil
 
@@ -350,8 +462,11 @@ final class BossMacOSViewModel: ObservableObject {
             do {
                 try await operation()
                 loadState = .ready
+                Self.log("Completed: \(label)")
             } catch {
-                loadState = .failed(Self.describe(error))
+                let description = Self.describe(error)
+                loadState = .failed(description)
+                Self.log("Failed: \(label) | \(description)")
             }
         }
     }
@@ -362,5 +477,9 @@ final class BossMacOSViewModel: ObservableObject {
             return description
         }
         return String(describing: error)
+    }
+
+    private static func log(_ message: String) {
+        fputs("[boss-macos] \(message)\n", stderr)
     }
 }

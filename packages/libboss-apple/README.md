@@ -49,10 +49,31 @@ let device = try await controller.bootstrap()
 let modes = try await controller.displayableAudioModes()
 let currentMode = try await controller.currentAudioMode()
 let settings = try await controller.audioModeSettings()
+let deviceSettings = try await controller.deviceSettings()
 
 let result = try await controller.setAudioModeSettings(
     BossAudioModeSettingsConfigPatch(cncLevel: 5, spatialAudioMode: .off)
 )
+
+let wearDetection = try await controller.wearDetection()
+let updatedWearDetection = try await controller.setWearDetection(
+    BossOnHeadDetectionPatch(
+        isEnabled: true,
+        isAutoPlayEnabled: true
+    )
+)
+
+let autoAware = try await controller.autoAware()
+let updatedAutoAware = try await controller.setAutoAware(false)
+
+let autoPlayPause = try await controller.autoPlayPause()
+let updatedAutoPlayPause = try await controller.setAutoPlayPause(false)
+
+let autoAnswer = try await controller.autoAnswer()
+let updatedAutoAnswer = try await controller.setAutoAnswer(false)
+
+let volumeControl = try await controller.volumeControl()
+let updatedVolumeControl = try await controller.setVolumeControl(.captouch)
 ```
 
 Convenience wrappers are available for the common GUI controls:

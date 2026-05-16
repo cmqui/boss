@@ -114,6 +114,50 @@ struct BossctlCLI {
             }
 
         case .settings(let command):
+            switch command.action {
+            case .getAll:
+                let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
+                let report = try await controller.deviceSettingsReport()
+                printDeviceSettingsReport(report)
+                return
+
+            case .getVolumeControl:
+                let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
+                guard let status = try await controller.volumeControl() else {
+                    throw BossctlError.unsupportedSetting("volume-control")
+                }
+                print("Volume control: \(status.value.displayName)")
+                if let supportedValues = status.supportedValues, !supportedValues.isEmpty {
+                    print("Supported modes: \(supportedValues.map(\.displayName).joined(separator: ", "))")
+                }
+                return
+
+            case .setVolumeControl(let value):
+                let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
+                let status = try await controller.setVolumeControl(value)
+                print("Volume control updated: \(status.value.displayName)")
+                if let supportedValues = status.supportedValues, !supportedValues.isEmpty {
+                    print("Supported modes: \(supportedValues.map(\.displayName).joined(separator: ", "))")
+                }
+                return
+
+            case .setOnHeadDetection(let patch):
+                let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
+                printWearDetectionFallbackPaths(for: patch)
+                let report = try await controller.updateWearDetectionRelatedSettings(patch)
+                printWearDetectionSettingsReport(report)
+                return
+
+            case .getOnHeadDetection:
+                let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
+                let report = try await controller.deviceSettingsReport()
+                printWearDetectionSettingsReport(report)
+                return
+
+            default:
+                break
+            }
+
             let connection = settingsConnectionOptions(for: command.connection)
             try await withConnectedLinkRetrying(connection) { error, preference in
                 guard connection.characteristicPreference == .automatic,
@@ -130,6 +174,9 @@ struct BossctlCLI {
                 return false
             } operation: { link in
                 switch command.action {
+                case .getAll:
+                    fatalError("settings get all should have been handled before opening a raw link")
+
                 case .getStandbyTimer:
                     let snapshot = try await awaitSettingsSnapshot(on: link, timeout: .seconds(5))
                     guard let parsed = try snapshot.standbyTimer() else {
@@ -171,14 +218,7 @@ struct BossctlCLI {
                     print("Auto-aware updated: \(try BossSettingsCodec.parseEnabledFlag(from: response))")
 
                 case .getOnHeadDetection:
-                    let snapshot = try await awaitSettingsSnapshot(on: link, timeout: .seconds(5))
-                    guard let parsed = try snapshot.onHeadDetection() else {
-                        throw BossctlError.unsupportedSetting("on-head-detection")
-                    }
-                    print("On-head detection: \(parsed.isEnabled)")
-                    print("Auto-play: \(formatOptionalBool(parsed.isAutoPlayEnabled))")
-                    print("Auto-answer: \(formatOptionalBool(parsed.isAutoAnswerEnabled))")
-                    print("Auto-transparency: \(formatOptionalBool(parsed.isAutoTransparencyEnabled))")
+                    fatalError("settings get on-head-detection should have been handled before opening a raw link")
 
                 case .getAutoPlayPause:
                     let snapshot = try await awaitSettingsSnapshot(on: link, timeout: .seconds(5))
@@ -218,24 +258,8 @@ struct BossctlCLI {
                     )
                     print("Auto-answer updated: \(try BossSettingsCodec.parseEnabledFlag(from: response))")
 
-                case .getVolumeControl:
-                    let snapshot = try await awaitSettingsSnapshot(on: link, timeout: .seconds(5))
-                    guard let status = try snapshot.volumeControl() else {
-                        throw BossctlError.unsupportedSetting("volume-control")
-                    }
-                    print("Volume control: \(status.value.displayName)")
-
-                case .setVolumeControl(let value):
-                    let response = try await sendAndAwaitSameFunction(
-                        packet: BossSettingsCodec.settingsPacket(
-                            functionRaw: BossSettingsCodec.volumeControlFunctionRaw,
-                            operatorValue: .setGet,
-                            payload: Data([value.rawValue])
-                        ),
-                        on: link,
-                        timeout: .seconds(5)
-                    )
-                    print("Volume control updated: \(try BossAudioModesCodec.parseVolumeControlStatus(from: response).value.displayName)")
+                case .setOnHeadDetection, .getVolumeControl, .setVolumeControl:
+                    fatalError("controller-backed settings should have been handled before opening a raw link")
                 }
             }
 

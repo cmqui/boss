@@ -52,9 +52,11 @@ enum Command {
     static let usage = """
     Usage:
       bossctl bootstrap [connection options]
+      bossctl settings get all [connection options]
       bossctl settings get standby-timer|auto-aware|on-head-detection|auto-play-pause|auto-answer [connection options]
       bossctl settings set standby-timer --minutes <n> [connection options]
       bossctl settings set auto-aware --enabled <true|false> [connection options]
+      bossctl settings set on-head-detection [--enabled <true|false>] [--auto-play <true|false>] [--auto-answer <true|false>] [--auto-transparency <true|false>] [connection options]
       bossctl settings set auto-play-pause --enabled <true|false> [connection options]
       bossctl settings set auto-answer --enabled <true|false> [connection options]
       bossctl settings get volume-control [connection options]
