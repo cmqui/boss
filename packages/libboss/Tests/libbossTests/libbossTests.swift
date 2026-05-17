@@ -325,7 +325,11 @@ final class LibbossTests: XCTestCase {
             operator: .status,
             payload: Data([0x07])
         )
-        let transport = MockTransport(frames: [try BmapCodec.encode(packet)])
+        let transport = MockTransport(
+            frames: [try BmapCodec.encode(packet)],
+            initialDelay: .milliseconds(100),
+            finishStream: false
+        )
         let link = StreamBmapLink(transport: transport)
         let packetSession = BossPacketSession(link: link)
         defer { packetSession.invalidate() }
@@ -336,6 +340,7 @@ final class LibbossTests: XCTestCase {
 
         XCTAssertEqual(received, 7)
     }
+
 }
 
 private enum TestTimeoutError: Error {

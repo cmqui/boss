@@ -285,6 +285,17 @@ public actor BossSession {
         }
     }
 
+    public nonisolated func audioModeSettingsUpdateStream() -> AsyncThrowingStream<BossAudioModeSettingsConfig, Error> {
+        let packets = packetStream {
+            $0.functionBlock == .audioModes &&
+                $0.function.rawValue == BossAudioModesCodec.settingsConfigFunctionRaw &&
+                $0.operator == .status
+        }
+        return Self.mapStream(packets) { packet in
+            try BossAudioModesCodec.parseSettingsConfig(from: packet)
+        }
+    }
+
     public nonisolated func equalizerUpdateStream() -> AsyncThrowingStream<BossEqualizerSettings, Error> {
         let packets = packetStream {
             $0.functionBlock == .settings &&

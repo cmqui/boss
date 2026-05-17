@@ -55,6 +55,9 @@ final class BossMacOSViewModel: ObservableObject {
     private var hasStartedInitialRefresh = false
     private var discoveryTask: Task<Void, Never>?
     private var backgroundLoadTask: Task<Void, Never>?
+    private var currentModeUpdateTask: Task<Void, Never>?
+    private var settingsUpdateTask: Task<Void, Never>?
+    private var equalizerUpdateTask: Task<Void, Never>?
     private var session: BossAppleSession?
     private var selectedDeviceIdentifier: UUID?
     private var isManualDeviceSelection = false
@@ -598,13 +601,97 @@ final class BossMacOSViewModel: ObservableObject {
 
     private func startBackgroundLoad(using session: BossAppleSession) {
         cancelBackgroundLoad()
+        currentModeUpdateTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let updates = await session.currentAudioModeUpdateStream()
+                for try await currentAudioModeIndex in updates {
+                    guard !Task.isCancelled else {
+                        break
+                    }
+                    await MainActor.run {
+                        guard self.appScreen == .workspace else {
+                            return
+                        }
+                        self.currentAudioModeIndex = currentAudioModeIndex
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    guard self.appScreen == .workspace, !self.isBusy else {
+                        return
+                    }
+                    self.lastResultMessage = "Live mode updates paused: \(Self.describe(error))"
+                }
+            }
+        }
+
+        settingsUpdateTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let updates = await session.audioModeSettingsUpdateStream()
+                for try await config in updates {
+                    guard !Task.isCancelled else {
+                        break
+                    }
+                    await MainActor.run {
+                        guard self.appScreen == .workspace, !self.hasDetachedSettingsDraft else {
+                            return
+                        }
+                        self.applySettingsSnapshot(config)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    guard self.appScreen == .workspace, !self.isBusy else {
+                        return
+                    }
+                    self.lastResultMessage = "Live settings updates paused: \(Self.describe(error))"
+                }
+            }
+        }
+
+        equalizerUpdateTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let updates = await session.equalizerUpdateStream()
+                for try await settings in updates {
+                    guard !Task.isCancelled else {
+                        break
+                    }
+                    await MainActor.run {
+                        guard self.appScreen == .workspace, !self.hasDetachedEqualizerDraft else {
+                            return
+                        }
+                        self.applyEqualizerSnapshot(settings)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    guard self.appScreen == .workspace, !self.isBusy else {
+                        return
+                    }
+                    self.lastResultMessage = "Live EQ updates paused: \(Self.describe(error))"
+                }
+            }
+        }
+
         backgroundLoadTask = Task { [weak self] in
             guard let self else {
                 return
             }
 
             do {
-                for try await snapshot in session.modeWorkspaceUpdates(interval: .seconds(5)) {
+                for try await snapshot in session.modeWorkspaceUpdates(interval: .seconds(30)) {
                     guard !Task.isCancelled else {
                         break
                     }
@@ -627,6 +714,12 @@ final class BossMacOSViewModel: ObservableObject {
     }
 
     private func cancelBackgroundLoad() {
+        currentModeUpdateTask?.cancel()
+        currentModeUpdateTask = nil
+        settingsUpdateTask?.cancel()
+        settingsUpdateTask = nil
+        equalizerUpdateTask?.cancel()
+        equalizerUpdateTask = nil
         backgroundLoadTask?.cancel()
         backgroundLoadTask = nil
     }

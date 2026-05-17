@@ -48,6 +48,7 @@ public actor BossAppleSession {
     public let connection: BossAppleConnectionOptions
 
     private var connectedLink: ConnectedLink?
+    private var cachedBootstrappedDevice: BootstrappedDevice?
 
     public init(connection: BossAppleConnectionOptions = BossAppleConnectionOptions()) {
         self.connection = connection
@@ -67,9 +68,15 @@ public actor BossAppleSession {
     }
 
     public func bootstrap() async throws -> BootstrappedDevice {
-        try await withRawLinkRetrying(preferredPreferences: [.unsecure, .secure], preferActiveLink: false) { link in
+        if let cachedBootstrappedDevice {
+            return cachedBootstrappedDevice
+        }
+
+        let bootstrappedDevice = try await withRawLinkRetrying(preferredPreferences: [.unsecure, .secure], preferActiveLink: false) { link in
             try await BootstrapSession(link: link).bootstrap()
         }
+        cachedBootstrappedDevice = bootstrappedDevice
+        return bootstrappedDevice
     }
 
     public func loadWorkspaceSnapshot() async throws -> BossAppleWorkspaceSnapshot {
@@ -110,6 +117,24 @@ public actor BossAppleSession {
             continuation.onTermination = { _ in
                 task.cancel()
             }
+        }
+    }
+
+    public func currentAudioModeUpdateStream() -> AsyncThrowingStream<Int, Error> {
+        reconnectingCoreStream(preferredPreferences: appOperationPreferences()) { session in
+            session.currentAudioModeUpdateStream()
+        }
+    }
+
+    public func audioModeSettingsUpdateStream() -> AsyncThrowingStream<BossAudioModeSettingsConfig, Error> {
+        reconnectingCoreStream(preferredPreferences: appOperationPreferences()) { session in
+            session.audioModeSettingsUpdateStream()
+        }
+    }
+
+    public func equalizerUpdateStream() -> AsyncThrowingStream<BossEqualizerSettings, Error> {
+        reconnectingCoreStream(preferredPreferences: appOperationPreferences()) { session in
+            session.equalizerUpdateStream()
         }
     }
 
@@ -534,6 +559,60 @@ public actor BossAppleSession {
         }
 
         return ordered
+    }
+
+    private func reconnectingCoreStream<Element: Sendable>(
+        preferredPreferences: [AppleBossCharacteristicPreference],
+        stream: @escaping @Sendable (BossSession) -> AsyncThrowingStream<Element, Error>
+    ) -> AsyncThrowingStream<Element, Error> {
+        let owner = self
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                while !Task.isCancelled {
+                    do {
+                        let coreSession = try await owner.withCoreSessionRetrying(
+                            preferredPreferences: preferredPreferences
+                        ) { session in
+                            session
+                        }
+
+                        for try await element in stream(coreSession) {
+                            guard !Task.isCancelled else {
+                                continuation.finish()
+                                return
+                            }
+                            continuation.yield(element)
+                        }
+
+                        if Task.isCancelled {
+                            continuation.finish()
+                            return
+                        }
+
+                        // The underlying packet stream ended. Force a reconnect and resume.
+                        await owner.closeCurrentLink()
+                        try? await Task.sleep(for: .milliseconds(250))
+                    } catch is CancellationError {
+                        continuation.finish()
+                        return
+                    } catch {
+                        if await owner.shouldReconnectCurrentSession(for: error) {
+                            await owner.closeCurrentLink()
+                            try? await Task.sleep(for: .milliseconds(250))
+                            continue
+                        }
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                }
+
+                continuation.finish()
+            }
+
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
     }
 
     private func shouldReconnectCurrentSession(for error: Error) -> Bool {
