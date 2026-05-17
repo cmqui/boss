@@ -54,19 +54,19 @@ struct BossMenuBarView: View {
             if !viewModel.selectableAudioModes.isEmpty {
                 Divider()
 
-                ForEach(viewModel.selectableAudioModes, id: \.modeIndex) { mode in
-                    Button {
-                        viewModel.selectAudioMode(mode.modeIndex)
-                    } label: {
-                        HStack(spacing: 8) {
-                            if viewModel.displayedCurrentAudioModeIndex == mode.modeIndex {
-                                Image(systemName: "checkmark")
-                            } else {
-                                Image(systemName: "checkmark")
-                                    .hidden()
-                            }
-
-                            Text(viewModel.customProfileDisplayName(for: mode))
+                ForEach(Array(viewModel.selectableAudioModes.enumerated()), id: \.element.modeIndex) { index, mode in
+                    if let shortcut = audioModeShortcut(for: index) {
+                        Button {
+                            viewModel.selectAudioMode(mode.modeIndex)
+                        } label: {
+                            audioModeRow(for: mode)
+                        }
+                        .keyboardShortcut(shortcut, modifiers: .command)
+                    } else {
+                        Button {
+                            viewModel.selectAudioMode(mode.modeIndex)
+                        } label: {
+                            audioModeRow(for: mode)
                         }
                     }
                 }
@@ -157,6 +157,36 @@ struct BossMenuBarView: View {
             viewModel.autoPlayPauseEnabled != nil ||
             viewModel.autoAnswerEnabled != nil ||
             viewModel.volumeControlValue != nil
+    }
+
+    @ViewBuilder
+    private func audioModeRow(for mode: BossAudioModeConfig) -> some View {
+        HStack(spacing: 8) {
+            if viewModel.displayedCurrentAudioModeIndex == mode.modeIndex {
+                Image(systemName: "checkmark")
+            } else {
+                Image(systemName: "checkmark")
+                    .hidden()
+            }
+
+            Text(viewModel.customProfileDisplayName(for: mode))
+        }
+    }
+
+    private func audioModeShortcut(for index: Int) -> KeyEquivalent? {
+        switch index {
+        case 0: "1"
+        case 1: "2"
+        case 2: "3"
+        case 3: "4"
+        case 4: "5"
+        case 5: "6"
+        case 6: "7"
+        case 7: "8"
+        case 8: "9"
+        case 9: "0"
+        default: nil
+        }
     }
 }
 

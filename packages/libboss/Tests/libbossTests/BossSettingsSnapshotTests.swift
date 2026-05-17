@@ -14,6 +14,37 @@ final class BossSettingsSnapshotTests: XCTestCase {
         XCTAssertEqual(try snapshot.autoPlayPause(), false)
     }
 
+    func testStandbyTimerSetGetPacketEncodesSingleByteMinutes() throws {
+        let packet = try BossSettingsCodec.standbyTimerSetGetPacket(minutes: 30)
+
+        XCTAssertEqual(packet.functionBlock, .settings)
+        XCTAssertEqual(packet.function.rawValue, BossSettingsCodec.standbyTimerFunctionRaw)
+        XCTAssertEqual(packet.operator, .setGet)
+        XCTAssertEqual(packet.payload, Data([0x1E]))
+    }
+
+    func testStandbyTimerSetGetPacketEncodesTwoByteMinutes() throws {
+        let packet = try BossSettingsCodec.standbyTimerSetGetPacket(minutes: 300)
+
+        XCTAssertEqual(packet.payload, Data([0x2C, 0x01]))
+    }
+
+    func testStandbyTimerSetGetPacketRejectsOutOfRangeMinutes() {
+        XCTAssertThrowsError(try BossSettingsCodec.standbyTimerSetGetPacket(minutes: -1)) { error in
+            XCTAssertEqual(
+                error as? BossSettingsCodecError,
+                .invalidPayload("Standby timer minutes must be in range 0...65535")
+            )
+        }
+
+        XCTAssertThrowsError(try BossSettingsCodec.standbyTimerSetGetPacket(minutes: 65_536)) { error in
+            XCTAssertEqual(
+                error as? BossSettingsCodecError,
+                .invalidPayload("Standby timer minutes must be in range 0...65535")
+            )
+        }
+    }
+
     func testAutoAnswerPrefersStandaloneSnapshotPacket() throws {
         let snapshot = BossSettingsSnapshot(packetsByFunctionRaw: [
             BossSettingsCodec.onHeadDetectionFunctionRaw: settingsPacket(

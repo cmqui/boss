@@ -127,6 +127,19 @@ public enum BossSettingsCodec {
         settingsPacket(functionRaw: onHeadDetectionFunctionRaw, operatorValue: .get)
     }
 
+    public static func standbyTimerGetPacket() -> BmapPacket {
+        settingsPacket(functionRaw: standbyTimerFunctionRaw, operatorValue: .get)
+    }
+
+    public static func standbyTimerSetGetPacket(minutes: Int) throws -> BmapPacket {
+        try validateStandbyTimerMinutes(minutes)
+        return settingsPacket(
+            functionRaw: standbyTimerFunctionRaw,
+            operatorValue: .setGet,
+            payload: encodeStandbyTimerMinutes(minutes)
+        )
+    }
+
     public static func onHeadDetectionSetGetPacket(_ value: BossOnHeadDetectionValue) -> BmapPacket {
         settingsPacket(
             functionRaw: onHeadDetectionFunctionRaw,
@@ -188,6 +201,12 @@ public enum BossSettingsCodec {
                 (value.isAutoAnswerEnabled == true ? 0x02 : 0x00) |
                 (value.isAutoTransparencyEnabled == true ? 0x04 : 0x00)
         ])
+    }
+
+    private static func validateStandbyTimerMinutes(_ minutes: Int) throws {
+        guard (0...0xFFFF).contains(minutes) else {
+            throw BossSettingsCodecError.invalidPayload("Standby timer minutes must be in range 0...65535")
+        }
     }
 
     private static func requireStatus(_ packet: BmapPacket) throws {

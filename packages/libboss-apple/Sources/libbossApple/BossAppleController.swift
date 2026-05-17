@@ -287,17 +287,16 @@ public struct BossAppleController: Sendable {
     }
 
     public func standbyTimer() async throws -> BossStandbyTimerValue? {
-        try await settingsSnapshot().standbyTimer()
+        if let value = try await settingsSnapshot().standbyTimer() {
+            return value
+        }
+        return try await Self.readStandbyTimer(connection: connection.securePreferred)
     }
 
     public func setStandbyTimer(minutes: Int) async throws -> BossStandbyTimerValue {
         try await Self.withConnectedLinkRetrying(connection, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
             let response = try await Self.sendAndAwaitSameFunction(
-                packet: BossSettingsCodec.settingsPacket(
-                    functionRaw: BossSettingsCodec.standbyTimerFunctionRaw,
-                    operatorValue: .setGet,
-                    payload: BossSettingsCodec.encodeStandbyTimerMinutes(minutes)
-                ),
+                packet: try BossSettingsCodec.standbyTimerSetGetPacket(minutes: minutes),
                 on: link,
                 timeout: .seconds(5)
             )
@@ -430,7 +429,13 @@ public struct BossAppleController: Sendable {
     }
 
     public func autoPlayPause() async throws -> Bool? {
-        try await settingsSnapshot().autoPlayPause()
+        if let value = try await settingsSnapshot().autoPlayPause() {
+            return value
+        }
+        return try await Self.readEnabledSetting(
+            functionRaw: BossSettingsCodec.autoPlayPauseFunctionRaw,
+            connection: connection.securePreferred
+        )
     }
 
     public func setAutoPlayPause(_ enabled: Bool) async throws -> Bool {
@@ -442,7 +447,13 @@ public struct BossAppleController: Sendable {
     }
 
     public func autoAnswer() async throws -> Bool? {
-        try await settingsSnapshot().autoAnswer()
+        if let value = try await settingsSnapshot().autoAnswer() {
+            return value
+        }
+        return try await Self.readEnabledSetting(
+            functionRaw: BossSettingsCodec.autoAnswerFunctionRaw,
+            connection: connection.securePreferred
+        )
     }
 
     public func setAutoAnswer(_ enabled: Bool) async throws -> Bool {
@@ -1432,6 +1443,15 @@ extension BossAppleController {
         }
     }
 
+    static func readStandbyTimer(
+        connection: BossAppleConnectionOptions,
+        timeout: Duration = .seconds(5)
+    ) async throws -> BossStandbyTimerValue? {
+        try await withConnectedLinkRetrying(connection, shouldRetry: retrySecureCharacteristicIfNeeded) { link in
+            try await standbyTimerIfAvailable(on: link, timeout: timeout)
+        }
+    }
+
     static func readEnabledSetting(
         functionRaw: UInt8,
         connection: BossAppleConnectionOptions,
@@ -1461,6 +1481,18 @@ extension BossAppleController {
             timeout: timeout
         )
         return try BossSettingsCodec.parseOnHeadDetection(from: response)
+    }
+
+    static func standbyTimerIfAvailable(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossStandbyTimerValue? {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossSettingsCodec.standbyTimerGetPacket(),
+            on: link,
+            timeout: timeout
+        )
+        return try BossSettingsCodec.parseStandbyTimer(from: response)
     }
 
     static func enabledSettingIfAvailable(
