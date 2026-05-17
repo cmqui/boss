@@ -146,6 +146,21 @@ struct ArgumentParser {
         return patch
     }
 
+    mutating func equalizerSettingsPatch() throws -> BossEqualizerSettingsPatch {
+        let bass = try optionalInt(for: "--bass")
+        let mid = try optionalInt(for: "--mid")
+        let treble = try optionalInt(for: "--treble")
+        let patch = BossEqualizerSettingsPatch(
+            bass: bass,
+            mid: mid,
+            treble: treble
+        )
+        guard !patch.isEmpty else {
+            throw UsageError("Specify at least one equalizer option")
+        }
+        return patch
+    }
+
     mutating func optionalSpatialAudioMode(for flag: String) throws -> BossSpatialAudioMode? {
         guard let value = try optionalValue(for: flag) else {
             return nil

@@ -4,6 +4,13 @@
 
 .env*
 .build/
+.swiftpm/
+**/.swiftpm/
+DerivedData/
+*.xcuserdatad/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
 docs/
 decomp/
 dist/

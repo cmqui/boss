@@ -50,6 +50,7 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
     case bmapErrorResponse(context: String, payloadHex: String)
     case unsupportedOperation(String)
     case modeChangeNotObserved(targetIndex: Int, observedIndex: Int)
+    case equalizerNotObserved(expected: String, observed: String)
     case settingsConfigNotObserved(expected: String, observed: String)
     case noFreeCustomAudioModeSlot
     case customAudioModeSlotNotEditable(Int)
@@ -77,6 +78,8 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
             return "unsupportedOperation(\"\(message)\")"
         case .modeChangeNotObserved(let targetIndex, let observedIndex):
             return "modeChangeNotObserved(targetIndex: \(targetIndex), observedIndex: \(observedIndex))"
+        case .equalizerNotObserved(let expected, let observed):
+            return "equalizerNotObserved(expected: \"\(expected)\", observed: \"\(observed)\")"
         case .settingsConfigNotObserved(let expected, let observed):
             return "settingsConfigNotObserved(expected: \"\(expected)\", observed: \"\(observed)\")"
         case .noFreeCustomAudioModeSlot:
@@ -94,6 +97,12 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
         }
         return BmapErrorCode(rawValue: rawValue)
     }
+}
+
+public enum BossAppleEqualizerWriteResult: Sendable, Equatable {
+    case unchanged(BossEqualizerSettings)
+    case updated(BossEqualizerSettings)
+    case verificationInconclusive(BossEqualizerSettings)
 }
 
 public enum BossAppleAudioModeSettingsWriteResult: Sendable, Equatable {
@@ -466,6 +475,31 @@ public struct BossAppleController: Sendable {
         }
     }
 
+    public func equalizer() async throws -> BossEqualizerSettings? {
+        if let value = try await settingsSnapshot().equalizer() {
+            return value
+        }
+        return try await Self.readEqualizerAfterReconnect(connection: connection.securePreferred)
+    }
+
+    public func setEqualizer(
+        _ update: BossEqualizerSettingsPatch
+    ) async throws -> BossAppleEqualizerWriteResult {
+        try await Self.setEqualizerWithVerification(update, connection: connection.securePreferred)
+    }
+
+    public func setEqualizerBass(_ level: Int) async throws -> BossAppleEqualizerWriteResult {
+        try await setEqualizer(BossEqualizerSettingsPatch(bass: level))
+    }
+
+    public func setEqualizerMid(_ level: Int) async throws -> BossAppleEqualizerWriteResult {
+        try await setEqualizer(BossEqualizerSettingsPatch(mid: level))
+    }
+
+    public func setEqualizerTreble(_ level: Int) async throws -> BossAppleEqualizerWriteResult {
+        try await setEqualizer(BossEqualizerSettingsPatch(treble: level))
+    }
+
     public func audioModes() async throws -> [BossAudioModeInfo] {
         try await audioModeConfigs().map(\.info)
     }
@@ -744,6 +778,18 @@ public struct BossAppleController: Sendable {
 }
 
 extension BossAppleController {
+    static func supportedAudioModePrompts(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> [BossAudioModePrompt] {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossAudioModesCodec.namesSupportedGetPacket(),
+            on: link,
+            timeout: timeout
+        )
+        return try BossAudioModesCodec.parseSupportedPrompts(from: response)
+    }
+
     static func awaitSettingsSnapshot(
         on link: BleBmapLink,
         timeout: Duration
@@ -964,6 +1010,18 @@ extension BossAppleController {
         return try BossAudioModesCodec.parseCurrentMode(from: response)
     }
 
+    static func requiredEqualizer(
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossEqualizerSettings {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossSettingsCodec.equalizerGetPacket(),
+            on: link,
+            timeout: timeout
+        )
+        return try BossSettingsCodec.parseEqualizer(from: response)
+    }
+
     static func requiredAudioModeSettingsConfig(
         on link: BleBmapLink,
         timeout: Duration
@@ -998,6 +1056,28 @@ extension BossAppleController {
             timeout: timeout
         )
         return try BossAudioModesCodec.parseCapabilities(from: response)
+    }
+
+    static func readEqualizerAfterReconnect(
+        connection: BossAppleConnectionOptions,
+        attempts: Int = 3,
+        retryDelay: Duration = .milliseconds(750)
+    ) async throws -> BossEqualizerSettings {
+        var lastError: Error = BossAppleControlError.responseTimedOut(seconds: 5)
+        for attempt in 0..<attempts {
+            do {
+                return try await withConnectedLinkRetrying(connection, shouldRetry: retrySecureCharacteristicIfNeeded) { link in
+                    try await requiredEqualizer(on: link, timeout: .seconds(5))
+                }
+            } catch {
+                lastError = error
+                guard isRecoverableEqualizerError(error), attempt < attempts - 1 else {
+                    throw error
+                }
+                try await Task.sleep(for: retryDelay)
+            }
+        }
+        throw lastError
     }
 
     static func readAudioModeSettingsConfigAfterReconnect(
@@ -1041,6 +1121,73 @@ extension BossAppleController {
             }
         }
         throw lastError
+    }
+
+    static func setEqualizerWithVerification(
+        _ update: BossEqualizerSettingsPatch,
+        connection: BossAppleConnectionOptions
+    ) async throws -> BossAppleEqualizerWriteResult {
+        let current = try await readEqualizerAfterReconnect(connection: connection)
+        guard !update.isEmpty else {
+            return .unchanged(current)
+        }
+
+        let requested = try validatedEqualizerRequests(update, current: current)
+        let target = BossEqualizerSettings(
+            ranges: current.ranges.map { range in
+                if let requestedLevel = requested.first(where: { $0.0 == range.band })?.1 {
+                    return BossEqualizerRangeLevel(
+                        band: range.band,
+                        currentLevel: requestedLevel,
+                        minLevel: range.minLevel,
+                        maxLevel: range.maxLevel
+                    )
+                }
+                return range
+            }
+        )
+        guard requested.contains(where: { band, level in
+            current.range(for: band)?.currentLevel != level
+        }) else {
+            return .unchanged(current)
+        }
+
+        var lastRecoverableError: Error?
+        for attempt in 0..<2 {
+            do {
+                let updated = try await withConnectedLinkRetrying(connection, shouldRetry: retrySecureCharacteristicIfNeeded) { link in
+                    try await sendEqualizerSetGets(requested, on: link, timeout: .seconds(5))
+                }
+                guard update.matches(updated) else {
+                    throw BossAppleControlError.equalizerNotObserved(
+                        expected: describe(update),
+                        observed: describe(updated)
+                    )
+                }
+                return .updated(updated)
+            } catch {
+                guard isRecoverableEqualizerError(error) else {
+                    throw error
+                }
+                lastRecoverableError = error
+
+                do {
+                    let verified = try await readEqualizerAfterReconnect(connection: connection, attempts: 3)
+                    if update.matches(verified) {
+                        return .updated(verified)
+                    }
+                } catch {
+                    lastRecoverableError = error
+                }
+
+                if attempt == 0 {
+                    try await Task.sleep(for: .seconds(1))
+                }
+            }
+        }
+
+        _ = lastRecoverableError
+        return .verificationInconclusive(target)
     }
 
     static func setAudioModeSettingsConfigWithVerification(
@@ -1089,6 +1236,37 @@ extension BossAppleController {
 
         _ = lastRecoverableError
         return .verificationInconclusive(target)
+    }
+
+    static func sendEqualizerSetGets(
+        _ requests: [(BossEqualizerBand, Int)],
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossEqualizerSettings {
+        var lastSettings: BossEqualizerSettings?
+        for (band, level) in requests {
+            lastSettings = try await sendEqualizerSetGet(
+                targetLevel: level,
+                band: band,
+                on: link,
+                timeout: timeout
+            )
+        }
+        guard let lastSettings else {
+            throw BossAppleControlError.unsupportedOperation("At least one equalizer band update is required")
+        }
+        return lastSettings
+    }
+
+    static func sendEqualizerSetGet(
+        targetLevel: Int,
+        band: BossEqualizerBand,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossEqualizerSettings {
+        let packet = try BossSettingsCodec.equalizerSetGetPacket(targetLevel: targetLevel, band: band)
+        let response = try await sendAndAwaitSameFunction(packet: packet, on: link, timeout: timeout)
+        return try BossSettingsCodec.parseEqualizer(from: response)
     }
 
     static func sendAudioModeSettingsConfigSetGet(
@@ -1334,6 +1512,130 @@ extension BossAppleController {
             return try BossSettingsCodec.parseEnabledFlag(from: response)
         }
     }
+
+    static func deviceSettingsReport(
+        from snapshot: BossSettingsSnapshot,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossAppleDeviceSettingsReport {
+        let wearDetection = try await observedWearDetection(from: snapshot, on: link, timeout: timeout)
+        let autoAwareEnabled = try await observedEnabledSetting(
+            functionRaw: BossSettingsCodec.autoAwareFunctionRaw,
+            snapshotValue: try snapshot.autoAware(),
+            snapshotPacketExists: snapshot.packet(functionRaw: BossSettingsCodec.autoAwareFunctionRaw) != nil,
+            on: link,
+            timeout: timeout
+        )
+        let autoPlayPauseEnabled = try await observedEnabledSetting(
+            functionRaw: BossSettingsCodec.autoPlayPauseFunctionRaw,
+            snapshotValue: try snapshot.autoPlayPause(),
+            snapshotPacketExists: snapshot.packet(functionRaw: BossSettingsCodec.autoPlayPauseFunctionRaw) != nil,
+            on: link,
+            timeout: timeout
+        )
+        let autoAnswerEnabled = try await observedAutoAnswer(from: snapshot, on: link, timeout: timeout)
+        let volumeControl = try await observedVolumeControl(from: snapshot, on: link, timeout: timeout)
+
+        return BossAppleDeviceSettingsReport(
+            wearDetection: wearDetection,
+            autoAwareEnabled: autoAwareEnabled,
+            autoPlayPauseEnabled: autoPlayPauseEnabled,
+            autoAnswerEnabled: autoAnswerEnabled,
+            volumeControl: volumeControl
+        )
+    }
+
+    static func equalizerIfAvailable(
+        from snapshot: BossSettingsSnapshot,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossEqualizerSettings? {
+        if let value = try snapshot.equalizer() {
+            return value
+        }
+        return try await observeSettingAfterDirectRead(
+            initialUnavailableReason: .missingFromSnapshot,
+            read: {
+                try await requiredEqualizer(on: link, timeout: timeout)
+            }
+        ).value
+    }
+
+    static func observedWearDetection(
+        from snapshot: BossSettingsSnapshot,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossAppleObservedSetting<BossOnHeadDetectionValue> {
+        if let value = try snapshot.onHeadDetection() {
+            return BossAppleObservedSetting(value: value, source: .snapshot)
+        }
+        return try await observeSettingAfterDirectRead(
+            initialUnavailableReason: .missingFromSnapshot,
+            read: {
+                try await onHeadDetectionIfAvailable(on: link, timeout: timeout)
+            }
+        )
+    }
+
+    static func observedEnabledSetting(
+        functionRaw: UInt8,
+        snapshotValue: Bool?,
+        snapshotPacketExists: Bool,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossAppleObservedSetting<Bool> {
+        if let snapshotValue {
+            return BossAppleObservedSetting(value: snapshotValue, source: .snapshot)
+        }
+        return try await observeSettingAfterDirectRead(
+            initialUnavailableReason: snapshotPacketExists ? .dataUnavailable : .missingFromSnapshot,
+            read: {
+                try await enabledSettingIfAvailable(functionRaw: functionRaw, on: link, timeout: timeout)
+            }
+        )
+    }
+
+    static func observedAutoAnswer(
+        from snapshot: BossSettingsSnapshot,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossAppleObservedSetting<Bool> {
+        if let packet = snapshot.packet(functionRaw: BossSettingsCodec.autoAnswerFunctionRaw) {
+            return BossAppleObservedSetting(
+                value: try BossSettingsCodec.parseEnabledFlag(from: packet),
+                source: .snapshot
+            )
+        }
+        if let derived = try snapshot.onHeadDetection()?.isAutoAnswerEnabled {
+            return BossAppleObservedSetting(value: derived, source: .compositeSnapshot)
+        }
+        return try await observeSettingAfterDirectRead(
+            initialUnavailableReason: .missingFromSnapshot,
+            read: {
+                try await enabledSettingIfAvailable(
+                    functionRaw: BossSettingsCodec.autoAnswerFunctionRaw,
+                    on: link,
+                    timeout: timeout
+                )
+            }
+        )
+    }
+
+    static func observedVolumeControl(
+        from snapshot: BossSettingsSnapshot,
+        on link: BleBmapLink,
+        timeout: Duration
+    ) async throws -> BossAppleObservedSetting<BossVolumeControlStatus> {
+        if let value = try snapshot.volumeControl() {
+            return BossAppleObservedSetting(value: value, source: .snapshot)
+        }
+        return try await observeSettingAfterDirectRead(
+            initialUnavailableReason: .missingFromSnapshot,
+            read: {
+                try await volumeControlIfAvailable(on: link, timeout: timeout)
+            }
+        )
+    }
 }
 
 extension BossAppleController {
@@ -1451,6 +1753,25 @@ extension BossAppleController {
         return false
     }
 
+    static func isRecoverableEqualizerError(_ error: Error) -> Bool {
+        if shouldFallbackForAudioModeWrite(error) {
+            return true
+        }
+        if let error = error as? BossAppleControlError {
+            switch error {
+            case .equalizerNotObserved:
+                return true
+            case .bmapErrorResponse(_, let payloadHex):
+                return bmapErrorCode(from: payloadHex) == .insecureTransport ||
+                    bmapErrorCode(from: payloadHex) == .timeout ||
+                    bmapErrorCode(from: payloadHex) == .busy
+            default:
+                return false
+            }
+        }
+        return false
+    }
+
     static func isVerificationInconclusiveError(_ error: Error) -> Bool {
         if shouldFallbackForAudioModeWrite(error) {
             return true
@@ -1517,6 +1838,37 @@ extension BossAppleController {
             return nil
         }
         return BmapErrorCode(rawValue: rawValue)
+    }
+
+    static func validatedEqualizerRequests(
+        _ update: BossEqualizerSettingsPatch,
+        current: BossEqualizerSettings
+    ) throws -> [(BossEqualizerBand, Int)] {
+        try update.requestedLevels.map { band, level in
+            guard let range = current.range(for: band) else {
+                throw BossAppleControlError.unsupportedOperation(
+                    "This device/session does not expose the \(band.displayName) equalizer band over BMAP"
+                )
+            }
+            guard (range.minLevel...range.maxLevel).contains(level) else {
+                throw BossAppleControlError.unsupportedOperation(
+                    "Requested \(band.displayName) equalizer level \(level) is outside the supported range \(range.minLevel)...\(range.maxLevel)"
+                )
+            }
+            return (band, level)
+        }
+    }
+
+    static func describe(_ update: BossEqualizerSettingsPatch) -> String {
+        update.requestedLevels
+            .map { "\($0.0.displayName)=\($0.1)" }
+            .joined(separator: ",")
+    }
+
+    static func describe(_ settings: BossEqualizerSettings) -> String {
+        settings.ranges
+            .map { "\($0.band.displayName)=\($0.currentLevel)[\($0.minLevel)...\($0.maxLevel)]" }
+            .joined(separator: ",")
     }
 
     static func describe(_ config: BossAudioModeSettingsConfig) -> String {

@@ -20,11 +20,11 @@ public enum ProductMap {
         codeName: "Wolverine",
         displayName: "Bose QC Ultra 2 HP",
         variants: [
-            0: "WolverineBlack",
-            1: "WolverineWhiteSmoke",
-            2: "WolverineDriftwoodSand",
-            3: "WolverineMidnightViolet",
-            4: "WolverineDesertGold",
+            1: "WolverineBlack",
+            2: "WolverineWhiteSmoke",
+            3: "WolverineDriftwoodSand",
+            4: "WolverineMidnightViolet",
+            5: "WolverineDesertGold",
         ]
     )
 

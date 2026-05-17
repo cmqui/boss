@@ -141,6 +141,20 @@ struct BossctlCLI {
                 }
                 return
 
+            case .getEqualizer:
+                let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
+                guard let settings = try await controller.equalizer() else {
+                    throw BossctlError.unsupportedSetting("equalizer")
+                }
+                printEqualizer(settings)
+                return
+
+            case .setEqualizer(let patch):
+                let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
+                let result = try await controller.setEqualizer(patch)
+                printEqualizerWriteResult(result)
+                return
+
             case .setOnHeadDetection(let patch):
                 let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
                 printWearDetectionFallbackPaths(for: patch)
@@ -258,7 +272,7 @@ struct BossctlCLI {
                     )
                     print("Auto-answer updated: \(try BossSettingsCodec.parseEnabledFlag(from: response))")
 
-                case .setOnHeadDetection, .getVolumeControl, .setVolumeControl:
+                case .setOnHeadDetection, .getVolumeControl, .setVolumeControl, .getEqualizer, .setEqualizer:
                     fatalError("controller-backed settings should have been handled before opening a raw link")
                 }
             }

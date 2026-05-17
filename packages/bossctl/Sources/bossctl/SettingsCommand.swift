@@ -32,6 +32,8 @@ struct SettingsCommand {
                 return SettingsCommand(connection: connection, action: .getAutoAnswer)
             case "volume-control":
                 return SettingsCommand(connection: connection, action: .getVolumeControl)
+            case "equalizer":
+                return SettingsCommand(connection: connection, action: .getEqualizer)
             default:
                 throw UsageError("Unknown settings get target: \(key)")
             }
@@ -64,6 +66,10 @@ struct SettingsCommand {
                 let value = try parser.requiredVolumeControlValue(for: "--mode")
                 let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
                 return SettingsCommand(connection: connection, action: .setVolumeControl(value))
+            case "equalizer":
+                let patch = try parser.equalizerSettingsPatch()
+                let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
+                return SettingsCommand(connection: connection, action: .setEqualizer(patch))
             default:
                 throw UsageError("Unknown settings set target: \(key)")
             }
@@ -87,4 +93,6 @@ enum SettingsAction {
     case setAutoAnswer(Bool)
     case getVolumeControl
     case setVolumeControl(BossVolumeControlValue)
+    case getEqualizer
+    case setEqualizer(BossEqualizerSettingsPatch)
 }

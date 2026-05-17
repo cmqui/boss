@@ -117,6 +117,70 @@ final class BossSettingsSnapshotTests: XCTestCase {
         XCTAssertEqual(try snapshot.volumeControl()?.supportedValues, [.button, .capTouch])
     }
 
+    func testEqualizerParserReadsSignedRangeLevels() throws {
+        let packet = BmapPacket(
+            functionBlock: .settings,
+            function: BmapFunction(block: .settings, rawValue: BossSettingsCodec.rangeControlFunctionRaw),
+            operator: .status,
+            payload: Data([
+                0xF6, 0x0A, 0x03, 0x00,
+                0xF6, 0x0A, 0xFE, 0x01,
+                0xF6, 0x0A, 0x05, 0x02
+            ])
+        )
+
+        let equalizer = try BossSettingsCodec.parseEqualizer(from: packet)
+        XCTAssertEqual(equalizer.bass, BossEqualizerRangeLevel(band: .bass, currentLevel: 3, minLevel: -10, maxLevel: 10))
+        XCTAssertEqual(equalizer.mid, BossEqualizerRangeLevel(band: .mid, currentLevel: -2, minLevel: -10, maxLevel: 10))
+        XCTAssertEqual(equalizer.treble, BossEqualizerRangeLevel(band: .treble, currentLevel: 5, minLevel: -10, maxLevel: 10))
+    }
+
+    func testEqualizerSetGetPacketEncodesSignedLevelAndBand() throws {
+        let packet = try BossSettingsCodec.equalizerSetGetPacket(targetLevel: -3, band: .mid)
+
+        XCTAssertEqual(packet.functionBlock, .settings)
+        XCTAssertEqual(packet.function.rawValue, BossSettingsCodec.rangeControlFunctionRaw)
+        XCTAssertEqual(packet.operator, .setGet)
+        XCTAssertEqual(packet.payload, Data([0xFD, 0x01]))
+    }
+
+    func testEqualizerResolvesFromSnapshotPacket() throws {
+        let snapshot = BossSettingsSnapshot(packetsByFunctionRaw: [
+            BossSettingsCodec.rangeControlFunctionRaw: settingsPacket(
+                functionRaw: BossSettingsCodec.rangeControlFunctionRaw,
+                payload: Data([
+                    0xF6, 0x0A, 0x03, 0x00,
+                    0xF6, 0x0A, 0xFE, 0x01,
+                    0xF6, 0x0A, 0x05, 0x02
+                ])
+            )
+        ])
+
+        let equalizer = try XCTUnwrap(snapshot.equalizer())
+        XCTAssertEqual(equalizer.bass?.currentLevel, 3)
+        XCTAssertEqual(equalizer.mid?.currentLevel, -2)
+        XCTAssertEqual(equalizer.treble?.currentLevel, 5)
+    }
+
+    func testEqualizerSettingsPatchMatchesOnlySpecifiedBands() {
+        let patch = BossEqualizerSettingsPatch(mid: -1)
+        let matching = BossEqualizerSettings(ranges: [
+            BossEqualizerRangeLevel(band: .bass, currentLevel: 4, minLevel: -10, maxLevel: 10),
+            BossEqualizerRangeLevel(band: .mid, currentLevel: -1, minLevel: -10, maxLevel: 10),
+            BossEqualizerRangeLevel(band: .treble, currentLevel: 2, minLevel: -10, maxLevel: 10)
+        ])
+        let nonMatching = BossEqualizerSettings(ranges: [
+            BossEqualizerRangeLevel(band: .bass, currentLevel: 4, minLevel: -10, maxLevel: 10),
+            BossEqualizerRangeLevel(band: .mid, currentLevel: 1, minLevel: -10, maxLevel: 10),
+            BossEqualizerRangeLevel(band: .treble, currentLevel: 2, minLevel: -10, maxLevel: 10)
+        ])
+
+        XCTAssertFalse(patch.isEmpty)
+        XCTAssertTrue(BossEqualizerSettingsPatch().isEmpty)
+        XCTAssertTrue(patch.matches(matching))
+        XCTAssertFalse(patch.matches(nonMatching))
+    }
+
     func testDeviceSettingsAggregatesSnapshotValues() throws {
         let snapshot = BossSettingsSnapshot(packetsByFunctionRaw: [
             BossSettingsCodec.onHeadDetectionFunctionRaw: settingsPacket(

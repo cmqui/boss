@@ -53,7 +53,7 @@ enum Command {
     Usage:
       bossctl bootstrap [connection options]
       bossctl settings get all [connection options]
-      bossctl settings get standby-timer|auto-aware|on-head-detection|auto-play-pause|auto-answer [connection options]
+      bossctl settings get standby-timer|auto-aware|on-head-detection|auto-play-pause|auto-answer|equalizer [connection options]
       bossctl settings set standby-timer --minutes <n> [connection options]
       bossctl settings set auto-aware --enabled <true|false> [connection options]
       bossctl settings set on-head-detection [--enabled <true|false>] [--auto-play <true|false>] [--auto-answer <true|false>] [--auto-transparency <true|false>] [connection options]
@@ -61,6 +61,7 @@ enum Command {
       bossctl settings set auto-answer --enabled <true|false> [connection options]
       bossctl settings get volume-control [connection options]
       bossctl settings set volume-control --mode <disabled|button|captouch|imu> [connection options]
+      bossctl settings set equalizer [--bass <n>] [--mid <n>] [--treble <n>] [connection options]
       bossctl audio-mode list [connection options]
       bossctl audio-mode get current [connection options]
       bossctl audio-mode set current (--index <n> | --mode <name>) [--play-voice-prompt <true|false>] [connection options]

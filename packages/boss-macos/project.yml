@@ -1,0 +1,46 @@
+name: Boss
+options:
+  createIntermediateGroups: true
+  groupSortPosition: top
+packages:
+  libboss:
+    path: ../libboss
+  libbossApple:
+    path: ../libboss-apple
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    PRODUCT_NAME: Boss
+    PRODUCT_BUNDLE_IDENTIFIER: dev.local.boss
+    MACOSX_DEPLOYMENT_TARGET: 14.0
+    MARKETING_VERSION: 1.0
+    CURRENT_PROJECT_VERSION: 1
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_CFBundleDisplayName: Boss
+    INFOPLIST_KEY_CFBundleName: Boss
+    INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: Boss uses Bluetooth to discover and connect to your Bose headphones so it can read and change device settings.
+    INFOPLIST_KEY_NSHighResolutionCapable: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+targets:
+  Boss:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources/BossMacOS
+        excludes:
+          - Resources/**
+      - path: Sources/BossMacOS/Resources
+        buildPhase: resources
+      - path: BossXcode/Assets.xcassets
+        buildPhase: resources
+    dependencies:
+      - package: libboss
+        product: libboss
+      - package: libbossApple
+        product: libbossApple
+schemes:
+  Boss:
+    build:
+      targets:
+        Boss: all

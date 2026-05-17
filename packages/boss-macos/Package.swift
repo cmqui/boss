@@ -23,7 +23,10 @@ let package = Package(
                 .product(name: "libboss", package: "libboss"),
                 .product(name: "libbossApple", package: "libboss-apple"),
             ],
-            path: "Sources/BossMacOS"
+            path: "Sources/BossMacOS",
+            resources: [
+                .process("Resources"),
+            ]
         ),
     ]
 )

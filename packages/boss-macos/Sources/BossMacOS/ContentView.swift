@@ -6,16 +6,24 @@ struct ContentView: View {
     @ObservedObject var viewModel: BossMacOSViewModel
 
     var body: some View {
-        let palette = DevicePalette(variantName: viewModel.deviceVariantName)
+        let workspacePalette = DevicePalette(variantName: viewModel.deviceVariantName)
+        let pickerPalette = DevicePalette.devicePicker
 
-        HStack(spacing: 0) {
-            sidebar(palette: palette)
-                .frame(width: 300)
+        Group {
+            switch viewModel.appScreen {
+            case .waitingForDevice:
+                waitingForDevice(palette: pickerPalette)
+            case .workspace:
+                HStack(spacing: 0) {
+                    sidebar(palette: workspacePalette)
+                        .frame(width: 300)
 
-            Divider()
+                    Divider()
 
-            detail(palette: palette)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    detail(palette: workspacePalette)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .task {
@@ -23,6 +31,97 @@ struct ContentView: View {
         }
         .sheet(isPresented: $viewModel.isPresentingSaveProfilePrompt) {
             SaveCustomProfileSheet(viewModel: viewModel)
+        }
+    }
+
+    private func waitingForDevice(palette: DevicePalette) -> some View {
+        ZStack {
+            LinearGradient(
+                colors: [palette.sidebarBackground, Color(nsColor: .windowBackgroundColor)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(spacing: 22) {
+                BossHeadphonesMark(size: 54)
+
+                VStack(spacing: 8) {
+                    Text("Waiting For Bose Device")
+                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+
+                    Text(viewModel.waitingStatusMessage)
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 520)
+                }
+
+                if viewModel.availableDevices.isEmpty, case .loading = viewModel.loadState {
+                    ProgressView()
+                        .controlSize(.large)
+                        .padding(.top, 4)
+                }
+
+                if viewModel.shouldShowDevicePickerCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 10) {
+                            Text("Available Bose Devices")
+                                .font(.headline)
+
+                            if case .loading = viewModel.loadState {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
+
+                        if viewModel.availableDevices.isEmpty {
+                            Text("No compatible Bose devices detected yet.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            VStack(spacing: 10) {
+                                ForEach(viewModel.availableDevices) { device in
+                                    Button {
+                                        viewModel.connectToDiscoveredDevice(device)
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(device.name)
+                                                    .fontWeight(.medium)
+                                                if device.isCurrentlyConnected {
+                                                    Text("Already connected to this Mac")
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 12)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                .fill(Color.white.opacity(0.35))
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    .padding(24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .fill(Color.white.opacity(0.45))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .strokeBorder(palette.cardStroke, lineWidth: 1)
+                    )
+                }
+            }
+            .padding(32)
         }
     }
 
@@ -109,12 +208,15 @@ struct ContentView: View {
 
                 SidebarCard(title: "Connection", systemImage: "dot.radiowaves.left.and.right", palette: palette) {
                     VStack(alignment: .leading, spacing: 12) {
-                        TextField("Name contains", text: $viewModel.nameFilter)
-                            .textFieldStyle(.roundedBorder)
-
-                        Stepper(value: $viewModel.scanTimeoutSeconds, in: 5...60, step: 5) {
-                            Text("Scan timeout: \(viewModel.scanTimeoutSeconds)s")
+                        Button {
+                            viewModel.returnToDeviceSelection()
+                        } label: {
+                            Label("Choose Device", systemImage: "dot.radiowaves.left.and.right")
+                                .frame(maxWidth: .infinity)
                         }
+                        .buttonStyle(.borderedProminent)
+                        .tint(palette.accent)
+                        .disabled(viewModel.isBusy)
 
                         Button {
                             viewModel.refresh()
@@ -135,7 +237,8 @@ struct ContentView: View {
     private func detail(palette: DevicePalette) -> some View {
         return ScrollView {
             ModeSettingsPanel(viewModel: viewModel, palette: palette)
-            .padding(28)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -184,45 +287,38 @@ private struct ModeSettingsPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .top, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Mode Workspace")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-
-                    Text(viewModel.hasDetachedSettingsDraft ? "Editing unsaved custom changes" : "Select a built-in or saved custom mode.")
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 12) {
-                    Picker("Audio Mode", selection: selectedModeBinding) {
-                        ForEach(viewModel.selectableAudioModes, id: \.modeIndex) { mode in
-                            Text(viewModel.customProfileDisplayName(for: mode)).tag(mode.modeIndex)
-                        }
+            HStack(alignment: .center, spacing: 16) {
+                Picker("Audio Mode", selection: selectedModeBinding) {
+                    ForEach(viewModel.selectableAudioModes, id: \.modeIndex) { mode in
+                        Text(viewModel.customProfileDisplayName(for: mode)).tag(mode.modeIndex)
                     }
-                    .labelsHidden()
-                    .frame(width: 260)
-                    .disabled(viewModel.selectableAudioModes.isEmpty || viewModel.isBusy)
+                }
+                .labelsHidden()
+                .frame(width: 300, alignment: .leading)
+                .controlSize(.large)
+                .font(.title3.weight(.semibold))
+                .disabled(viewModel.selectableAudioModes.isEmpty || viewModel.isBusy)
 
-                    HStack(spacing: 10) {
+                Spacer(minLength: 0)
+
+                HStack(spacing: 10) {
                         if let selectedMode {
                             Button {
                                 viewModel.setFavorite(!selectedMode.favorite, for: selectedMode)
                             } label: {
-                                Label(
-                                    selectedMode.favorite ? "Favorited" : "Favorite",
-                                    systemImage: selectedMode.favorite ? "star.fill" : "star"
-                                )
-                            }
-                            .disabled(viewModel.isBusy)
+                                AdaptiveToolbarLabel(
+                                title: selectedMode.favorite ? "Favorited" : "Favorite",
+                                systemImage: selectedMode.favorite ? "star.fill" : "star",
+                                iconColor: selectedMode.favorite ? .yellow : nil
+                            )
+                        }
+                        .disabled(viewModel.isBusy)
 
                             if viewModel.canDelete(selectedMode) {
                                 Button(role: .destructive) {
                                     viewModel.deleteCustomProfile(selectedMode)
                                 } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    AdaptiveToolbarLabel(title: "Delete", systemImage: "trash")
                                 }
                                 .disabled(viewModel.isBusy)
                             }
@@ -232,21 +328,26 @@ private struct ModeSettingsPanel: View {
                             Button {
                                 viewModel.beginSavingCustomProfile()
                             } label: {
-                                Label("Save as Custom", systemImage: "square.and.arrow.down")
+                                AdaptiveToolbarLabel(title: "Save as Custom", systemImage: "square.and.arrow.down")
                             }
                         }
 
+                    if viewModel.canApplyModeSettings {
                         Button {
-                            viewModel.applySettings()
+                            viewModel.applyModeSettings()
                         } label: {
-                            Label("Apply", systemImage: "checkmark")
+                            AdaptiveToolbarLabel(title: "Apply", systemImage: "checkmark")
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(palette.accent)
-                        .disabled(!viewModel.canApplySettings)
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(viewModel.hasDetachedSettingsDraft ? "Editing unsaved custom changes" : "Select a built-in or saved custom mode.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             if let selectedMode {
                 HStack(spacing: 10) {
@@ -273,7 +374,7 @@ private struct ModeSettingsPanel: View {
                 GridRow {
                     Text("Spatial Audio")
                         .foregroundStyle(.secondary)
-                    Picker("Spatial Audio", selection: spatialAudioBinding) {
+                    Picker("", selection: spatialAudioBinding) {
                         ForEach(BossSpatialAudioMode.allCases, id: \.rawValue) { mode in
                             Text(mode.displayName.capitalized).tag(mode)
                         }
@@ -293,20 +394,45 @@ private struct ModeSettingsPanel: View {
                     Toggle("Enabled", isOn: ancBinding)
                 }
             }
-            .disabled(viewModel.settings == nil || viewModel.isBusy)
+            .disabled((viewModel.settings == nil && viewModel.equalizer == nil) || viewModel.isBusy)
 
-            if viewModel.settings == nil {
+            if viewModel.equalizer != nil {
+                Divider()
+                    .padding(.vertical, 4)
+
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 12) {
+                        Text("Equalizer")
+                            .font(.headline)
+
+                        Spacer()
+
+                        Button {
+                            viewModel.applyEqualizerSettings()
+                        } label: {
+                            AdaptiveToolbarLabel(title: "Apply", systemImage: "checkmark")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(palette.accent)
+                        .disabled(!viewModel.canApplyEqualizer)
+                        .opacity(viewModel.canApplyEqualizer ? 1 : 0)
+                    }
+
+                    EqualizerControlGroup(viewModel: viewModel)
+                }
+            }
+
+            if viewModel.settings == nil && viewModel.equalizer == nil {
                 ContentUnavailableView(
-                    "No Mode Settings Loaded",
+                    "No Mode Controls Loaded",
                     systemImage: "slider.horizontal.3",
-                    description: Text("Reconnect to load the audio-mode controls for this device.")
+                    description: Text(emptyModeControlsMessage)
                 )
                 .frame(maxWidth: .infinity, minHeight: 260)
             }
 
-            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 700, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private var selectedModeBinding: Binding<Int> {
@@ -345,6 +471,89 @@ private struct ModeSettingsPanel: View {
             set: { viewModel.setANCEnabledDraft($0) }
         )
     }
+
+    private var emptyModeControlsMessage: String {
+        switch viewModel.loadState {
+        case .loading:
+            return "Loading the audio-mode and EQ controls for this device."
+        default:
+            return "Reconnect to load the audio-mode and EQ controls for this device."
+        }
+    }
+}
+
+private struct EqualizerControlGroup: View {
+    @ObservedObject var viewModel: BossMacOSViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let range = viewModel.equalizer?.bass {
+                EqualizerBandSliderRow(
+                    title: "Bass",
+                    range: range,
+                    value: Binding(
+                        get: { Double(viewModel.bassLevel) },
+                        set: { viewModel.setBassLevelDraft(Int($0.rounded())) }
+                    )
+                )
+            }
+
+            if let range = viewModel.equalizer?.mid {
+                EqualizerBandSliderRow(
+                    title: "Mid",
+                    range: range,
+                    value: Binding(
+                        get: { Double(viewModel.midLevel) },
+                        set: { viewModel.setMidLevelDraft(Int($0.rounded())) }
+                    )
+                )
+            }
+
+            if let range = viewModel.equalizer?.treble {
+                EqualizerBandSliderRow(
+                    title: "Treble",
+                    range: range,
+                    value: Binding(
+                        get: { Double(viewModel.trebleLevel) },
+                        set: { viewModel.setTrebleLevelDraft(Int($0.rounded())) }
+                    )
+                )
+            }
+        }
+    }
+}
+
+private struct EqualizerBandSliderRow: View {
+    let title: String
+    let range: BossEqualizerRangeLevel
+    let value: Binding<Double>
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .frame(width: 52, alignment: .leading)
+
+            Text("\(range.minLevel)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 28, alignment: .trailing)
+
+            Slider(
+                value: value,
+                in: Double(range.minLevel)...Double(range.maxLevel),
+                step: 1
+            )
+
+            Text("\(range.maxLevel)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 28, alignment: .leading)
+
+            Text("\(Int(value.wrappedValue))")
+                .monospacedDigit()
+                .frame(width: 28, alignment: .trailing)
+        }
+    }
 }
 
 private struct SidebarDeviceHeader: View {
@@ -354,9 +563,7 @@ private struct SidebarDeviceHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 12) {
-                Image(systemName: "headphones")
-                    .font(.system(size: 26, weight: .light))
-                    .foregroundStyle(palette.accent)
+                BossHeadphonesMark(size: 26)
 
                 Text(viewModel.deviceName)
                     .font(.title2)
@@ -387,6 +594,21 @@ private struct SidebarDeviceHeader: View {
         case .ready:
             Label("Connected", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
+        }
+    }
+}
+
+private struct BossHeadphonesMark: View {
+    let size: CGFloat
+
+    var body: some View {
+        if let image = BossImageResource.headphonesMark.nsImage() {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .accessibilityHidden(true)
         }
     }
 }
@@ -461,6 +683,39 @@ private struct Badge: View {
     }
 }
 
+private struct AdaptiveToolbarLabel: View {
+    let title: String
+    let systemImage: String
+    let iconColor: Color?
+
+    init(title: String, systemImage: String, iconColor: Color? = nil) {
+        self.title = title
+        self.systemImage = systemImage
+        self.iconColor = iconColor
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                toolbarIcon
+                Text(title)
+            }
+
+            toolbarIcon
+        }
+    }
+
+    @ViewBuilder
+    private var toolbarIcon: some View {
+        if let iconColor {
+            Image(systemName: systemImage)
+                .foregroundStyle(iconColor)
+        } else {
+            Image(systemName: systemImage)
+        }
+    }
+}
+
 private struct DevicePalette {
     let accent: Color
     let background: Color
@@ -469,6 +724,16 @@ private struct DevicePalette {
     let cardStroke: Color
     let primaryText: Color
     let secondaryText: Color
+
+    static let devicePicker = DevicePalette(
+        accent: Color(red: 0.56, green: 0.46, blue: 0.71),
+        background: Color(red: 0.22, green: 0.18, blue: 0.23),
+        sidebarBackground: Color(red: 0.2, green: 0.16, blue: 0.21),
+        cardBackground: Color.white.opacity(0.2),
+        cardStroke: Color.white.opacity(0.12),
+        primaryText: .white,
+        secondaryText: Color.white.opacity(0.7)
+    )
 
     init(variantName: String?) {
         let key = variantName?.lowercased() ?? ""
@@ -503,6 +768,24 @@ private struct DevicePalette {
         cardStroke = accent.opacity(0.18)
         primaryText = Color(red: 0.12, green: 0.11, blue: 0.1)
         secondaryText = Color(red: 0.28, green: 0.25, blue: 0.22)
+    }
+
+    private init(
+        accent: Color,
+        background: Color,
+        sidebarBackground: Color,
+        cardBackground: Color,
+        cardStroke: Color,
+        primaryText: Color,
+        secondaryText: Color
+    ) {
+        self.accent = accent
+        self.background = background
+        self.sidebarBackground = sidebarBackground
+        self.cardBackground = cardBackground
+        self.cardStroke = cardStroke
+        self.primaryText = primaryText
+        self.secondaryText = secondaryText
     }
 }
 

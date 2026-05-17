@@ -1,0 +1,416 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		12DD989A2537484E81B35403 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02972563E16DBC28A9162044 /* ContentView.swift */; };
+		3927016F18C61779B548DAF2 /* HeadphonesMenuBar.png in Resources */ = {isa = PBXBuildFile; fileRef = 146C9851027300CE90E03FED /* HeadphonesMenuBar.png */; };
+		5DF836B270CFC5E9EB09B09B /* HeadphonesMark.png in Resources */ = {isa = PBXBuildFile; fileRef = 84F21CC1E7A6D0316D418D1C /* HeadphonesMark.png */; };
+		626564DCD9D1C3C3A34AE91A /* BossMacOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96F4BDFFBE4F9E177883939 /* BossMacOSApp.swift */; };
+		63DE03FCD4BDA366D1739DDE /* BossLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = AFB0B8D450905136D198F448 /* BossLogo.png */; };
+		6B50C788FF5564E514BAAEE8 /* BossMacOSViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B22153A6B061770A45D12FB /* BossMacOSViewModel.swift */; };
+		92725E85518487ADF2FB563E /* BossResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F397452A28A84E164534B6 /* BossResources.swift */; };
+		C03A0939C5244B0145077CE5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5D40D1B528161BC87CFE416D /* Assets.xcassets */; };
+		C1D1087CCF33ADEFB76D24B4 /* libbossApple in Frameworks */ = {isa = PBXBuildFile; productRef = 04EF58F22849C7E60400DE71 /* libbossApple */; };
+		DEAFD8A822D2465BC02083A0 /* libboss in Frameworks */ = {isa = PBXBuildFile; productRef = 003CDF69F2A61F876B160E75 /* libboss */; };
+		EC96C2C57B95444C0012E7DD /* BossMenuBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C3141B6998C4F928C6A50F /* BossMenuBar.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		02972563E16DBC28A9162044 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		146C9851027300CE90E03FED /* HeadphonesMenuBar.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = HeadphonesMenuBar.png; sourceTree = "<group>"; };
+		5D40D1B528161BC87CFE416D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		6805378F136D4E46A2849CB7 /* libboss-apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "libboss-apple"; path = "../libboss-apple"; sourceTree = SOURCE_ROOT; };
+		730DED07C45A35B95E2AC7AC /* libboss */ = {isa = PBXFileReference; lastKnownFileType = folder; name = libboss; path = ../libboss; sourceTree = SOURCE_ROOT; };
+		77F397452A28A84E164534B6 /* BossResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossResources.swift; sourceTree = "<group>"; };
+		84F21CC1E7A6D0316D418D1C /* HeadphonesMark.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = HeadphonesMark.png; sourceTree = "<group>"; };
+		8B22153A6B061770A45D12FB /* BossMacOSViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossMacOSViewModel.swift; sourceTree = "<group>"; };
+		A96F4BDFFBE4F9E177883939 /* BossMacOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossMacOSApp.swift; sourceTree = "<group>"; };
+		AFB0B8D450905136D198F448 /* BossLogo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BossLogo.png; sourceTree = "<group>"; };
+		C3C3141B6998C4F928C6A50F /* BossMenuBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossMenuBar.swift; sourceTree = "<group>"; };
+		D5146AF815A4B7C86E0737CA /* Boss.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Boss.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FD58CFE76875C6D11382A771 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DEAFD8A822D2465BC02083A0 /* libboss in Frameworks */,
+				C1D1087CCF33ADEFB76D24B4 /* libbossApple in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		41490D50212AF6D1E0C439ED /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				6549FCBFE24A779517642F5A /* BossMacOS */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		58683C6F9AAA933C185535AE /* BossXcode */ = {
+			isa = PBXGroup;
+			children = (
+				5D40D1B528161BC87CFE416D /* Assets.xcassets */,
+			);
+			path = BossXcode;
+			sourceTree = "<group>";
+		};
+		6549FCBFE24A779517642F5A /* BossMacOS */ = {
+			isa = PBXGroup;
+			children = (
+				A3B44F46FAB080AF885982DC /* Resources */,
+				A96F4BDFFBE4F9E177883939 /* BossMacOSApp.swift */,
+				8B22153A6B061770A45D12FB /* BossMacOSViewModel.swift */,
+				C3C3141B6998C4F928C6A50F /* BossMenuBar.swift */,
+				77F397452A28A84E164534B6 /* BossResources.swift */,
+				02972563E16DBC28A9162044 /* ContentView.swift */,
+			);
+			path = BossMacOS;
+			sourceTree = "<group>";
+		};
+		708483B18F24FDC4F0ED474D = {
+			isa = PBXGroup;
+			children = (
+				58683C6F9AAA933C185535AE /* BossXcode */,
+				FD599E9FABB1B75DA45A394B /* Packages */,
+				41490D50212AF6D1E0C439ED /* Sources */,
+				FB484E028E45020E2B8D5F21 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A3B44F46FAB080AF885982DC /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				AFB0B8D450905136D198F448 /* BossLogo.png */,
+				84F21CC1E7A6D0316D418D1C /* HeadphonesMark.png */,
+				146C9851027300CE90E03FED /* HeadphonesMenuBar.png */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		FB484E028E45020E2B8D5F21 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D5146AF815A4B7C86E0737CA /* Boss.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FD599E9FABB1B75DA45A394B /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				730DED07C45A35B95E2AC7AC /* libboss */,
+				6805378F136D4E46A2849CB7 /* libboss-apple */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		513DBC6ED39479A047262672 /* Boss */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 415D069BCD684F98B538626C /* Build configuration list for PBXNativeTarget "Boss" */;
+			buildPhases = (
+				CDEB8DE37D8557CCED59236D /* Sources */,
+				CDC8659A71CE93F8A97B961D /* Resources */,
+				FD58CFE76875C6D11382A771 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Boss;
+			packageProductDependencies = (
+				003CDF69F2A61F876B160E75 /* libboss */,
+				04EF58F22849C7E60400DE71 /* libbossApple */,
+			);
+			productName = Boss;
+			productReference = D5146AF815A4B7C86E0737CA /* Boss.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		260C18A9329698EBC399DCB8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 176485C34F696E738F029511 /* Build configuration list for PBXProject "Boss" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 708483B18F24FDC4F0ED474D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D6CBDB4C12DADE77990715A1 /* XCLocalSwiftPackageReference "../libboss" */,
+				3B866AB1EF7C0B4D8130A380 /* XCLocalSwiftPackageReference "../libboss-apple" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = FB484E028E45020E2B8D5F21 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				513DBC6ED39479A047262672 /* Boss */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CDC8659A71CE93F8A97B961D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C03A0939C5244B0145077CE5 /* Assets.xcassets in Resources */,
+				63DE03FCD4BDA366D1739DDE /* BossLogo.png in Resources */,
+				5DF836B270CFC5E9EB09B09B /* HeadphonesMark.png in Resources */,
+				3927016F18C61779B548DAF2 /* HeadphonesMenuBar.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CDEB8DE37D8557CCED59236D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				626564DCD9D1C3C3A34AE91A /* BossMacOSApp.swift in Sources */,
+				6B50C788FF5564E514BAAEE8 /* BossMacOSViewModel.swift in Sources */,
+				EC96C2C57B95444C0012E7DD /* BossMenuBar.swift in Sources */,
+				92725E85518487ADF2FB563E /* BossResources.swift in Sources */,
+				12DD989A2537484E81B35403 /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0ACCAA7C5FBCBD7A5BBA1DDC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Boss;
+				INFOPLIST_KEY_CFBundleName = Boss;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Boss uses Bluetooth to discover and connect to your Bose headphones so it can read and change device settings.";
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.local.boss;
+				PRODUCT_NAME = Boss;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A2CB96493EEEE7877845EBC8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		C9BEBE4FB1EC56D14BD6ECC4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		E0B16B3F26B6BB4BFA785EE5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Boss;
+				INFOPLIST_KEY_CFBundleName = Boss;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Boss uses Bluetooth to discover and connect to your Bose headphones so it can read and change device settings.";
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.local.boss;
+				PRODUCT_NAME = Boss;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		176485C34F696E738F029511 /* Build configuration list for PBXProject "Boss" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E0B16B3F26B6BB4BFA785EE5 /* Debug */,
+				0ACCAA7C5FBCBD7A5BBA1DDC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		415D069BCD684F98B538626C /* Build configuration list for PBXNativeTarget "Boss" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2CB96493EEEE7877845EBC8 /* Debug */,
+				C9BEBE4FB1EC56D14BD6ECC4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		3B866AB1EF7C0B4D8130A380 /* XCLocalSwiftPackageReference "../libboss-apple" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../libboss-apple";
+		};
+		D6CBDB4C12DADE77990715A1 /* XCLocalSwiftPackageReference "../libboss" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../libboss;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		003CDF69F2A61F876B160E75 /* libboss */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = libboss;
+		};
+		04EF58F22849C7E60400DE71 /* libbossApple */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = libbossApple;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 260C18A9329698EBC399DCB8 /* Project object */;
+}

@@ -77,6 +77,30 @@ extension BossctlCLI {
         }
     }
 
+    static func printEqualizer(_ settings: BossEqualizerSettings) {
+        for band in settings.ranges {
+            print("\(band.band.displayName.capitalized): \(band.currentLevel) [range \(band.minLevel)...\(band.maxLevel)]")
+        }
+    }
+
+    static func printEqualizerWriteResult(_ result: BossAppleEqualizerWriteResult) {
+        let prefix: String
+        let settings: BossEqualizerSettings
+        switch result {
+        case .unchanged(let unchanged):
+            prefix = "Equalizer unchanged:"
+            settings = unchanged
+        case .updated(let updated):
+            prefix = "Equalizer updated:"
+            settings = updated
+        case .verificationInconclusive(let target):
+            prefix = "Equalizer update sent; verification inconclusive"
+            settings = target
+        }
+        print(prefix)
+        printEqualizer(settings)
+    }
+
     static func printAudioModeSettingsConfig(_ config: BossAudioModeSettingsConfig) {
         print("CNC level: \(config.cncLevel) (0=max ANC, 10=most ambient)")
         print("Auto CNC: \(config.autoCNCEnabled)")

@@ -95,12 +95,17 @@ final class LibbossTests: XCTestCase {
         )
         XCTAssertEqual(version.version, "1.2.3")
 
-        let product = try ProductInfoParser.parseProductIDVariant(
-            from: BmapPacket(functionBlock: .productInfo, function: .productInfoProductIDVariants, operator: .status, payload: Data([0x40, 0x82, 0x00]))
+        let black = try ProductInfoParser.parseProductIDVariant(
+            from: BmapPacket(functionBlock: .productInfo, function: .productInfoProductIDVariants, operator: .status, payload: Data([0x40, 0x82, 0x01]))
         )
-        XCTAssertEqual(product.productID, 0x4082)
-        XCTAssertEqual(product.product?.displayName, "Bose QC Ultra 2 HP")
-        XCTAssertEqual(product.variantName, "WolverineBlack")
+        XCTAssertEqual(black.productID, 0x4082)
+        XCTAssertEqual(black.product?.displayName, "Bose QC Ultra 2 HP")
+        XCTAssertEqual(black.variantName, "WolverineBlack")
+
+        let violet = try ProductInfoParser.parseProductIDVariant(
+            from: BmapPacket(functionBlock: .productInfo, function: .productInfoProductIDVariants, operator: .status, payload: Data([0x40, 0x82, 0x04]))
+        )
+        XCTAssertEqual(violet.variantName, "WolverineMidnightViolet")
 
         let firmware = try ProductInfoParser.parseFirmwareVersion(
             from: BmapPacket(functionBlock: .productInfo, function: .productInfoFirmwareVersion, port: 2, operator: .status, payload: Data("9.9.9".utf8))
@@ -112,7 +117,7 @@ final class LibbossTests: XCTestCase {
     func testBootstrapSessionSuccess() async throws {
         let transport = MockTransport(frames: [
             try BmapCodec.encode(BmapPacket(functionBlock: .productInfo, function: .productInfoBmapVersion, operator: .status, payload: Data("1.0.0".utf8))),
-            try BmapCodec.encode(BmapPacket(functionBlock: .productInfo, function: .productInfoProductIDVariants, operator: .status, payload: Data([0x40, 0x82, 0x01]))),
+            try BmapCodec.encode(BmapPacket(functionBlock: .productInfo, function: .productInfoProductIDVariants, operator: .status, payload: Data([0x40, 0x82, 0x02]))),
             try BmapCodec.encode(BmapPacket(functionBlock: .productInfo, function: .productInfoAllFblocks, operator: .status, payload: Data([0x00, 0x06]))),
         ])
         let link = StreamBmapLink(transport: transport)
@@ -135,7 +140,7 @@ final class LibbossTests: XCTestCase {
         let transport = MockTransport(
             frames: [
                 try BmapCodec.encode(BmapPacket(functionBlock: .productInfo, function: .productInfoBmapVersion, operator: .status, payload: Data("1.0.1".utf8))),
-                try BmapCodec.encode(BmapPacket(functionBlock: .productInfo, function: .productInfoProductIDVariants, operator: .status, payload: Data([0x40, 0x82, 0x00]))),
+                try BmapCodec.encode(BmapPacket(functionBlock: .productInfo, function: .productInfoProductIDVariants, operator: .status, payload: Data([0x40, 0x82, 0x01]))),
                 try BmapCodec.encode(BmapPacket(functionBlock: .productInfo, function: .productInfoAllFblocks, operator: .status, payload: Data([0x00]))),
             ],
             initialDelay: .milliseconds(30)
