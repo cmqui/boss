@@ -76,6 +76,22 @@ let volumeControl = try await controller.volumeControl()
 let updatedVolumeControl = try await controller.setVolumeControl(.captouch)
 ```
 
+For apps that need a long-lived connection and repeated refreshes, use `BossAppleSession` instead of reconnecting per call:
+
+```swift
+let session = BossAppleSession(
+    connection: BossAppleConnectionOptions(nameContains: "Bose")
+)
+
+let workspace = try await session.loadWorkspaceSnapshot()
+
+for try await update in session.modeWorkspaceUpdates(interval: .seconds(5)) {
+    print(update.currentAudioModeIndex)
+}
+```
+
+`modeWorkspaceUpdates` is a polling-based stream over one persistent BLE session. It improves GUI responsiveness and connection stability, but it is not yet true BMAP notification-subscription support.
+
 Convenience wrappers are available for the common GUI controls:
 
 - `setCNCLevel(_:)`

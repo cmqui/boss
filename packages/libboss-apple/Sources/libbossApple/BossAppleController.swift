@@ -1421,17 +1421,11 @@ extension BossAppleController {
         initialUnavailableReason: BossAppleSettingUnavailableReason,
         read: @escaping @Sendable () async throws -> Value?
     ) async throws -> BossAppleObservedSetting<Value> {
-        do {
-            if let value = try await read() {
-                return BossAppleObservedSetting(value: value, source: .directGet)
-            }
-            return BossAppleObservedSetting(value: nil, unavailableReason: initialUnavailableReason)
-        } catch {
-            if let reason = unavailableSettingReason(error) {
-                return BossAppleObservedSetting(value: nil, unavailableReason: reason)
-            }
-            throw error
-        }
+        let observed = try await BossSettingObservation.observeAfterDirectRead(
+            initialUnavailableReason: wrap(initialUnavailableReason),
+            read: read
+        )
+        return wrap(observed)
     }
 
     static func readOnHeadDetection(
@@ -1870,6 +1864,69 @@ extension BossAppleController {
             return nil
         }
         return BmapErrorCode(rawValue: rawValue)
+    }
+
+    static func wrap(_ reason: BossAppleSettingUnavailableReason) -> BossSettingUnavailableReason {
+        switch reason {
+        case .missingFromSnapshot:
+            return .missingFromSnapshot
+        case .timedOut:
+            return .timedOut
+        case .responseStreamEnded:
+            return .responseStreamEnded
+        case .functionUnsupported:
+            return .functionUnsupported
+        case .operatorUnsupported:
+            return .operatorUnsupported
+        case .dataUnavailable:
+            return .dataUnavailable
+        case .insecureTransport:
+            return .insecureTransport
+        case .unexpectedStreamTermination:
+            return .unexpectedStreamTermination
+        case .bmapError(let code):
+            return .bmapError(code)
+        }
+    }
+
+    static func wrap(_ reason: BossSettingUnavailableReason) -> BossAppleSettingUnavailableReason {
+        switch reason {
+        case .missingFromSnapshot:
+            return .missingFromSnapshot
+        case .timedOut:
+            return .timedOut
+        case .responseStreamEnded:
+            return .responseStreamEnded
+        case .functionUnsupported:
+            return .functionUnsupported
+        case .operatorUnsupported:
+            return .operatorUnsupported
+        case .dataUnavailable:
+            return .dataUnavailable
+        case .insecureTransport:
+            return .insecureTransport
+        case .unexpectedStreamTermination:
+            return .unexpectedStreamTermination
+        case .bmapError(let code):
+            return .bmapError(code)
+        }
+    }
+
+    static func wrap<Value>(_ observed: BossObservedSetting<Value>) -> BossAppleObservedSetting<Value> {
+        BossAppleObservedSetting(
+            value: observed.value,
+            source: observed.source.map {
+                switch $0 {
+                case .snapshot:
+                    return .snapshot
+                case .compositeSnapshot:
+                    return .compositeSnapshot
+                case .directGet:
+                    return .directGet
+                }
+            },
+            unavailableReason: observed.unavailableReason.map(wrap)
+        )
     }
 
     static func validatedEqualizerRequests(

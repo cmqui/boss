@@ -55,6 +55,7 @@ final class BossMacOSViewModel: ObservableObject {
     private var hasStartedInitialRefresh = false
     private var discoveryTask: Task<Void, Never>?
     private var backgroundLoadTask: Task<Void, Never>?
+    private var session: BossAppleSession?
     private var selectedDeviceIdentifier: UUID?
     private var isManualDeviceSelection = false
     private var isConnectingSelectedDevice = false
@@ -111,12 +112,14 @@ final class BossMacOSViewModel: ObservableObject {
         cancelDiscoveryLoop()
         cancelBackgroundLoad()
         run("Connecting") {
-            let controller = self.makeController()
+            let session = self.makeSession()
             do {
-                try await self.reloadAllState(using: controller)
+                try await self.reloadAllState(using: session)
                 self.appScreen = .workspace
                 self.waitingStatusMessage = "Connected."
+                self.startBackgroundLoad(using: session)
             } catch {
+                await self.clearSession()
                 self.enterWaitingMode(message: Self.describe(error))
                 self.startDiscoveryLoopIfNeeded()
                 throw error
@@ -156,6 +159,9 @@ final class BossMacOSViewModel: ObservableObject {
         isManualDeviceSelection = true
         selectedDeviceIdentifier = nil
         selectedDiscoveredDeviceID = nil
+        Task {
+            await self.clearSession()
+        }
         resetWorkspaceState()
         enterWaitingMode(message: "Looking for a Bose device nearby.")
         startDiscoveryLoopIfNeeded(forceImmediateRefresh: true)
@@ -164,8 +170,8 @@ final class BossMacOSViewModel: ObservableObject {
     func selectAudioMode(_ index: Int) {
         selectedAudioModeIndex = index
         run("Switching mode") {
-            let controller = self.makeController()
-            let result = try await controller.setCurrentAudioMode(index: index)
+            let session = self.makeSession()
+            let result = try await session.setCurrentAudioMode(index: index)
             let resultMessage: String
 
             switch result {
@@ -180,20 +186,20 @@ final class BossMacOSViewModel: ObservableObject {
                 resultMessage = "Mode command sent; verification was inconclusive"
             }
 
-            try await self.reloadModeWorkspace(using: controller)
+            try await self.reloadModeWorkspace(using: session)
             self.lastResultMessage = "\(resultMessage); settings refreshed"
         }
     }
 
     func setFavorite(_ isFavorite: Bool, for mode: BossAudioModeConfig) {
         run(isFavorite ? "Adding favorite" : "Removing favorite") {
-            let controller = self.makeController()
+            let session = self.makeSession()
             if isFavorite {
-                _ = try await controller.favoriteAudioMode(index: mode.modeIndex)
+                _ = try await session.favoriteAudioMode(index: mode.modeIndex)
             } else {
-                _ = try await controller.unfavoriteAudioMode(index: mode.modeIndex)
+                _ = try await session.unfavoriteAudioMode(index: mode.modeIndex)
             }
-            try await self.reloadAllState(using: controller)
+            try await self.reloadAllState(using: session)
             self.lastResultMessage = isFavorite
                 ? "Added \"\(self.customProfileDisplayName(for: mode))\" to favorites"
                 : "Removed \"\(self.customProfileDisplayName(for: mode))\" from favorites"
@@ -202,9 +208,9 @@ final class BossMacOSViewModel: ObservableObject {
 
     func deleteCustomProfile(_ mode: BossAudioModeConfig) {
         run("Deleting custom profile") {
-            let controller = self.makeController()
-            _ = try await controller.deleteCustomAudioMode(slot: mode.modeIndex)
-            try await self.reloadAllState(using: controller)
+            let session = self.makeSession()
+            _ = try await session.deleteCustomAudioMode(slot: mode.modeIndex)
+            try await self.reloadAllState(using: session)
             self.lastResultMessage = "Deleted \"\(self.customProfileDisplayName(for: mode))\""
         }
     }
@@ -214,14 +220,14 @@ final class BossMacOSViewModel: ObservableObject {
             return
         }
         run("Applying mode settings") {
-            let controller = self.makeController()
+            let session = self.makeSession()
             let patch = BossAudioModeSettingsConfigPatch(
                 cncLevel: self.cncLevel,
                 spatialAudioMode: self.spatialAudioMode,
                 windBlockEnabled: self.windBlockEnabled,
                 ancToggleEnabled: self.ancToggleEnabled
             )
-            let result = try await controller.setAudioModeSettings(patch)
+            let result = try await session.setAudioModeSettings(patch)
             switch result {
             case .unchanged(let config):
                 self.applySettingsSnapshot(config)
@@ -241,8 +247,8 @@ final class BossMacOSViewModel: ObservableObject {
             return
         }
         run("Applying EQ settings") {
-            let controller = self.makeController()
-            let result = try await controller.setEqualizer(self.currentEqualizerPatch())
+            let session = self.makeSession()
+            let result = try await session.setEqualizer(self.currentEqualizerPatch())
             switch result {
             case .unchanged(let settings):
                 self.applyEqualizerSnapshot(settings)
@@ -323,9 +329,9 @@ final class BossMacOSViewModel: ObservableObject {
         }
         wearDetectionEnabled = enabled
         run("Updating Wear Detection") {
-            let controller = self.makeController()
+            let session = self.makeSession()
             do {
-                let updated = try await controller.setWearDetectionEnabled(enabled)
+                let updated = try await session.setWearDetectionEnabled(enabled)
                 self.wearDetectionEnabled = updated.isEnabled
                 self.lastResultMessage = "Wear detection updated"
             } catch {
@@ -341,9 +347,9 @@ final class BossMacOSViewModel: ObservableObject {
         }
         autoAwareEnabled = enabled
         run("Updating Auto-Aware") {
-            let controller = self.makeController()
+            let session = self.makeSession()
             do {
-                _ = try await controller.setAutoAware(enabled)
+                _ = try await session.setAutoAware(enabled)
                 self.lastResultMessage = "Auto-Aware updated"
             } catch {
                 self.autoAwareEnabled = previousValue
@@ -358,9 +364,9 @@ final class BossMacOSViewModel: ObservableObject {
         }
         autoPlayPauseEnabled = enabled
         run("Updating Auto-Play/Pause") {
-            let controller = self.makeController()
+            let session = self.makeSession()
             do {
-                _ = try await controller.setAutoPlayPause(enabled)
+                _ = try await session.setAutoPlayPause(enabled)
                 self.lastResultMessage = "Auto-Play/Pause updated"
             } catch {
                 self.autoPlayPauseEnabled = previousValue
@@ -375,9 +381,9 @@ final class BossMacOSViewModel: ObservableObject {
         }
         autoAnswerEnabled = enabled
         run("Updating Auto-Answer") {
-            let controller = self.makeController()
+            let session = self.makeSession()
             do {
-                _ = try await controller.setAutoAnswer(enabled)
+                _ = try await session.setAutoAnswer(enabled)
                 self.lastResultMessage = "Auto-Answer updated"
             } catch {
                 self.autoAnswerEnabled = previousValue
@@ -392,9 +398,9 @@ final class BossMacOSViewModel: ObservableObject {
         }
         volumeControlValue = value
         run("Updating Volume Control") {
-            let controller = self.makeController()
+            let session = self.makeSession()
             do {
-                let updated = try await controller.setVolumeControl(value)
+                let updated = try await session.setVolumeControl(value)
                 self.volumeControlValue = updated.value
                 self.lastResultMessage = "Volume control updated"
             } catch {
@@ -404,37 +410,48 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
-    private func makeController() -> BossAppleController {
+    private func makeConnectionOptions() -> BossAppleConnectionOptions {
         let connectionScanTimeout = selectedDeviceIdentifier == nil
             ? scanTimeoutSeconds
             : min(scanTimeoutSeconds, 6)
-        return BossAppleController(
-            connection: BossAppleConnectionOptions(
-                nameContains: selectedDeviceIdentifier == nil ? "Bose" : nil,
-                identifier: selectedDeviceIdentifier,
-                scanTimeout: .seconds(connectionScanTimeout)
-            )
+        return BossAppleConnectionOptions(
+            nameContains: selectedDeviceIdentifier == nil ? "Bose" : nil,
+            identifier: selectedDeviceIdentifier,
+            scanTimeout: .seconds(connectionScanTimeout)
         )
     }
 
-    private func reloadAllState(using controller: BossAppleController) async throws {
-        let bootstrappedDevice = try await controller.bootstrap()
-        let currentMode = try await controller.currentAudioMode()
-        let modeSettings = try await controller.audioModeSettings()
-        let modeEqualizer = try await controller.equalizer()
-        let standaloneDeviceSettings = try await controller.deviceSettings()
-        let modes = try await controller.audioModeConfigs()
-        let prompts = await loadSupportedPrompts(using: controller)
+    private func makeSession() -> BossAppleSession {
+        let currentOptions = makeConnectionOptions()
+        if let session {
+            return session
+        }
+        let newSession = BossAppleSession(connection: currentOptions)
+        session = newSession
+        return newSession
+    }
 
-        currentAudioModeIndex = currentMode
-        selectedAudioModeIndex = currentMode
-        applySettingsSnapshot(modeSettings)
-        applyEqualizerSnapshot(modeEqualizer)
-        applyDeviceSettings(standaloneDeviceSettings)
-        deviceName = bootstrappedDevice.productName
-        deviceVariantName = bootstrappedDevice.productVariant.variantName
-        audioModes = modes
-        customProfileModes = modes.filter(\.userConfigurable)
+    private func clearSession() async {
+        let existing = session
+        session = nil
+        if let existing {
+            await existing.close()
+        }
+    }
+
+    private func reloadAllState(using session: BossAppleSession) async throws {
+        let workspace = try await session.loadWorkspaceSnapshot()
+        let prompts = await loadSupportedPrompts(using: session)
+
+        currentAudioModeIndex = workspace.modeWorkspace.currentAudioModeIndex
+        selectedAudioModeIndex = workspace.modeWorkspace.currentAudioModeIndex
+        applySettingsSnapshot(workspace.modeWorkspace.settings)
+        applyEqualizerSnapshot(workspace.modeWorkspace.equalizer)
+        applyDeviceSettings(workspace.modeWorkspace.deviceSettings.settings)
+        deviceName = workspace.bootstrappedDevice.productName
+        deviceVariantName = workspace.bootstrappedDevice.productVariant.variantName
+        audioModes = workspace.audioModes
+        customProfileModes = workspace.audioModes.filter(\.userConfigurable)
         supportedPrompts = prompts
         hasDetachedSettingsDraft = false
         hasDetachedEqualizerDraft = false
@@ -523,15 +540,18 @@ final class BossMacOSViewModel: ObservableObject {
         deviceName = device.name
         waitingStatusMessage = "Found \(device.name). Opening controls..."
         run("Connecting to \(device.name)") {
-            let controller = self.makeController()
+            await self.clearSession()
+            let session = self.makeSession()
             do {
-                try await self.reloadAllState(using: controller)
+                try await self.reloadAllState(using: session)
                 self.isConnectingSelectedDevice = false
                 self.appScreen = .workspace
                 self.waitingStatusMessage = "Connected."
+                self.startBackgroundLoad(using: session)
             } catch {
                 self.isConnectingSelectedDevice = false
                 self.selectedDeviceIdentifier = nil
+                await self.clearSession()
                 self.enterWaitingMode(message: Self.describe(error))
                 self.startDiscoveryLoopIfNeeded()
                 throw error
@@ -576,7 +596,35 @@ final class BossMacOSViewModel: ObservableObject {
         hasDetachedEqualizerDraft = false
     }
 
-    private func startBackgroundLoad(using controller: BossAppleController) {}
+    private func startBackgroundLoad(using session: BossAppleSession) {
+        cancelBackgroundLoad()
+        backgroundLoadTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                for try await snapshot in session.modeWorkspaceUpdates(interval: .seconds(5)) {
+                    guard !Task.isCancelled else {
+                        break
+                    }
+                    await MainActor.run {
+                        guard self.appScreen == .workspace else {
+                            return
+                        }
+                        self.applyBackgroundModeWorkspaceSnapshot(snapshot)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    guard self.appScreen == .workspace, !self.isBusy else {
+                        return
+                    }
+                    self.lastResultMessage = "Background refresh paused: \(Self.describe(error))"
+                }
+            }
+        }
+    }
 
     private func cancelBackgroundLoad() {
         backgroundLoadTask?.cancel()
@@ -601,20 +649,18 @@ final class BossMacOSViewModel: ObservableObject {
         return description
     }
 
-    private func reloadModeWorkspace(using controller: BossAppleController) async throws {
-        async let currentMode = controller.currentAudioMode()
-        async let settings = controller.audioModeSettings()
-        async let equalizer = controller.equalizer()
-        let snapshot = try await (currentMode, settings, equalizer)
-        currentAudioModeIndex = snapshot.0
-        selectedAudioModeIndex = snapshot.0
-        applySettingsSnapshot(snapshot.1)
-        applyEqualizerSnapshot(snapshot.2)
+    private func reloadModeWorkspace(using session: BossAppleSession) async throws {
+        let snapshot = try await session.refreshModeWorkspaceSnapshot()
+        currentAudioModeIndex = snapshot.currentAudioModeIndex
+        selectedAudioModeIndex = snapshot.currentAudioModeIndex
+        applySettingsSnapshot(snapshot.settings)
+        applyEqualizerSnapshot(snapshot.equalizer)
+        applyDeviceSettings(snapshot.deviceSettings.settings)
     }
 
-    private func loadSupportedPrompts(using controller: BossAppleController) async -> [BossAudioModePrompt] {
+    private func loadSupportedPrompts(using session: BossAppleSession) async -> [BossAudioModePrompt] {
         do {
-            let prompts = try await controller.supportedAudioModePrompts()
+            let prompts = try await session.supportedAudioModePrompts()
             return prompts.isEmpty ? fallbackSupportedPrompts : prompts
         } catch let error as BossAppleControlError
             where error.bmapErrorCode == .funcNotSupp {
@@ -647,6 +693,17 @@ final class BossMacOSViewModel: ObservableObject {
         autoPlayPauseEnabled = deviceSettings.autoPlayPauseEnabled ?? deviceSettings.wearDetection?.isAutoPlayEnabled
         autoAnswerEnabled = deviceSettings.autoAnswerEnabled ?? deviceSettings.wearDetection?.isAutoAnswerEnabled
         volumeControlValue = deviceSettings.volumeControl?.value
+    }
+
+    private func applyBackgroundModeWorkspaceSnapshot(_ snapshot: BossAppleModeWorkspaceSnapshot) {
+        currentAudioModeIndex = snapshot.currentAudioModeIndex
+        if !hasDetachedSettingsDraft {
+            applySettingsSnapshot(snapshot.settings)
+        }
+        if !hasDetachedEqualizerDraft {
+            applyEqualizerSnapshot(snapshot.equalizer)
+        }
+        applyDeviceSettings(snapshot.deviceSettings.settings)
     }
 
     private func noteManualSettingsEdit() {
@@ -698,13 +755,13 @@ final class BossMacOSViewModel: ObservableObject {
 
     private func saveCustomProfile(profileName: String, prompt: BossAudioModePrompt) {
         run("Saving custom profile") {
-            let controller = self.makeController()
-            let saved = try await controller.saveCustomAudioMode(
+            let session = self.makeSession()
+            let saved = try await session.saveCustomAudioMode(
                 name: profileName,
                 settings: self.currentDraftConfig(),
                 prompt: prompt
             )
-            try await self.reloadAllState(using: controller)
+            try await self.reloadAllState(using: session)
             self.currentAudioModeIndex = saved.modeIndex
             self.selectedAudioModeIndex = saved.modeIndex
             self.lastResultMessage = "Saved profile \"\(saved.name)\""

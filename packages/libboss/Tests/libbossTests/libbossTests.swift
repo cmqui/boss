@@ -192,6 +192,154 @@ final class LibbossTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
     }
+
+    func testBossPacketSessionAwaitsMatchingResponse() async throws {
+        let targetPacket = BmapPacket(
+            functionBlock: .productInfo,
+            function: .productInfoProductIDVariants,
+            operator: .status,
+            payload: Data([0x40, 0x82, 0x01])
+        )
+        let transport = MockTransport(frames: [try BmapCodec.encode(targetPacket)])
+        let link = StreamBmapLink(transport: transport)
+        let session = BossPacketSession(link: link)
+        defer { session.invalidate() }
+
+        let received = try await session.firstPacket(
+            matching: { $0.function == .productInfoProductIDVariants },
+            timeout: .seconds(1),
+            timeoutError: TestTimeoutError.timedOut
+        )
+
+        XCTAssertEqual(received, targetPacket)
+    }
+
+    func testBossPacketSessionStreamsMatchingPackets() async throws {
+        let ignoredPacket = BmapPacket(
+            functionBlock: .productInfo,
+            function: .productInfoBmapVersion,
+            operator: .status,
+            payload: Data("1.0.0".utf8)
+        )
+        let targetPacket = BmapPacket(
+            functionBlock: .productInfo,
+            function: .productInfoAllFblocks,
+            operator: .status,
+            payload: Data([0x00, 0x06])
+        )
+        let transport = MockTransport(frames: [
+            try BmapCodec.encode(ignoredPacket),
+            try BmapCodec.encode(targetPacket),
+        ])
+        let link = StreamBmapLink(transport: transport)
+        let session = BossPacketSession(link: link)
+        defer { session.invalidate() }
+
+        let stream = session.packetStream { $0.function == .productInfoAllFblocks }
+        var iterator = stream.makeAsyncIterator()
+        let received = try await iterator.next()
+
+        XCTAssertEqual(received, targetPacket)
+    }
+
+    func testBossPacketSessionBuildsSettingsSnapshotFromStatusPackets() async throws {
+        let snapshotPacket = BmapPacket(
+            functionBlock: .settings,
+            function: BmapFunction(block: .settings, rawValue: BossSettingsCodec.autoPlayPauseFunctionRaw),
+            operator: .status,
+            payload: Data([0x01])
+        )
+        let resultPacket = BmapPacket(
+            functionBlock: .settings,
+            function: BmapFunction(block: .settings, rawValue: BossSettingsCodec.settingsGetAllFunctionRaw),
+            operator: .result
+        )
+        let transport = MockTransport(frames: [
+            try BmapCodec.encode(snapshotPacket),
+            try BmapCodec.encode(resultPacket),
+        ])
+        let link = StreamBmapLink(transport: transport)
+        let session = BossPacketSession(link: link)
+        defer { session.invalidate() }
+
+        let snapshot = try await session.settingsSnapshot(
+            timeout: .seconds(1),
+            timeoutError: TestTimeoutError.timedOut
+        )
+
+        XCTAssertEqual(try snapshot.autoPlayPause(), true)
+    }
+
+    func testBossPacketSessionSurfacesGenericBmapResponseError() async throws {
+        let errorPacket = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.currentModeFunctionRaw),
+            operator: .error,
+            payload: Data([BmapErrorCode.timeout.rawValue])
+        )
+        let transport = MockTransport(frames: [try BmapCodec.encode(errorPacket)])
+        let link = StreamBmapLink(transport: transport)
+        let session = BossPacketSession(link: link)
+        defer { session.invalidate() }
+
+        do {
+            _ = try await session.currentAudioMode(
+                timeout: .seconds(1),
+                timeoutError: TestTimeoutError.timedOut
+            )
+            XCTFail("Expected failure")
+        } catch let error as BmapResponseError {
+            XCTAssertEqual(error.context, "audioModes.Unknown(31:3)")
+            XCTAssertEqual(error.payloadHex, "09")
+            XCTAssertEqual(error.code, .timeout)
+        }
+    }
+
+    func testBossSettingObservationReturnsDirectReadValue() async throws {
+        let observed = try await BossSettingObservation.observeAfterDirectRead(
+            initialUnavailableReason: .missingFromSnapshot,
+            read: { true }
+        )
+
+        XCTAssertEqual(observed.value, true)
+        XCTAssertEqual(observed.source, .directGet)
+        XCTAssertNil(observed.unavailableReason)
+    }
+
+    func testBossSettingObservationMapsSessionTimeoutToUnavailableReason() async throws {
+        let observed = try await BossSettingObservation.observeAfterDirectRead(
+            initialUnavailableReason: .missingFromSnapshot,
+            read: { () async throws -> Bool? in
+                throw BossSessionError.responseTimedOut(seconds: 5)
+            }
+        )
+
+        XCTAssertNil(observed.value)
+        XCTAssertEqual(observed.unavailableReason, BossSettingUnavailableReason.timedOut)
+    }
+
+    func testBossSessionCurrentAudioModeUpdateStreamParsesStatusPackets() async throws {
+        let packet = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.currentModeFunctionRaw),
+            operator: .status,
+            payload: Data([0x07])
+        )
+        let transport = MockTransport(frames: [try BmapCodec.encode(packet)])
+        let link = StreamBmapLink(transport: transport)
+        let packetSession = BossPacketSession(link: link)
+        defer { packetSession.invalidate() }
+        let session = BossSession(packetSession: packetSession)
+
+        var iterator = session.currentAudioModeUpdateStream().makeAsyncIterator()
+        let received = try await iterator.next()
+
+        XCTAssertEqual(received, 7)
+    }
+}
+
+private enum TestTimeoutError: Error {
+    case timedOut
 }
 
 private actor MockTransportState {
