@@ -8,7 +8,7 @@ struct BossApp: App {
     @StateObject private var launchAtLogin = LaunchAtLoginController()
 
     var body: some Scene {
-        WindowGroup("Boss", id: "main") {
+        Window("Boss", id: "main") {
             ContentView(viewModel: viewModel)
                 .frame(minWidth: 760, minHeight: 560)
         }
@@ -69,8 +69,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(windowWillClose(_:)),
-            name: NSWindow.willCloseNotification,
+            selector: #selector(handleWindowDidBecomeMain(_:)),
+            name: NSWindow.didBecomeMainNotification,
             object: nil
         )
         Self.applyAppIcon()
@@ -91,7 +91,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static func activateApp() {
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
-        NSApp.windows.first?.makeKeyAndOrderFront(nil)
+        if let window = NSApp.windows.first {
+            window.delegate = NSApp.delegate as? AppDelegate
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 
     static func openMainWindow() {
@@ -100,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.activate(ignoringOtherApps: true)
         DispatchQueue.main.async {
             if let window = NSApp.windows.first {
+                window.delegate = NSApp.delegate as? AppDelegate
                 window.makeKeyAndOrderFront(nil)
             }
         }
@@ -127,16 +131,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc
-    private func windowWillClose(_ notification: Notification) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            let hasVisibleWindows = NSApp.windows.contains { window in
-                window.isVisible
-            }
-            guard !hasVisibleWindows else {
-                return
-            }
-            Self.transitionToMenuBarOnly()
+    private func handleWindowDidBecomeMain(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else {
+            return
         }
+        window.delegate = self
+    }
+}
+
+extension AppDelegate: NSWindowDelegate {
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if sender.title == "Boss" {
+            AppDelegate.transitionToMenuBarOnly()
+            return false
+        }
+        return true
     }
 }
 

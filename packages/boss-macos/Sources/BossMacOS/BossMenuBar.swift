@@ -1,3 +1,5 @@
+import AppKit
+import libboss
 import ServiceManagement
 import SwiftUI
 
@@ -35,12 +37,10 @@ final class LaunchAtLoginController: ObservableObject {
 
 struct BossMenuBarView: View {
     @ObservedObject var viewModel: BossMacOSViewModel
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button("Open Boss") {
-                openWindow(id: "main")
                 AppDelegate.openMainWindow()
             }
 
@@ -52,62 +52,80 @@ struct BossMenuBarView: View {
             }
 
             if !viewModel.selectableAudioModes.isEmpty {
-                Menu("Audio Modes") {
-                    ForEach(viewModel.selectableAudioModes, id: \.modeIndex) { mode in
-                        Button {
-                            viewModel.selectAudioMode(mode.modeIndex)
-                        } label: {
+                Divider()
+
+                ForEach(viewModel.selectableAudioModes, id: \.modeIndex) { mode in
+                    Button {
+                        viewModel.selectAudioMode(mode.modeIndex)
+                    } label: {
+                        HStack(spacing: 8) {
                             if viewModel.displayedCurrentAudioModeIndex == mode.modeIndex {
-                                Label(viewModel.customProfileDisplayName(for: mode), systemImage: "checkmark")
+                                Image(systemName: "checkmark")
                             } else {
-                                Text(viewModel.customProfileDisplayName(for: mode))
+                                Image(systemName: "checkmark")
+                                    .hidden()
                             }
+
+                            Text(viewModel.customProfileDisplayName(for: mode))
                         }
                     }
                 }
             }
 
-            if viewModel.wearDetectionEnabled != nil || viewModel.autoAwareEnabled != nil ||
-                viewModel.autoPlayPauseEnabled != nil || viewModel.autoAnswerEnabled != nil {
-                Menu("Device Settings") {
-                    if viewModel.wearDetectionEnabled != nil {
-                        Toggle(
-                            "Wear Detection",
-                            isOn: Binding(
-                                get: { viewModel.wearDetectionEnabled ?? false },
-                                set: { viewModel.setWearDetectionEnabled($0) }
-                            )
-                        )
-                    }
+            if hasSupportedDeviceSettings {
+                Divider()
 
-                    if viewModel.autoAwareEnabled != nil {
-                        Toggle(
-                            "Auto-Aware",
-                            isOn: Binding(
-                                get: { viewModel.autoAwareEnabled ?? false },
-                                set: { viewModel.setAutoAwareEnabled($0) }
-                            )
+                if viewModel.wearDetectionEnabled != nil {
+                    Toggle(
+                        "Wear Detection",
+                        isOn: Binding(
+                            get: { viewModel.wearDetectionEnabled ?? false },
+                            set: { viewModel.setWearDetectionEnabled($0) }
                         )
-                    }
+                    )
+                }
 
-                    if viewModel.autoPlayPauseEnabled != nil {
-                        Toggle(
-                            "Auto-Play/Pause",
-                            isOn: Binding(
-                                get: { viewModel.autoPlayPauseEnabled ?? false },
-                                set: { viewModel.setAutoPlayPauseEnabled($0) }
-                            )
+                if viewModel.autoAwareEnabled != nil {
+                    Toggle(
+                        "Auto-Aware",
+                        isOn: Binding(
+                            get: { viewModel.autoAwareEnabled ?? false },
+                            set: { viewModel.setAutoAwareEnabled($0) }
                         )
-                    }
+                    )
+                }
 
-                    if viewModel.autoAnswerEnabled != nil {
-                        Toggle(
-                            "Auto-Answer",
-                            isOn: Binding(
-                                get: { viewModel.autoAnswerEnabled ?? false },
-                                set: { viewModel.setAutoAnswerEnabled($0) }
-                            )
+                if viewModel.autoPlayPauseEnabled != nil {
+                    Toggle(
+                        "Auto-Play/Pause",
+                        isOn: Binding(
+                            get: { viewModel.autoPlayPauseEnabled ?? false },
+                            set: { viewModel.setAutoPlayPauseEnabled($0) }
                         )
+                    )
+                }
+
+                if viewModel.autoAnswerEnabled != nil {
+                    Toggle(
+                        "Auto-Answer",
+                        isOn: Binding(
+                            get: { viewModel.autoAnswerEnabled ?? false },
+                            set: { viewModel.setAutoAnswerEnabled($0) }
+                        )
+                    )
+                }
+
+                if viewModel.volumeControlValue != nil {
+                    Picker(
+                        "Volume Control",
+                        selection: Binding(
+                            get: { viewModel.volumeControlValue ?? .capTouch },
+                            set: { viewModel.setVolumeControl($0) }
+                        )
+                    ) {
+                        ForEach(BossVolumeControlValue.allCases, id: \.rawValue) { value in
+                            Text(value.displayName).tag(value)
+                        }
                     }
                 }
             }
@@ -115,7 +133,6 @@ struct BossMenuBarView: View {
             Divider()
 
             Button("Choose Device") {
-                openWindow(id: "main")
                 AppDelegate.openMainWindow()
                 viewModel.returnToDeviceSelection()
             }
@@ -124,8 +141,22 @@ struct BossMenuBarView: View {
                 viewModel.refresh()
             }
             .disabled(viewModel.isBusy)
+
+            Divider()
+
+            Button("Quit Boss") {
+                NSApplication.shared.terminate(nil)
+            }
         }
         .padding(.vertical, 4)
+    }
+
+    private var hasSupportedDeviceSettings: Bool {
+        viewModel.wearDetectionEnabled != nil ||
+            viewModel.autoAwareEnabled != nil ||
+            viewModel.autoPlayPauseEnabled != nil ||
+            viewModel.autoAnswerEnabled != nil ||
+            viewModel.volumeControlValue != nil
     }
 }
 
