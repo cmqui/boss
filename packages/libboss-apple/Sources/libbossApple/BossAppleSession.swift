@@ -121,20 +121,64 @@ public actor BossAppleSession {
     }
 
     public func currentAudioModeUpdateStream() -> AsyncThrowingStream<Int, Error> {
-        reconnectingCoreStream(preferredPreferences: appOperationPreferences()) { session in
+        reconnectingCoreStream(
+            preferredPreferences: appOperationPreferences(),
+            initial: { session in try await session.currentAudioMode() }
+        ) { session in
             session.currentAudioModeUpdateStream()
         }
     }
 
     public func audioModeSettingsUpdateStream() -> AsyncThrowingStream<BossAudioModeSettingsConfig, Error> {
-        reconnectingCoreStream(preferredPreferences: appOperationPreferences()) { session in
+        reconnectingCoreStream(
+            preferredPreferences: appOperationPreferences(),
+            initial: { session in try await session.audioModeSettingsConfig() }
+        ) { session in
             session.audioModeSettingsUpdateStream()
         }
     }
 
     public func equalizerUpdateStream() -> AsyncThrowingStream<BossEqualizerSettings, Error> {
-        reconnectingCoreStream(preferredPreferences: appOperationPreferences()) { session in
+        reconnectingCoreStream(
+            preferredPreferences: appOperationPreferences(),
+            initial: { session in try await session.equalizerSettingsIfAvailable() }
+        ) { session in
             session.equalizerUpdateStream()
+        }
+    }
+
+    public func deviceSettingsUpdateStream() -> AsyncThrowingStream<BossAppleDeviceSettingsReport, Error> {
+        reconnectingCoreStream(
+            preferredPreferences: appOperationPreferences(),
+            initial: { [self] session in wrap(try await session.refreshDeviceSettingsReport()) }
+        ) { [self] session in
+            let upstream = session.deviceSettingsUpdateStream()
+            return AsyncThrowingStream { continuation in
+                let task = Task {
+                    do {
+                        for try await report in upstream {
+                            continuation.yield(wrap(report))
+                        }
+                        continuation.finish()
+                    } catch is CancellationError {
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+                continuation.onTermination = { _ in
+                    task.cancel()
+                }
+            }
+        }
+    }
+
+    public func audioModeCatalogUpdateStream() -> AsyncThrowingStream<[BossAudioModeConfig], Error> {
+        reconnectingCoreStream(
+            preferredPreferences: appOperationPreferences(),
+            initial: { session in try await session.audioModeConfigs() }
+        ) { session in
+            session.audioModeCatalogUpdateStream()
         }
     }
 
@@ -563,6 +607,7 @@ public actor BossAppleSession {
 
     private func reconnectingCoreStream<Element: Sendable>(
         preferredPreferences: [AppleBossCharacteristicPreference],
+        initial: @escaping @Sendable (BossSession) async throws -> Element?,
         stream: @escaping @Sendable (BossSession) -> AsyncThrowingStream<Element, Error>
     ) -> AsyncThrowingStream<Element, Error> {
         let owner = self
@@ -574,6 +619,14 @@ public actor BossAppleSession {
                             preferredPreferences: preferredPreferences
                         ) { session in
                             session
+                        }
+
+                        if let initialElement = try await initial(coreSession) {
+                            guard !Task.isCancelled else {
+                                continuation.finish()
+                                return
+                            }
+                            continuation.yield(initialElement)
                         }
 
                         for try await element in stream(coreSession) {

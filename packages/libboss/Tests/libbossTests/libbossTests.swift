@@ -227,10 +227,14 @@ final class LibbossTests: XCTestCase {
             operator: .status,
             payload: Data([0x00, 0x06])
         )
-        let transport = MockTransport(frames: [
-            try BmapCodec.encode(ignoredPacket),
-            try BmapCodec.encode(targetPacket),
-        ])
+        let transport = MockTransport(
+            frames: [
+                try BmapCodec.encode(ignoredPacket),
+                try BmapCodec.encode(targetPacket),
+            ],
+            initialDelay: .milliseconds(25),
+            finishStream: false
+        )
         let link = StreamBmapLink(transport: transport)
         let session = BossPacketSession(link: link)
         defer { session.invalidate() }
@@ -339,6 +343,115 @@ final class LibbossTests: XCTestCase {
         let received = try await iterator.next()
 
         XCTAssertEqual(received, 7)
+    }
+
+    func testBossSessionDeviceSettingsReducerUpdatesStandaloneFlags() throws {
+        let initial = BossDeviceSettingsReport(
+            wearDetection: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot),
+            autoAwareEnabled: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot),
+            autoPlayPauseEnabled: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot),
+            autoAnswerEnabled: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot),
+            volumeControl: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot)
+        )
+        let packet = BmapPacket(
+            functionBlock: .settings,
+            function: BmapFunction(block: .settings, rawValue: BossSettingsCodec.autoAwareFunctionRaw),
+            operator: .status,
+            payload: Data([0x01])
+        )
+
+        let reduced = try BossSession.reduceDeviceSettingsReport(initial, with: packet)
+
+        XCTAssertEqual(reduced?.autoAwareEnabled.value, true)
+        XCTAssertEqual(reduced?.autoAwareEnabled.source, .snapshot)
+        XCTAssertEqual(reduced?.wearDetection, initial.wearDetection)
+    }
+
+    func testBossSessionDeviceSettingsReducerDerivesAutoAnswerFromOnHeadDetection() throws {
+        let initial = BossDeviceSettingsReport(
+            wearDetection: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot),
+            autoAwareEnabled: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot),
+            autoPlayPauseEnabled: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot),
+            autoAnswerEnabled: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot),
+            volumeControl: BossObservedSetting(value: nil, unavailableReason: .missingFromSnapshot)
+        )
+        let packet = BmapPacket(
+            functionBlock: .settings,
+            function: BmapFunction(block: .settings, rawValue: BossSettingsCodec.onHeadDetectionFunctionRaw),
+            operator: .status,
+            payload: Data([0x05, 0x02])
+        )
+
+        let reduced = try BossSession.reduceDeviceSettingsReport(initial, with: packet)
+
+        XCTAssertEqual(reduced?.wearDetection.value?.isEnabled, true)
+        XCTAssertEqual(reduced?.wearDetection.source, .snapshot)
+        XCTAssertEqual(reduced?.autoAnswerEnabled.value, true)
+        XCTAssertEqual(reduced?.autoAnswerEnabled.source, .compositeSnapshot)
+    }
+
+    func testBossSessionAudioModeCatalogReducerUpdatesFavorites() throws {
+        let initial = [
+            BossAudioModeConfig(
+                modeIndex: 0,
+                prompt: .none,
+                name: "Quiet",
+                favorite: false,
+                userConfigurable: false,
+                userConfigured: false,
+                settings: BossAudioModeSettingsConfig(cncLevel: 5, autoCNCEnabled: false, spatialAudioMode: .off, windBlockEnabled: false, ancToggleEnabled: false)
+            ),
+            BossAudioModeConfig(
+                modeIndex: 1,
+                prompt: .none,
+                name: "Aware",
+                favorite: false,
+                userConfigurable: false,
+                userConfigured: false,
+                settings: BossAudioModeSettingsConfig(cncLevel: 2, autoCNCEnabled: false, spatialAudioMode: .off, windBlockEnabled: false, ancToggleEnabled: false)
+            ),
+        ]
+        let packet = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.favoritesFunctionRaw),
+            operator: .status,
+            payload: Data([0x02, 0x02])
+        )
+
+        let reduced = try BossSession.reduceAudioModeCatalog(initial, with: packet)
+
+        XCTAssertEqual(reduced?.map(\.favorite), [false, true])
+    }
+
+    func testBossSessionAudioModeCatalogReducerUpsertsModeConfig() throws {
+        let initial = [
+            BossAudioModeConfig(
+                modeIndex: 1,
+                prompt: .none,
+                name: "Aware",
+                favorite: false,
+                userConfigurable: false,
+                userConfigured: false,
+                settings: BossAudioModeSettingsConfig(cncLevel: 2, autoCNCEnabled: false, spatialAudioMode: .off, windBlockEnabled: false, ancToggleEnabled: false)
+            )
+        ]
+        let packet = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.modeConfigFunctionRaw),
+            operator: .status,
+            payload: Data([
+                0x03, 0x00, 0x00,
+                0x43, 0x75, 0x73, 0x74, 0x6F, 0x6D
+            ] + Array(repeating: 0x00, count: 32 - 6) + [
+                0x06, 0x01, BossSpatialAudioMode.head.rawValue, 0x01, 0x01
+            ])
+        )
+
+        let reduced = try BossSession.reduceAudioModeCatalog(initial, with: packet)
+
+        XCTAssertEqual(reduced?.map(\.modeIndex), [1, 3])
+        XCTAssertEqual(reduced?.last?.name, "Custom")
+        XCTAssertEqual(reduced?.last?.settings.spatialAudioMode, .head)
     }
 
 }

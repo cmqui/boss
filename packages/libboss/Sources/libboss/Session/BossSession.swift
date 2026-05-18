@@ -274,14 +274,46 @@ public actor BossSession {
         packetStream { $0.functionBlock == .notification }
     }
 
-    public nonisolated func currentAudioModeUpdateStream() -> AsyncThrowingStream<Int, Error> {
-        let packets = packetStream {
-            $0.functionBlock == .audioModes &&
-                $0.function.rawValue == BossAudioModesCodec.currentModeFunctionRaw &&
-                $0.operator == .status
-        }
-        return Self.mapStream(packets) { packet in
-            try BossAudioModesCodec.parseCurrentMode(from: packet)
+    public nonisolated func currentAudioModeUpdateStream(
+        pollInterval: Duration = .seconds(2)
+    ) -> AsyncThrowingStream<Int, Error> {
+        let session = self
+        return AsyncThrowingStream { continuation in
+            let state = DistinctStreamState<Int>(continuation: continuation)
+
+            let pushTask = Task {
+                do {
+                    let packets = session.packetStream {
+                        $0.functionBlock == .audioModes &&
+                            $0.function.rawValue == BossAudioModesCodec.currentModeFunctionRaw &&
+                            $0.operator == .status
+                    }
+                    for try await packet in packets {
+                        try Task.checkCancellation()
+                        await state.emit(try BossAudioModesCodec.parseCurrentMode(from: packet))
+                    }
+                } catch is CancellationError {
+                } catch {
+                    await state.finish(throwing: error)
+                }
+            }
+
+            let pollTask = Task {
+                do {
+                    while !Task.isCancelled {
+                        await state.emit(try await session.currentAudioMode())
+                        try await Task.sleep(for: pollInterval)
+                    }
+                } catch is CancellationError {
+                } catch {
+                    await state.finish(throwing: error)
+                }
+            }
+
+            continuation.onTermination = { _ in
+                pushTask.cancel()
+                pollTask.cancel()
+            }
         }
     }
 
@@ -304,6 +336,64 @@ public actor BossSession {
         }
         return Self.mapStream(packets) { packet in
             try BossSettingsCodec.parseEqualizer(from: packet)
+        }
+    }
+
+    public nonisolated func deviceSettingsUpdateStream() -> AsyncThrowingStream<BossDeviceSettingsReport, Error> {
+        let session = self
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    var currentReport = try await session.refreshDeviceSettingsReport()
+                    continuation.yield(currentReport)
+
+                    for try await packet in session.settingsPacketStream() {
+                        guard let updatedReport = try Self.reduceDeviceSettingsReport(currentReport, with: packet) else {
+                            continue
+                        }
+                        currentReport = updatedReport
+                        continuation.yield(updatedReport)
+                    }
+
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+
+    public nonisolated func audioModeCatalogUpdateStream() -> AsyncThrowingStream<[BossAudioModeConfig], Error> {
+        let session = self
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    var currentCatalog = try await session.audioModeConfigs()
+                    continuation.yield(currentCatalog)
+
+                    for try await packet in session.audioModePacketStream() {
+                        guard let updatedCatalog = try Self.reduceAudioModeCatalog(currentCatalog, with: packet) else {
+                            continue
+                        }
+                        currentCatalog = updatedCatalog
+                        continuation.yield(updatedCatalog)
+                    }
+
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
         }
     }
 
@@ -336,6 +426,11 @@ public actor BossSession {
             equalizer: equalizer,
             deviceSettings: deviceSettings
         )
+    }
+
+    public func refreshDeviceSettingsReport() async throws -> BossDeviceSettingsReport {
+        let settingsSnapshot = try await awaitSettingsSnapshot(timeout: .seconds(5))
+        return try await deviceSettingsReport(from: settingsSnapshot, timeout: .seconds(5))
     }
 
     public nonisolated func modeWorkspaceUpdates(
@@ -373,6 +468,23 @@ public actor BossSession {
 
     public func audioModeConfigs() async throws -> [BossAudioModeConfig] {
         try await awaitAudioModeConfigs(timeout: .seconds(30))
+    }
+
+    public func currentAudioMode() async throws -> Int {
+        try await requiredCurrentAudioMode(timeout: .seconds(5))
+    }
+
+    public func audioModeSettingsConfig() async throws -> BossAudioModeSettingsConfig {
+        try await readAudioModeSettingsConfig(
+            attempts: 2,
+            timeoutPerAttempt: .seconds(5),
+            retryDelay: .milliseconds(300)
+        )
+    }
+
+    public func equalizerSettingsIfAvailable() async throws -> BossEqualizerSettings? {
+        let settingsSnapshot = try await awaitSettingsSnapshot(timeout: .seconds(5))
+        return try await equalizerIfAvailable(from: settingsSnapshot, timeout: .seconds(5))
     }
 
     public func setCurrentAudioMode(
@@ -598,6 +710,36 @@ public actor BossSession {
         }
 
         return try await writeCustomAudioMode(slot: slot, name: name, settings: settings, prompt: prompt)
+    }
+}
+
+private actor DistinctStreamState<Element: Sendable & Equatable> {
+    private var latest: Element?
+    private var didFinish = false
+    private let continuation: AsyncThrowingStream<Element, Error>.Continuation
+
+    init(continuation: AsyncThrowingStream<Element, Error>.Continuation) {
+        self.continuation = continuation
+    }
+
+    func emit(_ value: Element) {
+        guard !didFinish, latest != value else {
+            return
+        }
+        latest = value
+        continuation.yield(value)
+    }
+
+    func finish(throwing error: Error? = nil) {
+        guard !didFinish else {
+            return
+        }
+        didFinish = true
+        if let error {
+            continuation.finish(throwing: error)
+        } else {
+            continuation.finish()
+        }
     }
 }
 
@@ -1113,6 +1255,129 @@ private extension BossSession {
             continuation.onTermination = { _ in
                 task.cancel()
             }
+        }
+    }
+
+}
+
+extension BossSession {
+    static func reduceAudioModeCatalog(
+        _ catalog: [BossAudioModeConfig],
+        with packet: BmapPacket
+    ) throws -> [BossAudioModeConfig]? {
+        guard packet.functionBlock == .audioModes, packet.operator == .status else {
+            return nil
+        }
+
+        switch packet.function.rawValue {
+        case BossAudioModesCodec.modeConfigFunctionRaw:
+            let mode = try BossAudioModesCodec.parseModeConfigDetail(from: packet)
+            var updated = Dictionary(uniqueKeysWithValues: catalog.map { ($0.modeIndex, $0) })
+            updated[mode.modeIndex] = mode
+            return updated.values.sorted { $0.modeIndex < $1.modeIndex }
+
+        case BossAudioModesCodec.favoritesFunctionRaw:
+            let favorites = Set(try BossAudioModesCodec.parseFavorites(from: packet))
+            return catalog.map { mode in
+                BossAudioModeConfig(
+                    modeIndex: mode.modeIndex,
+                    prompt: mode.prompt,
+                    name: mode.name,
+                    favorite: favorites.contains(mode.modeIndex),
+                    userConfigurable: mode.userConfigurable,
+                    userConfigured: mode.userConfigured,
+                    settings: mode.settings
+                )
+            }
+
+        default:
+            return nil
+        }
+    }
+
+    static func reduceDeviceSettingsReport(
+        _ report: BossDeviceSettingsReport,
+        with packet: BmapPacket
+    ) throws -> BossDeviceSettingsReport? {
+        guard packet.functionBlock == .settings, packet.operator == .status else {
+            return nil
+        }
+
+        switch packet.function.rawValue {
+        case BossSettingsCodec.onHeadDetectionFunctionRaw:
+            let value = try BossSettingsCodec.parseOnHeadDetection(from: packet)
+            let wearDetection = BossObservedSetting(
+                value: value,
+                source: .snapshot
+            )
+
+            let autoAnswerEnabled: BossObservedSetting<Bool>
+            if report.autoAnswerEnabled.source == .snapshot {
+                autoAnswerEnabled = report.autoAnswerEnabled
+            } else if let derived = value.isAutoAnswerEnabled {
+                autoAnswerEnabled = BossObservedSetting(value: derived, source: .compositeSnapshot)
+            } else {
+                autoAnswerEnabled = report.autoAnswerEnabled
+            }
+
+            return BossDeviceSettingsReport(
+                wearDetection: wearDetection,
+                autoAwareEnabled: report.autoAwareEnabled,
+                autoPlayPauseEnabled: report.autoPlayPauseEnabled,
+                autoAnswerEnabled: autoAnswerEnabled,
+                volumeControl: report.volumeControl
+            )
+
+        case BossSettingsCodec.autoAwareFunctionRaw:
+            return BossDeviceSettingsReport(
+                wearDetection: report.wearDetection,
+                autoAwareEnabled: BossObservedSetting(
+                    value: try BossSettingsCodec.parseEnabledFlag(from: packet),
+                    source: .snapshot
+                ),
+                autoPlayPauseEnabled: report.autoPlayPauseEnabled,
+                autoAnswerEnabled: report.autoAnswerEnabled,
+                volumeControl: report.volumeControl
+            )
+
+        case BossSettingsCodec.autoPlayPauseFunctionRaw:
+            return BossDeviceSettingsReport(
+                wearDetection: report.wearDetection,
+                autoAwareEnabled: report.autoAwareEnabled,
+                autoPlayPauseEnabled: BossObservedSetting(
+                    value: try BossSettingsCodec.parseEnabledFlag(from: packet),
+                    source: .snapshot
+                ),
+                autoAnswerEnabled: report.autoAnswerEnabled,
+                volumeControl: report.volumeControl
+            )
+
+        case BossSettingsCodec.autoAnswerFunctionRaw:
+            return BossDeviceSettingsReport(
+                wearDetection: report.wearDetection,
+                autoAwareEnabled: report.autoAwareEnabled,
+                autoPlayPauseEnabled: report.autoPlayPauseEnabled,
+                autoAnswerEnabled: BossObservedSetting(
+                    value: try BossSettingsCodec.parseEnabledFlag(from: packet),
+                    source: .snapshot
+                ),
+                volumeControl: report.volumeControl
+            )
+
+        case BossSettingsCodec.volumeControlFunctionRaw:
+            return BossDeviceSettingsReport(
+                wearDetection: report.wearDetection,
+                autoAwareEnabled: report.autoAwareEnabled,
+                autoPlayPauseEnabled: report.autoPlayPauseEnabled,
+                autoAnswerEnabled: report.autoAnswerEnabled,
+                volumeControl: BossObservedSetting(
+                    value: try BossAudioModesCodec.parseVolumeControlStatus(from: packet),
+                    source: .snapshot
+                )
+            )
+
+        default:
+            return nil
         }
     }
 }

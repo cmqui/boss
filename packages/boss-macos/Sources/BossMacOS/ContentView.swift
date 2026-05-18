@@ -2,6 +2,12 @@ import AppKit
 import libboss
 import SwiftUI
 
+private func deferMain(_ action: @escaping @MainActor () -> Void) {
+    Task { @MainActor in
+        action()
+    }
+}
+
 struct ContentView: View {
     @ObservedObject var viewModel: BossMacOSViewModel
 
@@ -138,7 +144,11 @@ struct ContentView: View {
                                     title: "Wear Detection",
                                     isOn: Binding(
                                         get: { viewModel.wearDetectionEnabled ?? false },
-                                        set: { viewModel.setWearDetectionEnabled($0) }
+                                        set: { newValue in
+                                            deferMain {
+                                                viewModel.setWearDetectionEnabled(newValue)
+                                            }
+                                        }
                                     ),
                                     isEnabled: !viewModel.isBusy,
                                     palette: palette
@@ -150,7 +160,11 @@ struct ContentView: View {
                                     title: "Auto-Aware",
                                     isOn: Binding(
                                         get: { viewModel.autoAwareEnabled ?? false },
-                                        set: { viewModel.setAutoAwareEnabled($0) }
+                                        set: { newValue in
+                                            deferMain {
+                                                viewModel.setAutoAwareEnabled(newValue)
+                                            }
+                                        }
                                     ),
                                     isEnabled: !viewModel.isBusy,
                                     palette: palette
@@ -162,7 +176,11 @@ struct ContentView: View {
                                     title: "Auto-Play/Pause",
                                     isOn: Binding(
                                         get: { viewModel.autoPlayPauseEnabled ?? false },
-                                        set: { viewModel.setAutoPlayPauseEnabled($0) }
+                                        set: { newValue in
+                                            deferMain {
+                                                viewModel.setAutoPlayPauseEnabled(newValue)
+                                            }
+                                        }
                                     ),
                                     isEnabled: !viewModel.isBusy,
                                     palette: palette
@@ -174,7 +192,11 @@ struct ContentView: View {
                                     title: "Auto-Answer",
                                     isOn: Binding(
                                         get: { viewModel.autoAnswerEnabled ?? false },
-                                        set: { viewModel.setAutoAnswerEnabled($0) }
+                                        set: { newValue in
+                                            deferMain {
+                                                viewModel.setAutoAnswerEnabled(newValue)
+                                            }
+                                        }
                                     ),
                                     isEnabled: !viewModel.isBusy,
                                     palette: palette
@@ -190,7 +212,11 @@ struct ContentView: View {
                                         "Volume Control",
                                         selection: Binding(
                                             get: { viewModel.volumeControlValue ?? .capTouch },
-                                            set: { viewModel.setVolumeControl($0) }
+                                            set: { newValue in
+                                                deferMain {
+                                                    viewModel.setVolumeControl(newValue)
+                                                }
+                                            }
                                         )
                                     ) {
                                         ForEach(BossVolumeControlValue.allCases, id: \.rawValue) { value in
@@ -440,35 +466,55 @@ private struct ModeSettingsPanel: View {
             get: {
                 viewModel.selectedAudioModeIndex ?? viewModel.selectableAudioModes.first?.modeIndex ?? 0
             },
-            set: { viewModel.selectAudioMode($0) }
+            set: { newValue in
+                deferMain {
+                    viewModel.selectAudioMode(newValue)
+                }
+            }
         )
     }
 
     private var cncBinding: Binding<Double> {
         Binding(
             get: { Double(viewModel.cncLevel) },
-            set: { viewModel.setCNCLevelDraft(Int($0.rounded())) }
+            set: { newValue in
+                deferMain {
+                    viewModel.setCNCLevelDraft(Int(newValue.rounded()))
+                }
+            }
         )
     }
 
     private var spatialAudioBinding: Binding<BossSpatialAudioMode> {
         Binding(
             get: { viewModel.spatialAudioMode },
-            set: { viewModel.setSpatialAudioModeDraft($0) }
+            set: { newValue in
+                deferMain {
+                    viewModel.setSpatialAudioModeDraft(newValue)
+                }
+            }
         )
     }
 
     private var windBlockBinding: Binding<Bool> {
         Binding(
             get: { viewModel.windBlockEnabled },
-            set: { viewModel.setWindBlockEnabledDraft($0) }
+            set: { newValue in
+                deferMain {
+                    viewModel.setWindBlockEnabledDraft(newValue)
+                }
+            }
         )
     }
 
     private var ancBinding: Binding<Bool> {
         Binding(
             get: { viewModel.ancToggleEnabled },
-            set: { viewModel.setANCEnabledDraft($0) }
+            set: { newValue in
+                deferMain {
+                    viewModel.setANCEnabledDraft(newValue)
+                }
+            }
         )
     }
 

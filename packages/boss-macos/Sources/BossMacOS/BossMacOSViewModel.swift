@@ -54,10 +54,11 @@ final class BossMacOSViewModel: ObservableObject {
 
     private var hasStartedInitialRefresh = false
     private var discoveryTask: Task<Void, Never>?
-    private var backgroundLoadTask: Task<Void, Never>?
     private var currentModeUpdateTask: Task<Void, Never>?
     private var settingsUpdateTask: Task<Void, Never>?
     private var equalizerUpdateTask: Task<Void, Never>?
+    private var deviceSettingsUpdateTask: Task<Void, Never>?
+    private var audioModeCatalogUpdateTask: Task<Void, Never>?
     private var session: BossAppleSession?
     private var selectedDeviceIdentifier: UUID?
     private var isManualDeviceSelection = false
@@ -202,7 +203,6 @@ final class BossMacOSViewModel: ObservableObject {
             } else {
                 _ = try await session.unfavoriteAudioMode(index: mode.modeIndex)
             }
-            try await self.reloadAllState(using: session)
             self.lastResultMessage = isFavorite
                 ? "Added \"\(self.customProfileDisplayName(for: mode))\" to favorites"
                 : "Removed \"\(self.customProfileDisplayName(for: mode))\" from favorites"
@@ -212,9 +212,9 @@ final class BossMacOSViewModel: ObservableObject {
     func deleteCustomProfile(_ mode: BossAudioModeConfig) {
         run("Deleting custom profile") {
             let session = self.makeSession()
+            let displayName = self.customProfileDisplayName(for: mode)
             _ = try await session.deleteCustomAudioMode(slot: mode.modeIndex)
-            try await self.reloadAllState(using: session)
-            self.lastResultMessage = "Deleted \"\(self.customProfileDisplayName(for: mode))\""
+            self.lastResultMessage = "Deleted \"\(displayName)\""
         }
     }
 
@@ -453,8 +453,7 @@ final class BossMacOSViewModel: ObservableObject {
         applyDeviceSettings(workspace.modeWorkspace.deviceSettings.settings)
         deviceName = workspace.bootstrappedDevice.productName
         deviceVariantName = workspace.bootstrappedDevice.productVariant.variantName
-        audioModes = workspace.audioModes
-        customProfileModes = workspace.audioModes.filter(\.userConfigurable)
+        applyAudioModes(workspace.audioModes)
         supportedPrompts = prompts
         hasDetachedSettingsDraft = false
         hasDetachedEqualizerDraft = false
@@ -612,11 +611,27 @@ final class BossMacOSViewModel: ObservableObject {
                     guard !Task.isCancelled else {
                         break
                     }
-                    await MainActor.run {
+                    let shouldRefreshWorkspace = await MainActor.run {
                         guard self.appScreen == .workspace else {
-                            return
+                            return false
                         }
+                        let modeChanged =
+                            self.currentAudioModeIndex != currentAudioModeIndex ||
+                            self.selectedAudioModeIndex != currentAudioModeIndex
                         self.currentAudioModeIndex = currentAudioModeIndex
+                        self.selectedAudioModeIndex = currentAudioModeIndex
+                        return modeChanged
+                    }
+
+                    if shouldRefreshWorkspace {
+                        await MainActor.run {
+                            self.loadState = .loading("Refreshing mode state")
+                        }
+                        try await self.reloadModeWorkspace(using: session)
+                        await MainActor.run {
+                            self.loadState = .ready
+                            self.lastResultMessage = "Mode changed on device; controls refreshed"
+                        }
                     }
                 }
             } catch {
@@ -685,13 +700,14 @@ final class BossMacOSViewModel: ObservableObject {
             }
         }
 
-        backgroundLoadTask = Task { [weak self] in
+        deviceSettingsUpdateTask = Task { [weak self] in
             guard let self else {
                 return
             }
 
             do {
-                for try await snapshot in session.modeWorkspaceUpdates(interval: .seconds(30)) {
+                let updates = await session.deviceSettingsUpdateStream()
+                for try await report in updates {
                     guard !Task.isCancelled else {
                         break
                     }
@@ -699,7 +715,7 @@ final class BossMacOSViewModel: ObservableObject {
                         guard self.appScreen == .workspace else {
                             return
                         }
-                        self.applyBackgroundModeWorkspaceSnapshot(snapshot)
+                        self.applyDeviceSettings(report.settings)
                     }
                 }
             } catch {
@@ -707,7 +723,35 @@ final class BossMacOSViewModel: ObservableObject {
                     guard self.appScreen == .workspace, !self.isBusy else {
                         return
                     }
-                    self.lastResultMessage = "Background refresh paused: \(Self.describe(error))"
+                    self.lastResultMessage = "Live device settings updates paused: \(Self.describe(error))"
+                }
+            }
+        }
+
+        audioModeCatalogUpdateTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let updates = await session.audioModeCatalogUpdateStream()
+                for try await modes in updates {
+                    guard !Task.isCancelled else {
+                        break
+                    }
+                    await MainActor.run {
+                        guard self.appScreen == .workspace else {
+                            return
+                        }
+                        self.applyAudioModes(modes)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    guard self.appScreen == .workspace, !self.isBusy else {
+                        return
+                    }
+                    self.lastResultMessage = "Live audio mode updates paused: \(Self.describe(error))"
                 }
             }
         }
@@ -720,8 +764,10 @@ final class BossMacOSViewModel: ObservableObject {
         settingsUpdateTask = nil
         equalizerUpdateTask?.cancel()
         equalizerUpdateTask = nil
-        backgroundLoadTask?.cancel()
-        backgroundLoadTask = nil
+        deviceSettingsUpdateTask?.cancel()
+        deviceSettingsUpdateTask = nil
+        audioModeCatalogUpdateTask?.cancel()
+        audioModeCatalogUpdateTask = nil
     }
 
     private func waitingMessage(for error: Error, description: String) -> String {
@@ -788,15 +834,9 @@ final class BossMacOSViewModel: ObservableObject {
         volumeControlValue = deviceSettings.volumeControl?.value
     }
 
-    private func applyBackgroundModeWorkspaceSnapshot(_ snapshot: BossAppleModeWorkspaceSnapshot) {
-        currentAudioModeIndex = snapshot.currentAudioModeIndex
-        if !hasDetachedSettingsDraft {
-            applySettingsSnapshot(snapshot.settings)
-        }
-        if !hasDetachedEqualizerDraft {
-            applyEqualizerSnapshot(snapshot.equalizer)
-        }
-        applyDeviceSettings(snapshot.deviceSettings.settings)
+    private func applyAudioModes(_ modes: [BossAudioModeConfig]) {
+        audioModes = modes
+        customProfileModes = modes.filter(\.userConfigurable)
     }
 
     private func noteManualSettingsEdit() {
@@ -854,7 +894,7 @@ final class BossMacOSViewModel: ObservableObject {
                 settings: self.currentDraftConfig(),
                 prompt: prompt
             )
-            try await self.reloadAllState(using: session)
+            self.applySettingsSnapshot(saved.settings)
             self.currentAudioModeIndex = saved.modeIndex
             self.selectedAudioModeIndex = saved.modeIndex
             self.lastResultMessage = "Saved profile \"\(saved.name)\""
