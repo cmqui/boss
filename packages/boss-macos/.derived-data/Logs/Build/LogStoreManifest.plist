@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>logFormatVersion</key>
+	<integer>12</integer>
+	<key>logs</key>
+	<dict>
+		<key>89E8086E-1B82-4735-9202-BFCD58230DCC</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>89E8086E-1B82-4735-9202-BFCD58230DCC.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>S</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>0</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>Boss project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>Boss</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project Boss with scheme Boss and configuration Debug</string>
+			<key>timeStartedRecording</key>
+			<real>800813226.26735997</real>
+			<key>timeStoppedRecording</key>
+			<real>800813241.74242306</real>
+			<key>title</key>
+			<string>Building project Boss with scheme Boss and configuration Debug</string>
+			<key>uniqueIdentifier</key>
+			<string>89E8086E-1B82-4735-9202-BFCD58230DCC</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

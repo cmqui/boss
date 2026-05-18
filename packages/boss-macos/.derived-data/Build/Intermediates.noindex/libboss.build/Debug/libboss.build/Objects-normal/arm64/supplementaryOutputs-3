@@ -1,0 +1,30 @@
+{
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapFunction.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapFunctionBlock.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapOperator.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapPacket.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.swiftdeps"
+  }
+}

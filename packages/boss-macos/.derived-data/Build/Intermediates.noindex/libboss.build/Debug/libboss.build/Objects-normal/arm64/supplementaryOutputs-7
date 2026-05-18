@@ -1,0 +1,23 @@
+{
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Session/SessionInternals.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BleSegmentReassembler.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BleSegmentation.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.swiftdeps"
+  }
+}

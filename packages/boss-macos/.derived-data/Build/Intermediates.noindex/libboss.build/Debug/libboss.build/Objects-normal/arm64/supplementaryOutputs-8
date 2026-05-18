@@ -1,0 +1,23 @@
+{
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BmapFrameStreamDecoder.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BossLink.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BossTransport.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.swiftdeps"
+  }
+}

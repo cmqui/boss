@@ -470,6 +470,17 @@ public actor BossSession {
         try await awaitAudioModeConfigs(timeout: .seconds(30))
     }
 
+    public func firmwareVersion(port: Int = 0, deviceID: Int = 0) async throws -> FirmwareVersionInfo {
+        try await mapSessionErrors {
+            try await packetSession.firmwareVersion(
+                port: port,
+                deviceID: deviceID,
+                timeout: .seconds(5),
+                timeoutError: timeoutError(for: .seconds(5))
+            )
+        }
+    }
+
     public func currentAudioMode() async throws -> Int {
         try await requiredCurrentAudioMode(timeout: .seconds(5))
     }

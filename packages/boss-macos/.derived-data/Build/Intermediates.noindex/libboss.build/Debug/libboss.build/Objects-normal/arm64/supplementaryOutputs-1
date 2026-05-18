@@ -1,0 +1,30 @@
+{
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Commands/ProductInfoCommands.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Constants/BoseUUIDs.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Core/BossError.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Core/ByteCursor.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.dia",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.swiftdeps"
+  }
+}

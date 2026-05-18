@@ -198,6 +198,14 @@ public actor BossAppleSession {
         }
     }
 
+    public func firmwareVersion(port: Int = 0, deviceID: Int = 0) async throws -> FirmwareVersionInfo {
+        try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
+            try await mapCoreErrors {
+                try await session.firmwareVersion(port: port, deviceID: deviceID)
+            }
+        }
+    }
+
     public func setCurrentAudioMode(
         index targetIndex: Int,
         playVoicePrompt: Bool = false

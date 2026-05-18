@@ -1,0 +1,4 @@
+module libboss {
+header "libboss-Swift.h"
+export *
+}

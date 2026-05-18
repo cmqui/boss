@@ -1,0 +1,299 @@
+{
+  "" : {
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/libboss-primary.dia",
+    "emit-module-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/libboss-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/libboss-primary-emit-module.dia",
+    "pch" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/libboss-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/libboss-primary.swiftdeps"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Commands/ProductInfoCommands.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoCommands~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Constants/BoseUUIDs.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BoseUUIDs~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Core/BossError.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossError~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Core/ByteCursor.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ByteCursor~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Libboss.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/Libboss.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/Libboss.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/Libboss.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/Libboss.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/Libboss.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/Libboss.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/Libboss.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/Libboss~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Parsers/ProductInfoParser.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoParser.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoParser.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoParser.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoParser.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoParser.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoParser.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoParser.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductInfoParser~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapCodec.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapCodec.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapCodec.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapCodec.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapCodec.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapCodec.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapCodec.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapCodec.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapCodec~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapErrorCode.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapErrorCode.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapErrorCode.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapErrorCode.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapErrorCode.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapErrorCode.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapErrorCode.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapErrorCode.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapErrorCode~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapFunction.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunction~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapFunctionBlock.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFunctionBlock~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapOperator.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapOperator~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BmapPacket.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapPacket~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BossAudioModes.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossAudioModes.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossAudioModes.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossAudioModes.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossAudioModes.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossAudioModes.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossAudioModes.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossAudioModes.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossAudioModes~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BossEqualizer.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossEqualizer.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossEqualizer.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossEqualizer.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossEqualizer.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossEqualizer.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossEqualizer.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossEqualizer.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossEqualizer~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/BossSettingsSnapshot.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSettingsSnapshot.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSettingsSnapshot.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSettingsSnapshot.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSettingsSnapshot.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSettingsSnapshot.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSettingsSnapshot.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSettingsSnapshot.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSettingsSnapshot~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/FunctionBlockSet.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/FunctionBlockSet.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/FunctionBlockSet.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/FunctionBlockSet.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/FunctionBlockSet.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/FunctionBlockSet.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/FunctionBlockSet.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/FunctionBlockSet.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/FunctionBlockSet~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Protocol/ProductMap.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductMap.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductMap.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductMap.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductMap.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductMap.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductMap.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductMap.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/ProductMap~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Session/BootstrapSession.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrapSession.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrapSession.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrapSession.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrapSession.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrapSession.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrapSession.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrapSession.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrapSession~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Session/BootstrappedDevice.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrappedDevice.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrappedDevice.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrappedDevice.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrappedDevice.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrappedDevice.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrappedDevice.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrappedDevice.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BootstrappedDevice~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Session/BossPacketSession+Bmap.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession+Bmap.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession+Bmap.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession+Bmap.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession+Bmap.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession+Bmap.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession+Bmap.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession+Bmap.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession+Bmap~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Session/BossPacketSession.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossPacketSession~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Session/BossSession.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSession.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSession.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSession.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSession.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSession.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSession.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSession.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossSession~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Session/SessionConfiguration.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionConfiguration.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionConfiguration.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionConfiguration.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionConfiguration.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionConfiguration.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionConfiguration.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionConfiguration.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionConfiguration~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Session/SessionInternals.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/SessionInternals~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BleSegmentReassembler.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentReassembler~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BleSegmentation.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BleSegmentation~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BmapFrameStreamDecoder.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BmapFrameStreamDecoder~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BossLink.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossLink~partial.swiftmodule"
+  },
+  "/Users/ciara/Code/boss/packages/libboss/Sources/libboss/Transport/BossTransport.swift" : {
+    "const-values" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.swiftconstvalues",
+    "dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.d",
+    "diagnostics" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.dia",
+    "index-unit-output-path" : "/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.o",
+    "llvm-bc" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.bc",
+    "object" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.o",
+    "swift-dependencies" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport.swiftdeps",
+    "swiftmodule" : "/Users/ciara/Code/boss/packages/boss-macos/.derived-data/Build/Intermediates.noindex/libboss.build/Debug/libboss.build/Objects-normal/arm64/BossTransport~partial.swiftmodule"
+  }
+}

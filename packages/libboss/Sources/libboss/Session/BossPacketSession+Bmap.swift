@@ -157,6 +157,20 @@ public extension BossPacketSession {
         return try BossAudioModesCodec.parseSupportedPrompts(from: response)
     }
 
+    func firmwareVersion(
+        port: Int,
+        deviceID: Int = 0,
+        timeout: Duration,
+        timeoutError: Error
+    ) async throws -> FirmwareVersionInfo {
+        let response = try await responsePacket(
+            for: ProductInfoCommands.firmwareVersion(port: port, deviceID: deviceID),
+            timeout: timeout,
+            timeoutError: timeoutError
+        )
+        return try ProductInfoParser.parseFirmwareVersion(from: response)
+    }
+
     func currentAudioMode(
         timeout: Duration,
         timeoutError: Error

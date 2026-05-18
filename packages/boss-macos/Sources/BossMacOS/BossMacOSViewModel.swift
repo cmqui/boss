@@ -29,6 +29,7 @@ final class BossMacOSViewModel: ObservableObject {
     @Published private(set) var equalizer: BossEqualizerSettings?
     @Published private(set) var deviceName = "Bose Device"
     @Published private(set) var deviceVariantName: String?
+    @Published private(set) var firmwareVersion: String?
     @Published private(set) var wearDetectionEnabled: Bool?
     @Published private(set) var autoAwareEnabled: Bool?
     @Published private(set) var autoPlayPauseEnabled: Bool?
@@ -443,8 +444,13 @@ final class BossMacOSViewModel: ObservableObject {
     }
 
     private func reloadAllState(using session: BossAppleSession) async throws {
-        let workspace = try await session.loadWorkspaceSnapshot()
-        let prompts = await loadSupportedPrompts(using: session)
+        async let workspaceSnapshot = session.loadWorkspaceSnapshot()
+        async let promptsTask = loadSupportedPrompts(using: session)
+        async let firmwareVersionTask = loadFirmwareVersion(using: session)
+
+        let workspace = try await workspaceSnapshot
+        let prompts = await promptsTask
+        let firmwareVersion = await firmwareVersionTask
 
         currentAudioModeIndex = workspace.modeWorkspace.currentAudioModeIndex
         selectedAudioModeIndex = workspace.modeWorkspace.currentAudioModeIndex
@@ -453,6 +459,7 @@ final class BossMacOSViewModel: ObservableObject {
         applyDeviceSettings(workspace.modeWorkspace.deviceSettings.settings)
         deviceName = workspace.bootstrappedDevice.productName
         deviceVariantName = workspace.bootstrappedDevice.productVariant.variantName
+        self.firmwareVersion = firmwareVersion
         applyAudioModes(workspace.audioModes)
         supportedPrompts = prompts
         hasDetachedSettingsDraft = false
@@ -588,6 +595,7 @@ final class BossMacOSViewModel: ObservableObject {
         equalizer = nil
         deviceName = "Bose Device"
         deviceVariantName = nil
+        firmwareVersion = nil
         wearDetectionEnabled = nil
         autoAwareEnabled = nil
         autoPlayPauseEnabled = nil
@@ -806,6 +814,14 @@ final class BossMacOSViewModel: ObservableObject {
             return fallbackSupportedPrompts
         } catch {
             return supportedPrompts.isEmpty ? fallbackSupportedPrompts : supportedPrompts
+        }
+    }
+
+    private func loadFirmwareVersion(using session: BossAppleSession) async -> String? {
+        do {
+            return try await session.firmwareVersion().version
+        } catch {
+            return nil
         }
     }
 

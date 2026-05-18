@@ -299,6 +299,26 @@ final class LibbossTests: XCTestCase {
         }
     }
 
+    func testBossSessionReadsFirmwareVersion() async throws {
+        let packet = BmapPacket(
+            functionBlock: .productInfo,
+            function: .productInfoFirmwareVersion,
+            port: 2,
+            operator: .status,
+            payload: Data("9.9.9".utf8)
+        )
+        let transport = MockTransport(frames: [try BmapCodec.encode(packet)])
+        let link = StreamBmapLink(transport: transport)
+        let packetSession = BossPacketSession(link: link)
+        defer { packetSession.invalidate() }
+        let session = BossSession(packetSession: packetSession)
+
+        let firmware = try await session.firmwareVersion(port: 2)
+
+        XCTAssertEqual(firmware.version, "9.9.9")
+        XCTAssertEqual(firmware.port, 2)
+    }
+
     func testBossSettingObservationReturnsDirectReadValue() async throws {
         let observed = try await BossSettingObservation.observeAfterDirectRead(
             initialUnavailableReason: .missingFromSnapshot,

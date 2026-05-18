@@ -608,13 +608,25 @@ private struct SidebarDeviceHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                BossHeadphonesMark(size: 26)
+            HStack(alignment: .center, spacing: 0) {
+                BossHeadphonesMark(
+                    size: 52,
+                    deviceName: viewModel.deviceName,
+                    variantName: viewModel.deviceVariantName
+                )
 
-                Text(viewModel.deviceName)
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(palette.primaryText)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(viewModel.deviceName)
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(palette.primaryText)
+
+                    if let firmwareVersion = viewModel.firmwareVersion, !firmwareVersion.isEmpty {
+                        Text("Firmware \(firmwareVersion)")
+                            .font(.caption)
+                            .foregroundStyle(palette.secondaryText)
+                    }
+                }
             }
 
             statusView
@@ -646,14 +658,26 @@ private struct SidebarDeviceHeader: View {
 
 private struct BossHeadphonesMark: View {
     let size: CGFloat
+    var deviceName: String? = nil
+    var variantName: String? = nil
 
     var body: some View {
-        if let image = BossImageResource.headphonesMark.nsImage() {
+        let image = if let deviceName,
+                       let deviceImage = BossDeviceImageResource(
+                           productName: deviceName,
+                           variantName: variantName
+                       )?.nsImage() {
+            deviceImage
+        } else {
+            BossImageResource.headphonesMark.nsImage()
+        }
+
+        if let image {
             Image(nsImage: image)
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .frame(width: size, height: size)
+                .frame(width: deviceName == nil ? size : size * 1.85, height: size)
                 .accessibilityHidden(true)
         }
     }

@@ -8,7 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		12DD989A2537484E81B35403 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02972563E16DBC28A9162044 /* ContentView.swift */; };
+		29B1EC5ABA5DE3E15D7DC70E /* Black.png in Resources */ = {isa = PBXBuildFile; fileRef = 53B802A718607B08D8A3A850 /* Black.png */; };
 		3927016F18C61779B548DAF2 /* HeadphonesMenuBar.png in Resources */ = {isa = PBXBuildFile; fileRef = 146C9851027300CE90E03FED /* HeadphonesMenuBar.png */; };
+		4AE139CAEB4003F5E22900AE /* MidnightViolet.png in Resources */ = {isa = PBXBuildFile; fileRef = 662C619660F4A4AE38356C8C /* MidnightViolet.png */; };
 		5DF836B270CFC5E9EB09B09B /* HeadphonesMark.png in Resources */ = {isa = PBXBuildFile; fileRef = 84F21CC1E7A6D0316D418D1C /* HeadphonesMark.png */; };
 		626564DCD9D1C3C3A34AE91A /* BossMacOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96F4BDFFBE4F9E177883939 /* BossMacOSApp.swift */; };
 		63DE03FCD4BDA366D1739DDE /* BossLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = AFB0B8D450905136D198F448 /* BossLogo.png */; };
@@ -16,6 +18,9 @@
 		92725E85518487ADF2FB563E /* BossResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F397452A28A84E164534B6 /* BossResources.swift */; };
 		C03A0939C5244B0145077CE5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5D40D1B528161BC87CFE416D /* Assets.xcassets */; };
 		C1D1087CCF33ADEFB76D24B4 /* libbossApple in Frameworks */ = {isa = PBXBuildFile; productRef = 04EF58F22849C7E60400DE71 /* libbossApple */; };
+		C6BFEDB0497E0C8A40025531 /* DriftwoodSand.png in Resources */ = {isa = PBXBuildFile; fileRef = BA9068650716DCD5D108891B /* DriftwoodSand.png */; };
+		D919165A959CDE5B4541C018 /* WhiteSmoke.png in Resources */ = {isa = PBXBuildFile; fileRef = 2EC3955FE9D1E84754D7DCED /* WhiteSmoke.png */; };
+		DB8A94308C276DD03E277541 /* DesertGold.png in Resources */ = {isa = PBXBuildFile; fileRef = 31AA73B59A3B71B663D1932C /* DesertGold.png */; };
 		DEAFD8A822D2465BC02083A0 /* libboss in Frameworks */ = {isa = PBXBuildFile; productRef = 003CDF69F2A61F876B160E75 /* libboss */; };
 		EC96C2C57B95444C0012E7DD /* BossMenuBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C3141B6998C4F928C6A50F /* BossMenuBar.swift */; };
 /* End PBXBuildFile section */
@@ -23,7 +28,11 @@
 /* Begin PBXFileReference section */
 		02972563E16DBC28A9162044 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		146C9851027300CE90E03FED /* HeadphonesMenuBar.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = HeadphonesMenuBar.png; sourceTree = "<group>"; };
+		2EC3955FE9D1E84754D7DCED /* WhiteSmoke.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = WhiteSmoke.png; sourceTree = "<group>"; };
+		31AA73B59A3B71B663D1932C /* DesertGold.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = DesertGold.png; sourceTree = "<group>"; };
+		53B802A718607B08D8A3A850 /* Black.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Black.png; sourceTree = "<group>"; };
 		5D40D1B528161BC87CFE416D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		662C619660F4A4AE38356C8C /* MidnightViolet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = MidnightViolet.png; sourceTree = "<group>"; };
 		6805378F136D4E46A2849CB7 /* libboss-apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "libboss-apple"; path = "../libboss-apple"; sourceTree = SOURCE_ROOT; };
 		730DED07C45A35B95E2AC7AC /* libboss */ = {isa = PBXFileReference; lastKnownFileType = folder; name = libboss; path = ../libboss; sourceTree = SOURCE_ROOT; };
 		77F397452A28A84E164534B6 /* BossResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossResources.swift; sourceTree = "<group>"; };
@@ -31,6 +40,7 @@
 		8B22153A6B061770A45D12FB /* BossMacOSViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossMacOSViewModel.swift; sourceTree = "<group>"; };
 		A96F4BDFFBE4F9E177883939 /* BossMacOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossMacOSApp.swift; sourceTree = "<group>"; };
 		AFB0B8D450905136D198F448 /* BossLogo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BossLogo.png; sourceTree = "<group>"; };
+		BA9068650716DCD5D108891B /* DriftwoodSand.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = DriftwoodSand.png; sourceTree = "<group>"; };
 		C3C3141B6998C4F928C6A50F /* BossMenuBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossMenuBar.swift; sourceTree = "<group>"; };
 		D5146AF815A4B7C86E0737CA /* Boss.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Boss.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -54,6 +64,18 @@
 				6549FCBFE24A779517642F5A /* BossMacOS */,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		56C5B9E18C546497FB13C9AC /* wolverine */ = {
+			isa = PBXGroup;
+			children = (
+				53B802A718607B08D8A3A850 /* Black.png */,
+				31AA73B59A3B71B663D1932C /* DesertGold.png */,
+				BA9068650716DCD5D108891B /* DriftwoodSand.png */,
+				662C619660F4A4AE38356C8C /* MidnightViolet.png */,
+				2EC3955FE9D1E84754D7DCED /* WhiteSmoke.png */,
+			);
+			path = wolverine;
 			sourceTree = "<group>";
 		};
 		58683C6F9AAA933C185535AE /* BossXcode */ = {
@@ -87,9 +109,18 @@
 			);
 			sourceTree = "<group>";
 		};
+		7341E665CF3D9765F65D22D7 /* Devices */ = {
+			isa = PBXGroup;
+			children = (
+				56C5B9E18C546497FB13C9AC /* wolverine */,
+			);
+			path = Devices;
+			sourceTree = "<group>";
+		};
 		A3B44F46FAB080AF885982DC /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				7341E665CF3D9765F65D22D7 /* Devices */,
 				AFB0B8D450905136D198F448 /* BossLogo.png */,
 				84F21CC1E7A6D0316D418D1C /* HeadphonesMark.png */,
 				146C9851027300CE90E03FED /* HeadphonesMenuBar.png */,
@@ -178,9 +209,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				C03A0939C5244B0145077CE5 /* Assets.xcassets in Resources */,
+				29B1EC5ABA5DE3E15D7DC70E /* Black.png in Resources */,
 				63DE03FCD4BDA366D1739DDE /* BossLogo.png in Resources */,
+				DB8A94308C276DD03E277541 /* DesertGold.png in Resources */,
+				C6BFEDB0497E0C8A40025531 /* DriftwoodSand.png in Resources */,
 				5DF836B270CFC5E9EB09B09B /* HeadphonesMark.png in Resources */,
 				3927016F18C61779B548DAF2 /* HeadphonesMenuBar.png in Resources */,
+				4AE139CAEB4003F5E22900AE /* MidnightViolet.png in Resources */,
+				D919165A959CDE5B4541C018 /* WhiteSmoke.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
