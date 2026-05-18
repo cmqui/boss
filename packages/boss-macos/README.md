@@ -20,3 +20,9 @@ The GUI currently uses `BossAppleController` from `libbossApple` and provides a 
 - loading displayable audio modes
 - switching the current audio mode
 - reading and applying CNC, spatial audio, Wind Block, and ANC toggle settings
+
+Behavior notes for Bose QC Ultra 2 HP:
+
+- the Bose UI representation of CNC is inverted relative to the raw BMAP value
+- saved custom profile edits follow Bose-style `AudioModes.ModeConfig` writes rather than live `SettingsConfig` writes
+- when Wind Block is enabled, firmware normalizes saved-profile CNC to the Bose-displayed maximum (`10`)

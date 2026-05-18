@@ -108,12 +108,13 @@ The user-facing CLI now lives in [`../bossctl`](../bossctl/README.md). Keep Appl
 
 Debug logging:
 
+- `LIBBOSS_DEBUG=1` enables low-level `libboss` packet-shape tracing for selected protocol helpers such as `AudioModes.ModeConfig`
 - `LIBBOSS_APPLE_DEBUG=1` enables lifecycle and discovery logs
 - `LIBBOSS_APPLE_DEBUG_PACKETS=1` additionally logs raw BLE write/notification frames
 
 Example:
 
 ```bash
-LIBBOSS_APPLE_DEBUG=1 LIBBOSS_APPLE_DEBUG_PACKETS=1 \
+LIBBOSS_DEBUG=1 LIBBOSS_APPLE_DEBUG=1 LIBBOSS_APPLE_DEBUG_PACKETS=1 \
   swift run boss-bootstrap --name Bose --timeout 20
 ```

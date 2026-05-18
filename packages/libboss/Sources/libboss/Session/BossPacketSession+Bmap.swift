@@ -243,8 +243,18 @@ public extension BossPacketSession {
             name: name,
             settings: settings
         )
+        Self.debug(
+            "audio mode config setget request | modeIndex=\(modeIndex) | prompt=\(prompt.name) | name=\"\(name)\" | settings=\(Self.describe(settings)) | payloadCount=\(packet.payload.count) | payloadHex=\(Self.hexString(packet.payload)) | payloadFields=\(Self.describeModeConfigPayload(packet.payload))"
+        )
         let response = try await responsePacket(for: packet, timeout: timeout, timeoutError: timeoutError)
-        return try BossAudioModesCodec.parseModeConfigDetail(from: response)
+        Self.debug(
+            "audio mode config setget response | operator=\(response.operator) | payloadCount=\(response.payload.count) | payloadHex=\(Self.hexString(response.payload)) | payloadFields=\(Self.describeModeConfigPayload(response.payload))"
+        )
+        let parsed = try BossAudioModesCodec.parseModeConfigDetail(from: response)
+        Self.debug(
+            "audio mode config setget parsed | modeIndex=\(parsed.modeIndex) | prompt=\(parsed.prompt.name) | name=\"\(parsed.name)\" | favorite=\(parsed.favorite) | userConfigurable=\(parsed.userConfigurable) | userConfigured=\(parsed.userConfigured) | settings=\(Self.describe(parsed.settings))"
+        )
+        return parsed
     }
 
     func setFavoriteAudioModeIndices(
@@ -399,5 +409,51 @@ public extension BossPacketSession {
 
     private static func hexString(_ data: Data) -> String {
         data.map { String(format: "%02X", $0) }.joined()
+    }
+
+    private static func describe(_ config: BossAudioModeSettingsConfig) -> String {
+        "cnc=\(config.cncLevel),autoCNC=\(config.autoCNCEnabled),spatial=\(config.spatialAudioMode.displayName),wind=\(config.windBlockEnabled),anc=\(config.ancToggleEnabled)"
+    }
+
+    private static func describeModeConfigPayload(_ payload: Data) -> String {
+        let bytes = Array(payload)
+        switch bytes.count {
+        case 48...:
+            let modeIndex = bytes[0]
+            let prompt = BossAudioModePrompt.known(byte1: bytes[1], byte2: bytes[2]).name
+            let favorite = bytes[5]
+            let name = String(decoding: bytes[6..<38].prefix { $0 != 0 }, as: UTF8.self)
+            let settings = "cnc=\(bytes[42]),autoCNC=\(bytes[43]),spatial=\(bytes[44]),wind=\(bytes[46]),anc=\(bytes[47])"
+            return "format=status48 modeIndex=\(modeIndex) prompt=\(prompt) favorite=\(favorite) name=\"\(name)\" \(settings)"
+        case 47:
+            let modeIndex = bytes[0]
+            let prompt = BossAudioModePrompt.known(byte1: bytes[1], byte2: bytes[2]).name
+            let favorite = bytes[5]
+            let name = String(decoding: bytes[6..<38].prefix { $0 != 0 }, as: UTF8.self)
+            let settings = "cnc=\(bytes[42]),autoCNC=\(bytes[43]),spatial=\(bytes[44]),wind=\(bytes[46])"
+            return "format=status47 modeIndex=\(modeIndex) prompt=\(prompt) favorite=\(favorite) name=\"\(name)\" \(settings)"
+        case 45...:
+            let modeIndex = bytes[0]
+            let prompt = BossAudioModePrompt.known(byte1: bytes[1], byte2: bytes[2]).name
+            let favorite = bytes[5]
+            let name = String(decoding: bytes[6..<38].prefix { $0 != 0 }, as: UTF8.self)
+            let settings = "cnc=\(bytes[42]),autoCNC=\(bytes[43]),spatial=\(bytes[44])"
+            return "format=status45 modeIndex=\(modeIndex) prompt=\(prompt) favorite=\(favorite) name=\"\(name)\" \(settings)"
+        case 40...:
+            let modeIndex = bytes[0]
+            let prompt = BossAudioModePrompt.known(byte1: bytes[1], byte2: bytes[2]).name
+            let name = String(decoding: bytes[3..<35].prefix { $0 != 0 }, as: UTF8.self)
+            let settings = "cnc=\(bytes[35]),autoCNC=\(bytes[36]),spatial=\(bytes[37]),wind=\(bytes[38]),anc=\(bytes[39])"
+            return "format=setget40 modeIndex=\(modeIndex) prompt=\(prompt) name=\"\(name)\" \(settings)"
+        default:
+            return "unknownFormat(count=\(bytes.count))"
+        }
+    }
+
+    private static func debug(_ message: String) {
+        guard ProcessInfo.processInfo.environment["LIBBOSS_DEBUG"] == "1" else {
+            return
+        }
+        fputs("[libboss] \(message)\n", stderr)
     }
 }

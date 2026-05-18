@@ -275,9 +275,11 @@ final class BossSettingsSnapshotTests: XCTestCase {
         payload[3] = 0x01
         payload[4] = 0x00
         payload[5] = 0x01
+        payload[41] = 0x1D
         payload[42] = 0x05
         payload[44] = 0x02
-        payload[45] = 0x01
+        payload[45] = 0x7F
+        payload[46] = 0x01
         payload[47] = 0x01
         let nameBytes = Array("Immersion".utf8)
         payload.replaceSubrange(6..<(6 + nameBytes.count), with: nameBytes)
@@ -301,6 +303,66 @@ final class BossSettingsSnapshotTests: XCTestCase {
         XCTAssertEqual(detail.settings.spatialAudioMode, .head)
         XCTAssertTrue(detail.settings.windBlockEnabled)
         XCTAssertTrue(detail.settings.ancToggleEnabled)
+    }
+
+    func testAudioModeConfigParserTreatsStatus47WindAsByte46() throws {
+        var payload = Data(repeating: 0, count: 47)
+        payload[0] = 0x06
+        payload[1] = 0x00
+        payload[2] = 0x06
+        payload[3] = 0x01
+        payload[4] = 0x01
+        payload[5] = 0x01
+        payload[42] = 0x04
+        payload[43] = 0x00
+        payload[44] = 0x00
+        payload[45] = 0x7F
+        payload[46] = 0x01
+        let nameBytes = Array("Comfort".utf8)
+        payload.replaceSubrange(6..<(6 + nameBytes.count), with: nameBytes)
+        let packet = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.modeConfigFunctionRaw),
+            operator: .status,
+            payload: payload
+        )
+
+        let detail = try BossAudioModesCodec.parseModeConfigDetail(from: packet)
+        XCTAssertEqual(detail.modeIndex, 6)
+        XCTAssertEqual(detail.settings.cncLevel, 4)
+        XCTAssertEqual(detail.settings.spatialAudioMode, .off)
+        XCTAssertTrue(detail.settings.windBlockEnabled)
+        XCTAssertFalse(detail.settings.ancToggleEnabled)
+    }
+
+    func testAudioModeConfigParserTreatsStatus45AsNoWindNoAnc() throws {
+        var payload = Data(repeating: 0, count: 45)
+        payload[0] = 0x04
+        payload[1] = 0x00
+        payload[2] = 0x0D
+        payload[3] = 0x01
+        payload[4] = 0x01
+        payload[5] = 0x00
+        payload[42] = 0x02
+        payload[43] = 0x01
+        payload[44] = 0x01
+        let nameBytes = Array("Focus".utf8)
+        payload.replaceSubrange(6..<(6 + nameBytes.count), with: nameBytes)
+        let packet = BmapPacket(
+            functionBlock: .audioModes,
+            function: BmapFunction(block: .audioModes, rawValue: BossAudioModesCodec.modeConfigFunctionRaw),
+            operator: .status,
+            payload: payload
+        )
+
+        let detail = try BossAudioModesCodec.parseModeConfigDetail(from: packet)
+        XCTAssertEqual(detail.modeIndex, 4)
+        XCTAssertEqual(detail.prompt, .focus)
+        XCTAssertEqual(detail.settings.cncLevel, 2)
+        XCTAssertTrue(detail.settings.autoCNCEnabled)
+        XCTAssertEqual(detail.settings.spatialAudioMode, .room)
+        XCTAssertFalse(detail.settings.windBlockEnabled)
+        XCTAssertFalse(detail.settings.ancToggleEnabled)
     }
 
     func testAudioModeConfigSetGetPacketEncodesProfileNamePromptAndSettings() throws {

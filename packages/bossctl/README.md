@@ -48,9 +48,10 @@ swift run bossctl bmap send --name Bose --block 0x00 --function 0x01 --op get
 - `audio-mode set settings-config` writes the same live config with `SetGet`; omitted fields are preserved from the current device state.
 - `audio-mode set settings-config` verifies the exact target config after writing and reconnects for readback if the BLE stream ends or times out.
 - If a settings-config write was sent but verification remains inconclusive after retries, `bossctl` reports that explicitly instead of claiming the update failed or succeeded.
-- The live settings-config payload controls CNC level, auto-CNC, spatial audio, wind block, and ANC toggle. CNC is inverted on QC Ultra 2 HP: `0` is maximum ANC and `10` is most ambient.
+- The live settings-config payload controls CNC level, auto-CNC, spatial audio, wind block, and ANC toggle. Bose's UI inverts CNC on QC Ultra 2 HP: raw `0` displays as `10`, and raw `10` displays as `0`.
 - `audio-mode cnc|spatial|wind-block|anc` are convenience wrappers over the same verified `settings-config` write path.
-- Wrapper commands verify the requested field only; the firmware may normalize related fields, for example disabling ANC can reset CNC to `10`.
+- Wrapper commands verify the requested field only; the firmware may normalize related fields.
+- On QC Ultra 2 HP saved custom profiles, enabling Wind Block forces CNC back to raw `0`, which Bose-style UI displays as `10`.
 - On Bose QC Ultra 2 HP, the direct `AudioModesCurrentMode Start` response is the most trustworthy success signal for mode changes.
 - On macOS/CoreBluetooth, immediate post-write `AudioModesCurrentMode Get` verification is not fully reliable; `bossctl` treats readback as best-effort and may report `verification inconclusive` instead of a false failure.
 - On Bose QC Ultra 2 HP, `auto-play-pause` reads cleanly from standalone settings function `0x18`.
@@ -69,12 +70,13 @@ swift run bossctl bmap send --name Bose --block 0x00 --function 0x01 --op get
 
 ## Debug Logging
 
+- `LIBBOSS_DEBUG=1` enables low-level `libboss` packet-shape tracing for selected protocol helpers such as `AudioModes.ModeConfig`
 - `LIBBOSS_APPLE_DEBUG=1` enables lifecycle and discovery logs
 - `LIBBOSS_APPLE_DEBUG_PACKETS=1` additionally logs raw BLE write/notification frames
 
 Example:
 
 ```bash
-LIBBOSS_APPLE_DEBUG=1 LIBBOSS_APPLE_DEBUG_PACKETS=1 \
+LIBBOSS_DEBUG=1 LIBBOSS_APPLE_DEBUG=1 LIBBOSS_APPLE_DEBUG_PACKETS=1 \
   swift run bossctl audio-mode get settings-config --name Bose
 ```

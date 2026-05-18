@@ -64,6 +64,8 @@ final class BossMacOSViewModel: ObservableObject {
     private var selectedDeviceIdentifier: UUID?
     private var isManualDeviceSelection = false
     private var isConnectingSelectedDevice = false
+    private let cncTotalSteps = 11
+    private var cncDisplayMaximum: Int { cncTotalSteps - 1 }
 
     var isBusy: Bool {
         if case .loading = loadState {
@@ -91,6 +93,10 @@ final class BossMacOSViewModel: ObservableObject {
         settings != nil && hasDetachedSettingsDraft && !isBusy
     }
 
+    var isCNCForcedToDisplayMaximumByCurrentConstraint: Bool {
+        windBlockEnabled
+    }
+
     var canApplyEqualizer: Bool {
         equalizer != nil && hasDetachedEqualizerDraft && !isBusy
     }
@@ -111,6 +117,20 @@ final class BossMacOSViewModel: ObservableObject {
     var selectableSaveProfilePrompts: [BossAudioModePrompt] {
         let nonNone = supportedPrompts.filter { $0 != .none }
         return nonNone.isEmpty ? supportedPrompts : nonNone
+    }
+
+    var resolvedSelectedAudioModeIndex: Int? {
+        if let selectedAudioModeIndex,
+           selectableAudioModes.contains(where: { $0.modeIndex == selectedAudioModeIndex }) {
+            return selectedAudioModeIndex
+        }
+
+        if let currentAudioModeIndex,
+           selectableAudioModes.contains(where: { $0.modeIndex == currentAudioModeIndex }) {
+            return currentAudioModeIndex
+        }
+
+        return selectableAudioModes.first?.modeIndex
     }
 
     func refresh() {
@@ -174,6 +194,9 @@ final class BossMacOSViewModel: ObservableObject {
 
     func selectAudioMode(_ index: Int) {
         selectedAudioModeIndex = index
+        if let selectedMode = audioModes.first(where: { $0.modeIndex == index }) {
+            applySettingsSnapshot(selectedMode.settings)
+        }
         run("Switching mode") {
             let session = self.makeSession()
             let result = try await session.setCurrentAudioMode(index: index)
@@ -225,23 +248,114 @@ final class BossMacOSViewModel: ObservableObject {
         }
         run("Applying mode settings") {
             let session = self.makeSession()
-            let patch = BossAudioModeSettingsConfigPatch(
-                cncLevel: self.cncLevel,
-                spatialAudioMode: self.spatialAudioMode,
-                windBlockEnabled: self.windBlockEnabled,
-                ancToggleEnabled: self.ancToggleEnabled
-            )
-            let result = try await session.setAudioModeSettings(patch)
-            switch result {
-            case .unchanged(let config):
-                self.applySettingsSnapshot(config)
-                self.lastResultMessage = "Mode settings unchanged"
-            case .updated(let config):
-                self.applySettingsSnapshot(config)
-                self.lastResultMessage = "Mode settings updated"
-            case .verificationInconclusive(let config):
-                self.applySettingsSnapshot(config)
-                self.lastResultMessage = "Mode settings verification was inconclusive"
+            let draftSettings = self.currentDraftConfig()
+            Self.log(self.debugSummary(
+                "Apply mode settings requested",
+                selectedModeIndex: self.resolvedSelectedAudioModeIndex,
+                currentModeIndex: self.currentAudioModeIndex,
+                draftSettings: draftSettings
+            ))
+
+            if let selectedMode = self.selectedModeConfig,
+               selectedMode.userConfigurable,
+               selectedMode.userConfigured,
+               self.hasCustomProfileName(selectedMode) {
+                Self.log(self.debugSummary(
+                    "Saving custom mode",
+                    selectedModeIndex: selectedMode.modeIndex,
+                    currentModeIndex: self.currentAudioModeIndex,
+                    mode: selectedMode,
+                    draftSettings: draftSettings
+                ))
+                let saved = try await self.saveCustomModeSettingsSequentially(
+                    using: session,
+                    startingFrom: selectedMode,
+                    targetSettings: draftSettings
+                )
+                Self.log(self.debugSummary(
+                    "Custom mode save returned",
+                    selectedModeIndex: self.resolvedSelectedAudioModeIndex,
+                    currentModeIndex: self.currentAudioModeIndex,
+                    mode: saved,
+                    draftSettings: draftSettings,
+                    returnedSettings: saved.settings
+                ))
+                self.applySettingsSnapshot(saved.settings)
+                self.selectedAudioModeIndex = saved.modeIndex
+
+                var updatedModes = self.audioModes
+                if let existingIndex = updatedModes.firstIndex(where: { $0.modeIndex == saved.modeIndex }) {
+                    updatedModes[existingIndex] = saved
+                    self.applyAudioModes(updatedModes)
+                } else {
+                    self.applyAudioModes(try await session.audioModeConfigs())
+                }
+
+                if saved.settings == draftSettings {
+                    self.lastResultMessage = "Updated \"\(self.customProfileDisplayName(for: saved))\""
+                } else {
+                    self.lastResultMessage = "Updated \"\(self.customProfileDisplayName(for: saved))\", but firmware normalized the settings"
+                }
+            } else {
+                let targetModeIndex = self.resolvedSelectedAudioModeIndex
+
+                if let targetModeIndex,
+                   self.currentAudioModeIndex != targetModeIndex {
+                    Self.log(self.debugSummary(
+                        "Switching current mode before live settings write",
+                        selectedModeIndex: targetModeIndex,
+                        currentModeIndex: self.currentAudioModeIndex
+                    ))
+                    _ = try await session.setCurrentAudioMode(index: targetModeIndex)
+                    self.currentAudioModeIndex = targetModeIndex
+                    self.selectedAudioModeIndex = targetModeIndex
+                }
+
+                let patch = BossAudioModeSettingsConfigPatch(
+                    cncLevel: self.rawCNCLevel(fromDisplay: self.cncLevel),
+                    spatialAudioMode: self.spatialAudioMode,
+                    windBlockEnabled: self.windBlockEnabled,
+                    ancToggleEnabled: self.ancToggleEnabled
+                )
+                Self.log(self.debugSummary(
+                    "Writing live mode settings patch",
+                    selectedModeIndex: self.resolvedSelectedAudioModeIndex,
+                    currentModeIndex: self.currentAudioModeIndex,
+                    draftSettings: draftSettings
+                ))
+                let result = try await session.setAudioModeSettings(patch)
+                switch result {
+                case .unchanged(let config):
+                    Self.log(self.debugSummary(
+                        "Live mode settings returned unchanged",
+                        selectedModeIndex: self.resolvedSelectedAudioModeIndex,
+                        currentModeIndex: self.currentAudioModeIndex,
+                        draftSettings: draftSettings,
+                        returnedSettings: config
+                    ))
+                    self.applySettingsSnapshot(config)
+                    self.lastResultMessage = "Mode settings unchanged"
+                case .updated(let config):
+                    Self.log(self.debugSummary(
+                        "Live mode settings returned updated",
+                        selectedModeIndex: self.resolvedSelectedAudioModeIndex,
+                        currentModeIndex: self.currentAudioModeIndex,
+                        draftSettings: draftSettings,
+                        returnedSettings: config
+                    ))
+                    self.applySettingsSnapshot(config)
+                    self.lastResultMessage = "Mode settings updated"
+                case .verificationInconclusive(let config):
+                    Self.log(self.debugSummary(
+                        "Live mode settings verification inconclusive",
+                        selectedModeIndex: self.resolvedSelectedAudioModeIndex,
+                        currentModeIndex: self.currentAudioModeIndex,
+                        draftSettings: draftSettings,
+                        returnedSettings: config
+                    ))
+                    self.applySettingsSnapshot(config)
+                    self.lastResultMessage = "Mode settings verification was inconclusive"
+                }
             }
         }
     }
@@ -252,6 +366,15 @@ final class BossMacOSViewModel: ObservableObject {
         }
         run("Applying EQ settings") {
             let session = self.makeSession()
+            let targetModeIndex = self.resolvedSelectedAudioModeIndex
+
+            if let targetModeIndex,
+               self.currentAudioModeIndex != targetModeIndex {
+                _ = try await session.setCurrentAudioMode(index: targetModeIndex)
+                self.currentAudioModeIndex = targetModeIndex
+                self.selectedAudioModeIndex = targetModeIndex
+            }
+
             let result = try await session.setEqualizer(self.currentEqualizerPatch())
             switch result {
             case .unchanged(let settings):
@@ -264,6 +387,8 @@ final class BossMacOSViewModel: ObservableObject {
                 self.applyEqualizerSnapshot(settings)
                 self.lastResultMessage = "EQ verification was inconclusive"
             }
+
+            try await self.reloadModeWorkspace(using: session)
         }
     }
 
@@ -293,7 +418,12 @@ final class BossMacOSViewModel: ObservableObject {
     }
 
     func setCNCLevelDraft(_ level: Int) {
-        cncLevel = level
+        if isCNCForcedToDisplayMaximumByCurrentConstraint {
+            cncLevel = cncDisplayMaximum
+            noteManualSettingsEdit()
+            return
+        }
+        cncLevel = normalizedDisplayCNCLevel(level)
         noteManualSettingsEdit()
     }
 
@@ -304,11 +434,13 @@ final class BossMacOSViewModel: ObservableObject {
 
     func setWindBlockEnabledDraft(_ enabled: Bool) {
         windBlockEnabled = enabled
+        enforceConfirmedModeSettingConstraints()
         noteManualSettingsEdit()
     }
 
     func setANCEnabledDraft(_ enabled: Bool) {
         ancToggleEnabled = enabled
+        enforceConfirmedModeSettingConstraints()
         noteManualSettingsEdit()
     }
 
@@ -454,17 +586,24 @@ final class BossMacOSViewModel: ObservableObject {
 
         currentAudioModeIndex = workspace.modeWorkspace.currentAudioModeIndex
         selectedAudioModeIndex = workspace.modeWorkspace.currentAudioModeIndex
-        applySettingsSnapshot(workspace.modeWorkspace.settings)
-        applyEqualizerSnapshot(workspace.modeWorkspace.equalizer)
-        applyDeviceSettings(workspace.modeWorkspace.deviceSettings.settings)
         deviceName = workspace.bootstrappedDevice.productName
         deviceVariantName = workspace.bootstrappedDevice.productVariant.variantName
         self.firmwareVersion = firmwareVersion
         applyAudioModes(workspace.audioModes)
+        applyDisplayedModeSettings(liveConfig: workspace.modeWorkspace.settings)
+        applyEqualizerSnapshot(workspace.modeWorkspace.equalizer)
+        applyDeviceSettings(workspace.modeWorkspace.deviceSettings.settings)
         supportedPrompts = prompts
         hasDetachedSettingsDraft = false
         hasDetachedEqualizerDraft = false
         lastResultMessage = "Loaded \(audioModes.count) audio modes"
+        Self.log(debugSummary(
+            "Reloaded all workspace state",
+            selectedModeIndex: selectedAudioModeIndex,
+            currentModeIndex: currentAudioModeIndex,
+            draftSettings: settings,
+            liveSettings: workspace.modeWorkspace.settings
+        ))
     }
 
     private func startDiscoveryLoopIfNeeded(forceImmediateRefresh: Bool = false) {
@@ -619,15 +758,21 @@ final class BossMacOSViewModel: ObservableObject {
                     guard !Task.isCancelled else {
                         break
                     }
+                    await MainActor.run {
+                        Self.log(self.debugSummary(
+                            "Current mode stream update",
+                            selectedModeIndex: self.selectedAudioModeIndex,
+                            currentModeIndex: self.currentAudioModeIndex,
+                            incomingModeIndex: currentAudioModeIndex,
+                            draftSettings: self.settings
+                        ))
+                    }
                     let shouldRefreshWorkspace = await MainActor.run {
                         guard self.appScreen == .workspace else {
                             return false
                         }
-                        let modeChanged =
-                            self.currentAudioModeIndex != currentAudioModeIndex ||
-                            self.selectedAudioModeIndex != currentAudioModeIndex
+                        let modeChanged = self.currentAudioModeIndex != currentAudioModeIndex
                         self.currentAudioModeIndex = currentAudioModeIndex
-                        self.selectedAudioModeIndex = currentAudioModeIndex
                         return modeChanged
                     }
 
@@ -667,7 +812,13 @@ final class BossMacOSViewModel: ObservableObject {
                         guard self.appScreen == .workspace, !self.hasDetachedSettingsDraft else {
                             return
                         }
-                        self.applySettingsSnapshot(config)
+                        Self.log(self.debugSummary(
+                            "Live settings stream update",
+                            selectedModeIndex: self.selectedAudioModeIndex,
+                            currentModeIndex: self.currentAudioModeIndex,
+                            liveSettings: config
+                        ))
+                        self.applyDisplayedModeSettings(liveConfig: config)
                     }
                 }
             } catch {
@@ -751,6 +902,14 @@ final class BossMacOSViewModel: ObservableObject {
                         guard self.appScreen == .workspace else {
                             return
                         }
+                        let selectedMode = self.selectedModeConfig
+                        Self.log(self.debugSummary(
+                            "Audio mode catalog stream update",
+                            selectedModeIndex: self.selectedAudioModeIndex,
+                            currentModeIndex: self.currentAudioModeIndex,
+                            mode: selectedMode,
+                            draftSettings: selectedMode?.settings
+                        ) + " catalogCount=\(modes.count)")
                         self.applyAudioModes(modes)
                     }
                 }
@@ -799,8 +958,13 @@ final class BossMacOSViewModel: ObservableObject {
     private func reloadModeWorkspace(using session: BossAppleSession) async throws {
         let snapshot = try await session.refreshModeWorkspaceSnapshot()
         currentAudioModeIndex = snapshot.currentAudioModeIndex
-        selectedAudioModeIndex = snapshot.currentAudioModeIndex
-        applySettingsSnapshot(snapshot.settings)
+        Self.log(debugSummary(
+            "Reloaded mode workspace snapshot",
+            selectedModeIndex: selectedAudioModeIndex,
+            currentModeIndex: currentAudioModeIndex,
+            liveSettings: snapshot.settings
+        ))
+        applyDisplayedModeSettings(liveConfig: snapshot.settings)
         applyEqualizerSnapshot(snapshot.equalizer)
         applyDeviceSettings(snapshot.deviceSettings.settings)
     }
@@ -827,7 +991,7 @@ final class BossMacOSViewModel: ObservableObject {
 
     private func applySettingsSnapshot(_ config: BossAudioModeSettingsConfig) {
         settings = config
-        cncLevel = config.cncLevel
+        cncLevel = displayCNCLevel(fromRaw: config.cncLevel)
         spatialAudioMode = config.spatialAudioMode
         windBlockEnabled = config.windBlockEnabled
         ancToggleEnabled = config.ancToggleEnabled
@@ -853,6 +1017,47 @@ final class BossMacOSViewModel: ObservableObject {
     private func applyAudioModes(_ modes: [BossAudioModeConfig]) {
         audioModes = modes
         customProfileModes = modes.filter(\.userConfigurable)
+
+        if let selectedAudioModeIndex,
+           !selectableAudioModes.contains(where: { $0.modeIndex == selectedAudioModeIndex }) {
+            self.selectedAudioModeIndex = resolvedSelectedAudioModeIndex
+        }
+
+        if !hasDetachedSettingsDraft,
+           let selectedModeConfig,
+           selectedModeConfig.modeIndex != currentAudioModeIndex {
+            Self.log(debugSummary(
+                "Applying selected mode settings from catalog",
+                selectedModeIndex: selectedAudioModeIndex,
+                currentModeIndex: currentAudioModeIndex,
+                mode: selectedModeConfig,
+                draftSettings: selectedModeConfig.settings
+            ))
+            applySettingsSnapshot(selectedModeConfig.settings)
+        }
+    }
+
+    private func applyDisplayedModeSettings(liveConfig: BossAudioModeSettingsConfig) {
+        if let selectedModeConfig,
+           selectedModeConfig.modeIndex != currentAudioModeIndex {
+            Self.log(debugSummary(
+                "Ignoring live settings in favor of selected catalog mode",
+                selectedModeIndex: selectedAudioModeIndex,
+                currentModeIndex: currentAudioModeIndex,
+                mode: selectedModeConfig,
+                draftSettings: selectedModeConfig.settings,
+                liveSettings: liveConfig
+            ))
+            applySettingsSnapshot(selectedModeConfig.settings)
+            return
+        }
+        Self.log(debugSummary(
+            "Applying live settings to UI",
+            selectedModeIndex: selectedAudioModeIndex,
+            currentModeIndex: currentAudioModeIndex,
+            liveSettings: liveConfig
+        ))
+        applySettingsSnapshot(liveConfig)
     }
 
     private func noteManualSettingsEdit() {
@@ -874,12 +1079,34 @@ final class BossMacOSViewModel: ObservableObject {
 
     private func currentDraftConfig() -> BossAudioModeSettingsConfig {
         BossAudioModeSettingsConfig(
-            cncLevel: cncLevel,
+            cncLevel: rawCNCLevel(fromDisplay: cncLevel),
             autoCNCEnabled: settings?.autoCNCEnabled ?? false,
             spatialAudioMode: spatialAudioMode,
             windBlockEnabled: windBlockEnabled,
             ancToggleEnabled: ancToggleEnabled
         )
+    }
+
+    private func enforceConfirmedModeSettingConstraints() {
+        if isCNCForcedToDisplayMaximumByCurrentConstraint {
+            cncLevel = cncDisplayMaximum
+        }
+    }
+
+    private func displayCNCLevel(fromRaw rawValue: Int) -> Int {
+        abs(normalizedRawCNCLevel(rawValue) - cncDisplayMaximum)
+    }
+
+    private func rawCNCLevel(fromDisplay displayValue: Int) -> Int {
+        abs(normalizedDisplayCNCLevel(displayValue) - cncDisplayMaximum)
+    }
+
+    private func normalizedDisplayCNCLevel(_ value: Int) -> Int {
+        min(max(value, 0), cncDisplayMaximum)
+    }
+
+    private func normalizedRawCNCLevel(_ value: Int) -> Int {
+        min(max(value, 0), cncDisplayMaximum)
     }
 
     private func currentEqualizerPatch() -> BossEqualizerSettingsPatch {
@@ -890,8 +1117,99 @@ final class BossMacOSViewModel: ObservableObject {
         )
     }
 
+    private func saveCustomModeSettingsSequentially(
+        using session: BossAppleSession,
+        startingFrom initialMode: BossAudioModeConfig,
+        targetSettings: BossAudioModeSettingsConfig
+    ) async throws -> BossAudioModeConfig {
+        let normalizedName = normalizedCustomProfileName(initialMode.name)
+        var workingMode = initialMode
+
+        func saveStep(
+            _ label: String,
+            transform: (BossAudioModeSettingsConfig) -> BossAudioModeSettingsConfig
+        ) async throws {
+            let stepSettings = transform(workingMode.settings)
+            guard stepSettings != workingMode.settings else {
+                return
+            }
+            Self.log(debugSummary(
+                "Saving custom mode step: \(label)",
+                selectedModeIndex: workingMode.modeIndex,
+                currentModeIndex: currentAudioModeIndex,
+                mode: workingMode,
+                draftSettings: stepSettings
+            ))
+            workingMode = try await session.saveCustomAudioMode(
+                name: normalizedName,
+                settings: stepSettings,
+                prompt: initialMode.prompt,
+                slot: workingMode.modeIndex
+            )
+            Self.log(debugSummary(
+                "Custom mode step returned: \(label)",
+                selectedModeIndex: workingMode.modeIndex,
+                currentModeIndex: currentAudioModeIndex,
+                mode: workingMode,
+                returnedSettings: workingMode.settings
+            ))
+        }
+
+        try await saveStep("spatial") { current in
+            BossAudioModeSettingsConfig(
+                cncLevel: current.cncLevel,
+                autoCNCEnabled: current.autoCNCEnabled,
+                spatialAudioMode: targetSettings.spatialAudioMode,
+                windBlockEnabled: current.windBlockEnabled,
+                ancToggleEnabled: current.ancToggleEnabled
+            )
+        }
+
+        let ancWillChange = workingMode.settings.ancToggleEnabled != targetSettings.ancToggleEnabled
+        try await saveStep("anc") { current in
+            BossAudioModeSettingsConfig(
+                cncLevel: current.cncLevel,
+                autoCNCEnabled: current.autoCNCEnabled,
+                spatialAudioMode: current.spatialAudioMode,
+                windBlockEnabled: current.windBlockEnabled,
+                ancToggleEnabled: targetSettings.ancToggleEnabled
+            )
+        }
+
+        if ancWillChange || workingMode.settings.windBlockEnabled != targetSettings.windBlockEnabled {
+            try await saveStep("wind") { current in
+                BossAudioModeSettingsConfig(
+                    cncLevel: current.cncLevel,
+                    autoCNCEnabled: current.autoCNCEnabled,
+                    spatialAudioMode: current.spatialAudioMode,
+                    windBlockEnabled: targetSettings.windBlockEnabled,
+                    ancToggleEnabled: current.ancToggleEnabled
+                )
+            }
+        }
+
+        try await saveStep("cnc") { current in
+            BossAudioModeSettingsConfig(
+                cncLevel: targetSettings.cncLevel,
+                autoCNCEnabled: current.autoCNCEnabled,
+                spatialAudioMode: current.spatialAudioMode,
+                windBlockEnabled: current.windBlockEnabled,
+                ancToggleEnabled: current.ancToggleEnabled
+            )
+        }
+
+        return workingMode
+    }
+
     func customProfileDisplayName(for mode: BossAudioModeConfig) -> String {
         displayName(for: mode)
+    }
+
+    private var selectedModeConfig: BossAudioModeConfig? {
+        guard let selectedAudioModeIndex = resolvedSelectedAudioModeIndex else {
+            return nil
+        }
+        return audioModes.first(where: { $0.modeIndex == selectedAudioModeIndex })
     }
 
     func canDelete(_ mode: BossAudioModeConfig) -> Bool {
@@ -987,6 +1305,52 @@ final class BossMacOSViewModel: ObservableObject {
             return description
         }
         return String(describing: error)
+    }
+
+    private func debugSummary(
+        _ prefix: String,
+        selectedModeIndex: Int?,
+        currentModeIndex: Int?,
+        incomingModeIndex: Int? = nil,
+        mode: BossAudioModeConfig? = nil,
+        draftSettings: BossAudioModeSettingsConfig? = nil,
+        returnedSettings: BossAudioModeSettingsConfig? = nil,
+        liveSettings: BossAudioModeSettingsConfig? = nil
+    ) -> String {
+        var fields: [String] = [
+            "selected=\(selectedModeIndex.map(String.init) ?? "nil")",
+            "current=\(currentModeIndex.map(String.init) ?? "nil")"
+        ]
+
+        if let incomingModeIndex {
+            fields.append("incoming=\(incomingModeIndex)")
+        }
+
+        if let mode {
+            fields.append("mode=\(debugModeLabel(mode))")
+        }
+
+        if let draftSettings {
+            fields.append("draft=\(debugSettingsLabel(draftSettings))")
+        }
+
+        if let returnedSettings {
+            fields.append("returned=\(debugSettingsLabel(returnedSettings))")
+        }
+
+        if let liveSettings {
+            fields.append("live=\(debugSettingsLabel(liveSettings))")
+        }
+
+        return "\(prefix) | " + fields.joined(separator: " | ")
+    }
+
+    private func debugModeLabel(_ mode: BossAudioModeConfig) -> String {
+        "\(customProfileDisplayName(for: mode))#\(mode.modeIndex){userConfigurable=\(mode.userConfigurable),userConfigured=\(mode.userConfigured),favorite=\(mode.favorite),prompt=\(mode.prompt.name),settings=\(debugSettingsLabel(mode.settings))}"
+    }
+
+    private func debugSettingsLabel(_ settings: BossAudioModeSettingsConfig) -> String {
+        "{cnc=\(settings.cncLevel),autoCNC=\(settings.autoCNCEnabled),spatial=\(String(describing: settings.spatialAudioMode)),wind=\(settings.windBlockEnabled),ancToggle=\(settings.ancToggleEnabled)}"
     }
 
     private static func log(_ message: String) {

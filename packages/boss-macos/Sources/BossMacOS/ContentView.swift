@@ -305,7 +305,7 @@ private struct ModeSettingsPanel: View {
     let palette: DevicePalette
 
     private var selectedMode: BossAudioModeConfig? {
-        guard let selectedAudioModeIndex = viewModel.selectedAudioModeIndex else {
+        guard let selectedAudioModeIndex = viewModel.resolvedSelectedAudioModeIndex else {
             return nil
         }
         return viewModel.selectableAudioModes.first(where: { $0.modeIndex == selectedAudioModeIndex })
@@ -389,11 +389,19 @@ private struct ModeSettingsPanel: View {
                 GridRow {
                     Text("CNC")
                         .foregroundStyle(.secondary)
-                    HStack {
-                        Slider(value: cncBinding, in: 0...10, step: 1)
-                        Text("\(viewModel.cncLevel)")
-                            .monospacedDigit()
-                            .frame(width: 28, alignment: .trailing)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Slider(value: cncBinding, in: 0...10, step: 1)
+                                .disabled(viewModel.isCNCForcedToDisplayMaximumByCurrentConstraint)
+                            Text("\(viewModel.cncLevel)")
+                                .monospacedDigit()
+                                .frame(width: 28, alignment: .trailing)
+                        }
+                        Text("This device forces CNC to 10 while Wind Block is enabled.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .opacity(viewModel.isCNCForcedToDisplayMaximumByCurrentConstraint ? 1 : 0)
+                            .accessibilityHidden(!viewModel.isCNCForcedToDisplayMaximumByCurrentConstraint)
                     }
                 }
 
@@ -464,7 +472,7 @@ private struct ModeSettingsPanel: View {
     private var selectedModeBinding: Binding<Int> {
         Binding(
             get: {
-                viewModel.selectedAudioModeIndex ?? viewModel.selectableAudioModes.first?.modeIndex ?? 0
+                viewModel.resolvedSelectedAudioModeIndex ?? 0
             },
             set: { newValue in
                 deferMain {

@@ -404,7 +404,7 @@ public enum BossAudioModesCodec {
     public static func parseModeConfigDetail(from packet: BmapPacket) throws -> BossAudioModeConfig {
         try requireStatus(packet)
         let payload = Array(packet.payload)
-        if payload.count >= 48 {
+        if payload.count >= 45 {
             guard let spatialAudioMode = BossSpatialAudioMode(rawValue: payload[44]) else {
                 throw BossAudioModesCodecError.invalidPayload("Unknown spatial audio mode: \(payload[44])")
             }
@@ -419,8 +419,8 @@ public enum BossAudioModesCodec {
                     cncLevel: Int(payload[42]),
                     autoCNCEnabled: payload[43] != 0,
                     spatialAudioMode: spatialAudioMode,
-                    windBlockEnabled: payload[45] != 0,
-                    ancToggleEnabled: payload[47] != 0
+                    windBlockEnabled: payload.count >= 47 ? payload[46] != 0 : false,
+                    ancToggleEnabled: payload.count >= 48 ? payload[47] != 0 : false
                 )
             )
         }
