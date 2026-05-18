@@ -210,7 +210,17 @@ public actor BossAppleSession {
         index targetIndex: Int,
         playVoicePrompt: Bool = false
     ) async throws -> BossAppleCurrentAudioModeWriteResult {
-        try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRawLinkRetrying(preferredPreferences: [.secure, .unsecure]) { link in
+                try await rustBridge.setCurrentAudioMode(
+                    on: link,
+                    targetIndex: targetIndex,
+                    playVoicePrompt: playVoicePrompt
+                )
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
             try await mapCoreErrors {
                 wrap(try await session.setCurrentAudioMode(index: targetIndex, playVoicePrompt: playVoicePrompt))
             }
@@ -220,7 +230,13 @@ public actor BossAppleSession {
     public func setAudioModeSettings(
         _ update: BossAudioModeSettingsConfigPatch
     ) async throws -> BossAppleAudioModeSettingsWriteResult {
-        try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRawLinkRetrying(preferredPreferences: [.secure, .unsecure]) { link in
+                try await rustBridge.setAudioModeSettings(on: link, update: update)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
             try await mapCoreErrors {
                 wrap(try await session.setAudioModeSettings(update))
             }

@@ -22,8 +22,13 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "CBossRustFFI",
+            publicHeadersPath: "include"
+        ),
+        .target(
             name: "libbossApple",
             dependencies: [
+                "CBossRustFFI",
                 .product(name: "libboss", package: "libboss"),
             ]
         ),

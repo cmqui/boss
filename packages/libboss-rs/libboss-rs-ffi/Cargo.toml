@@ -1,0 +1,16 @@
+[package]
+name = "libboss-rs-ffi"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[lib]
+name = "libboss_rs_ffi"
+path = "src/lib.rs"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+async-trait = "0.1"
+futures = "0.3"
+libboss-rs-core = { path = "../libboss-rs-core" }
+libboss-rs-session = { path = "../libboss-rs-session" }
