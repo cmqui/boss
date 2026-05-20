@@ -58,50 +58,230 @@ pub struct BossAudioModePrompt {
 }
 
 impl BossAudioModePrompt {
-    pub const NONE: Self = Self { byte1: 0, byte2: 0, name: "None" };
-    pub const QUIET: Self = Self { byte1: 0, byte2: 1, name: "Quiet" };
-    pub const AWARE: Self = Self { byte1: 0, byte2: 2, name: "Aware" };
-    pub const TRANSPARENT: Self = Self { byte1: 0, byte2: 3, name: "Transparent" };
-    pub const TRANSPARENCY: Self = Self { byte1: 0, byte2: 4, name: "Transparency" };
-    pub const MASKING: Self = Self { byte1: 0, byte2: 5, name: "Masking" };
-    pub const COMFORT: Self = Self { byte1: 0, byte2: 6, name: "Comfort" };
-    pub const COMMUTE: Self = Self { byte1: 0, byte2: 7, name: "Commute" };
-    pub const OUTDOOR: Self = Self { byte1: 0, byte2: 8, name: "Outdoor" };
-    pub const WORKOUT: Self = Self { byte1: 0, byte2: 9, name: "Workout" };
-    pub const HOME: Self = Self { byte1: 0, byte2: 10, name: "Home" };
-    pub const WORK: Self = Self { byte1: 0, byte2: 11, name: "Work" };
-    pub const MUSIC: Self = Self { byte1: 0, byte2: 12, name: "Music" };
-    pub const FOCUS: Self = Self { byte1: 0, byte2: 13, name: "Focus" };
-    pub const RELAX: Self = Self { byte1: 0, byte2: 14, name: "Relax" };
-    pub const FLIGHT: Self = Self { byte1: 0, byte2: 15, name: "Flight" };
-    pub const AIRPORT: Self = Self { byte1: 0, byte2: 16, name: "Airport" };
-    pub const DRIVING: Self = Self { byte1: 0, byte2: 17, name: "Driving" };
-    pub const TRAINING: Self = Self { byte1: 0, byte2: 18, name: "Training" };
-    pub const GYM: Self = Self { byte1: 0, byte2: 19, name: "Gym" };
-    pub const RUN: Self = Self { byte1: 0, byte2: 20, name: "Run" };
-    pub const WALK: Self = Self { byte1: 0, byte2: 21, name: "Walk" };
-    pub const HIKE: Self = Self { byte1: 0, byte2: 22, name: "Hike" };
-    pub const TALK: Self = Self { byte1: 0, byte2: 23, name: "Talk" };
-    pub const CALL: Self = Self { byte1: 0, byte2: 24, name: "Call" };
-    pub const WHISPER: Self = Self { byte1: 0, byte2: 25, name: "Whisper" };
-    pub const HEARING: Self = Self { byte1: 0, byte2: 26, name: "Hearing" };
-    pub const LEARN: Self = Self { byte1: 0, byte2: 27, name: "Learn" };
-    pub const PODCAST: Self = Self { byte1: 0, byte2: 28, name: "Podcast" };
-    pub const AUDIOBOOK: Self = Self { byte1: 0, byte2: 29, name: "Audiobook" };
-    pub const CALM: Self = Self { byte1: 0, byte2: 30, name: "Calm" };
-    pub const SLEEP: Self = Self { byte1: 0, byte2: 31, name: "Sleep" };
-    pub const MEDITATE: Self = Self { byte1: 0, byte2: 32, name: "Meditate" };
-    pub const YOGA: Self = Self { byte1: 0, byte2: 33, name: "Yoga" };
-    pub const IMMERSION: Self = Self { byte1: 0, byte2: 34, name: "Immersion" };
-    pub const STEREO: Self = Self { byte1: 0, byte2: 35, name: "Stereo" };
-    pub const CINEMA: Self = Self { byte1: 0, byte2: 36, name: "Cinema" };
+    pub const NONE: Self = Self {
+        byte1: 0,
+        byte2: 0,
+        name: "None",
+    };
+    pub const QUIET: Self = Self {
+        byte1: 0,
+        byte2: 1,
+        name: "Quiet",
+    };
+    pub const AWARE: Self = Self {
+        byte1: 0,
+        byte2: 2,
+        name: "Aware",
+    };
+    pub const TRANSPARENT: Self = Self {
+        byte1: 0,
+        byte2: 3,
+        name: "Transparent",
+    };
+    pub const TRANSPARENCY: Self = Self {
+        byte1: 0,
+        byte2: 4,
+        name: "Transparency",
+    };
+    pub const MASKING: Self = Self {
+        byte1: 0,
+        byte2: 5,
+        name: "Masking",
+    };
+    pub const COMFORT: Self = Self {
+        byte1: 0,
+        byte2: 6,
+        name: "Comfort",
+    };
+    pub const COMMUTE: Self = Self {
+        byte1: 0,
+        byte2: 7,
+        name: "Commute",
+    };
+    pub const OUTDOOR: Self = Self {
+        byte1: 0,
+        byte2: 8,
+        name: "Outdoor",
+    };
+    pub const WORKOUT: Self = Self {
+        byte1: 0,
+        byte2: 9,
+        name: "Workout",
+    };
+    pub const HOME: Self = Self {
+        byte1: 0,
+        byte2: 10,
+        name: "Home",
+    };
+    pub const WORK: Self = Self {
+        byte1: 0,
+        byte2: 11,
+        name: "Work",
+    };
+    pub const MUSIC: Self = Self {
+        byte1: 0,
+        byte2: 12,
+        name: "Music",
+    };
+    pub const FOCUS: Self = Self {
+        byte1: 0,
+        byte2: 13,
+        name: "Focus",
+    };
+    pub const RELAX: Self = Self {
+        byte1: 0,
+        byte2: 14,
+        name: "Relax",
+    };
+    pub const FLIGHT: Self = Self {
+        byte1: 0,
+        byte2: 15,
+        name: "Flight",
+    };
+    pub const AIRPORT: Self = Self {
+        byte1: 0,
+        byte2: 16,
+        name: "Airport",
+    };
+    pub const DRIVING: Self = Self {
+        byte1: 0,
+        byte2: 17,
+        name: "Driving",
+    };
+    pub const TRAINING: Self = Self {
+        byte1: 0,
+        byte2: 18,
+        name: "Training",
+    };
+    pub const GYM: Self = Self {
+        byte1: 0,
+        byte2: 19,
+        name: "Gym",
+    };
+    pub const RUN: Self = Self {
+        byte1: 0,
+        byte2: 20,
+        name: "Run",
+    };
+    pub const WALK: Self = Self {
+        byte1: 0,
+        byte2: 21,
+        name: "Walk",
+    };
+    pub const HIKE: Self = Self {
+        byte1: 0,
+        byte2: 22,
+        name: "Hike",
+    };
+    pub const TALK: Self = Self {
+        byte1: 0,
+        byte2: 23,
+        name: "Talk",
+    };
+    pub const CALL: Self = Self {
+        byte1: 0,
+        byte2: 24,
+        name: "Call",
+    };
+    pub const WHISPER: Self = Self {
+        byte1: 0,
+        byte2: 25,
+        name: "Whisper",
+    };
+    pub const HEARING: Self = Self {
+        byte1: 0,
+        byte2: 26,
+        name: "Hearing",
+    };
+    pub const LEARN: Self = Self {
+        byte1: 0,
+        byte2: 27,
+        name: "Learn",
+    };
+    pub const PODCAST: Self = Self {
+        byte1: 0,
+        byte2: 28,
+        name: "Podcast",
+    };
+    pub const AUDIOBOOK: Self = Self {
+        byte1: 0,
+        byte2: 29,
+        name: "Audiobook",
+    };
+    pub const CALM: Self = Self {
+        byte1: 0,
+        byte2: 30,
+        name: "Calm",
+    };
+    pub const SLEEP: Self = Self {
+        byte1: 0,
+        byte2: 31,
+        name: "Sleep",
+    };
+    pub const MEDITATE: Self = Self {
+        byte1: 0,
+        byte2: 32,
+        name: "Meditate",
+    };
+    pub const YOGA: Self = Self {
+        byte1: 0,
+        byte2: 33,
+        name: "Yoga",
+    };
+    pub const IMMERSION: Self = Self {
+        byte1: 0,
+        byte2: 34,
+        name: "Immersion",
+    };
+    pub const STEREO: Self = Self {
+        byte1: 0,
+        byte2: 35,
+        name: "Stereo",
+    };
+    pub const CINEMA: Self = Self {
+        byte1: 0,
+        byte2: 36,
+        name: "Cinema",
+    };
 
     pub const ALL_KNOWN: [Self; 37] = [
-        Self::NONE, Self::QUIET, Self::AWARE, Self::TRANSPARENT, Self::TRANSPARENCY, Self::MASKING, Self::COMFORT,
-        Self::COMMUTE, Self::OUTDOOR, Self::WORKOUT, Self::HOME, Self::WORK, Self::MUSIC, Self::FOCUS, Self::RELAX,
-        Self::FLIGHT, Self::AIRPORT, Self::DRIVING, Self::TRAINING, Self::GYM, Self::RUN, Self::WALK, Self::HIKE,
-        Self::TALK, Self::CALL, Self::WHISPER, Self::HEARING, Self::LEARN, Self::PODCAST, Self::AUDIOBOOK, Self::CALM,
-        Self::SLEEP, Self::MEDITATE, Self::YOGA, Self::IMMERSION, Self::STEREO, Self::CINEMA,
+        Self::NONE,
+        Self::QUIET,
+        Self::AWARE,
+        Self::TRANSPARENT,
+        Self::TRANSPARENCY,
+        Self::MASKING,
+        Self::COMFORT,
+        Self::COMMUTE,
+        Self::OUTDOOR,
+        Self::WORKOUT,
+        Self::HOME,
+        Self::WORK,
+        Self::MUSIC,
+        Self::FOCUS,
+        Self::RELAX,
+        Self::FLIGHT,
+        Self::AIRPORT,
+        Self::DRIVING,
+        Self::TRAINING,
+        Self::GYM,
+        Self::RUN,
+        Self::WALK,
+        Self::HIKE,
+        Self::TALK,
+        Self::CALL,
+        Self::WHISPER,
+        Self::HEARING,
+        Self::LEARN,
+        Self::PODCAST,
+        Self::AUDIOBOOK,
+        Self::CALM,
+        Self::SLEEP,
+        Self::MEDITATE,
+        Self::YOGA,
+        Self::IMMERSION,
+        Self::STEREO,
+        Self::CINEMA,
     ];
 
     pub fn known(byte1: u8, byte2: u8) -> Self {
@@ -109,7 +289,11 @@ impl BossAudioModePrompt {
             .iter()
             .copied()
             .find(|prompt| prompt.byte1 == byte1 && prompt.byte2 == byte2)
-            .unwrap_or(Self { byte1, byte2, name: "Unknown" })
+            .unwrap_or(Self {
+                byte1,
+                byte2,
+                name: "Unknown",
+            })
     }
 }
 
@@ -177,6 +361,16 @@ impl BossAudioModeConfig {
             user_configured: self.user_configured,
         }
     }
+
+    pub fn deleted_settings_baseline(&self) -> BossAudioModeSettingsConfig {
+        BossAudioModeSettingsConfig {
+            cnc_level: 5,
+            auto_cnc_enabled: self.settings.auto_cnc_enabled,
+            spatial_audio_mode: self.settings.spatial_audio_mode,
+            wind_block_enabled: self.settings.wind_block_enabled,
+            anc_toggle_enabled: self.settings.anc_toggle_enabled,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -197,13 +391,22 @@ impl BossAudioModeSettingsConfigPatch {
             && self.anc_toggle_enabled.is_none()
     }
 
-    pub fn merged_with(&self, current: &BossAudioModeSettingsConfig) -> BossAudioModeSettingsConfig {
+    pub fn merged_with(
+        &self,
+        current: &BossAudioModeSettingsConfig,
+    ) -> BossAudioModeSettingsConfig {
         BossAudioModeSettingsConfig {
             cnc_level: self.cnc_level.unwrap_or(current.cnc_level),
             auto_cnc_enabled: self.auto_cnc_enabled.unwrap_or(current.auto_cnc_enabled),
-            spatial_audio_mode: self.spatial_audio_mode.unwrap_or(current.spatial_audio_mode),
-            wind_block_enabled: self.wind_block_enabled.unwrap_or(current.wind_block_enabled),
-            anc_toggle_enabled: self.anc_toggle_enabled.unwrap_or(current.anc_toggle_enabled),
+            spatial_audio_mode: self
+                .spatial_audio_mode
+                .unwrap_or(current.spatial_audio_mode),
+            wind_block_enabled: self
+                .wind_block_enabled
+                .unwrap_or(current.wind_block_enabled),
+            anc_toggle_enabled: self
+                .anc_toggle_enabled
+                .unwrap_or(current.anc_toggle_enabled),
         }
     }
 
@@ -239,7 +442,10 @@ impl BossAudioModeSettingsConfigPatch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BossAudioModesCodecError {
-    UnexpectedOperator { expected: BmapOperator, actual: BmapOperator },
+    UnexpectedOperator {
+        expected: BmapOperator,
+        actual: BmapOperator,
+    },
     InvalidPayload(String),
 }
 
@@ -255,11 +461,22 @@ impl BossAudioModesCodec {
 
     pub fn packet(function_raw: u8, operator: BmapOperator, payload: Bytes) -> BmapPacket {
         let block = BmapFunctionBlock::AudioModes;
-        BmapPacket::new(block, BmapFunction::from_raw(block, function_raw), 0, 0, operator, payload)
+        BmapPacket::new(
+            block,
+            BmapFunction::from_raw(block, function_raw),
+            0,
+            0,
+            operator,
+            payload,
+        )
     }
 
     pub fn names_supported_get_packet() -> BmapPacket {
-        Self::packet(Self::NAMES_SUPPORTED_FUNCTION_RAW, BmapOperator::Get, vec![])
+        Self::packet(
+            Self::NAMES_SUPPORTED_FUNCTION_RAW,
+            BmapOperator::Get,
+            vec![],
+        )
     }
 
     pub fn current_mode_get_packet() -> BmapPacket {
@@ -270,7 +487,10 @@ impl BossAudioModesCodec {
         Self::packet(
             Self::CURRENT_MODE_FUNCTION_RAW,
             BmapOperator::Start,
-            vec![mode_index as u8, if play_voice_prompt { 0x01 } else { 0x00 }],
+            vec![
+                mode_index as u8,
+                if play_voice_prompt { 0x01 } else { 0x00 },
+            ],
         )
     }
 
@@ -279,7 +499,11 @@ impl BossAudioModesCodec {
     }
 
     pub fn mode_config_get_packet(mode_index: i32) -> BmapPacket {
-        Self::packet(Self::MODE_CONFIG_FUNCTION_RAW, BmapOperator::Get, vec![mode_index as u8])
+        Self::packet(
+            Self::MODE_CONFIG_FUNCTION_RAW,
+            BmapOperator::Get,
+            vec![mode_index as u8],
+        )
     }
 
     pub fn mode_config_start_packet() -> BmapPacket {
@@ -291,10 +515,16 @@ impl BossAudioModesCodec {
     }
 
     pub fn settings_config_get_packet() -> BmapPacket {
-        Self::packet(Self::SETTINGS_CONFIG_FUNCTION_RAW, BmapOperator::Get, vec![])
+        Self::packet(
+            Self::SETTINGS_CONFIG_FUNCTION_RAW,
+            BmapOperator::Get,
+            vec![],
+        )
     }
 
-    pub fn settings_config_set_get_packet(config: &BossAudioModeSettingsConfig) -> Result<BmapPacket, BossAudioModesCodecError> {
+    pub fn settings_config_set_get_packet(
+        config: &BossAudioModeSettingsConfig,
+    ) -> Result<BmapPacket, BossAudioModesCodecError> {
         Ok(Self::packet(
             Self::SETTINGS_CONFIG_FUNCTION_RAW,
             BmapOperator::SetGet,
@@ -315,10 +545,14 @@ impl BossAudioModesCodec {
         ))
     }
 
-    pub fn parse_capabilities(packet: &BmapPacket) -> Result<BossAudioModesCapabilities, BossAudioModesCodecError> {
+    pub fn parse_capabilities(
+        packet: &BmapPacket,
+    ) -> Result<BossAudioModesCapabilities, BossAudioModesCodecError> {
         Self::require_status(packet)?;
         if packet.payload.len() < 2 {
-            return Err(BossAudioModesCodecError::InvalidPayload("Expected at least two payload bytes for audio mode capabilities".into()));
+            return Err(BossAudioModesCodecError::InvalidPayload(
+                "Expected at least two payload bytes for audio mode capabilities".into(),
+            ));
         }
         Ok(BossAudioModesCapabilities {
             bose_modes: packet.payload[0] as i32,
@@ -329,18 +563,27 @@ impl BossAudioModesCodec {
     pub fn parse_current_mode(packet: &BmapPacket) -> Result<i32, BossAudioModesCodecError> {
         Self::require_status(packet)?;
         let Some(first) = packet.payload.first().copied() else {
-            return Err(BossAudioModesCodecError::InvalidPayload("Expected at least one payload byte for current audio mode".into()));
+            return Err(BossAudioModesCodecError::InvalidPayload(
+                "Expected at least one payload byte for current audio mode".into(),
+            ));
         };
         Ok(first as i32)
     }
 
-    pub fn parse_settings_config(packet: &BmapPacket) -> Result<BossAudioModeSettingsConfig, BossAudioModesCodecError> {
+    pub fn parse_settings_config(
+        packet: &BmapPacket,
+    ) -> Result<BossAudioModeSettingsConfig, BossAudioModesCodecError> {
         Self::require_status(packet)?;
         if packet.payload.len() < 5 {
-            return Err(BossAudioModesCodecError::InvalidPayload("Expected at least five payload bytes for audio mode settings config".into()));
+            return Err(BossAudioModesCodecError::InvalidPayload(
+                "Expected at least five payload bytes for audio mode settings config".into(),
+            ));
         }
         let Some(spatial_audio_mode) = BossSpatialAudioMode::from_raw(packet.payload[2]) else {
-            return Err(BossAudioModesCodecError::InvalidPayload(format!("Unknown spatial audio mode: {}", packet.payload[2])));
+            return Err(BossAudioModesCodecError::InvalidPayload(format!(
+                "Unknown spatial audio mode: {}",
+                packet.payload[2]
+            )));
         };
         Ok(BossAudioModeSettingsConfig {
             cnc_level: packet.payload[0] as i32,
@@ -351,16 +594,23 @@ impl BossAudioModesCodec {
         })
     }
 
-    pub fn parse_mode_config(packet: &BmapPacket) -> Result<BossAudioModeInfo, BossAudioModesCodecError> {
+    pub fn parse_mode_config(
+        packet: &BmapPacket,
+    ) -> Result<BossAudioModeInfo, BossAudioModesCodecError> {
         Ok(Self::parse_mode_config_detail(packet)?.info())
     }
 
-    pub fn parse_mode_config_detail(packet: &BmapPacket) -> Result<BossAudioModeConfig, BossAudioModesCodecError> {
+    pub fn parse_mode_config_detail(
+        packet: &BmapPacket,
+    ) -> Result<BossAudioModeConfig, BossAudioModesCodecError> {
         Self::require_status(packet)?;
         let payload = &packet.payload;
         if payload.len() >= 45 {
             let Some(spatial_audio_mode) = BossSpatialAudioMode::from_raw(payload[44]) else {
-                return Err(BossAudioModesCodecError::InvalidPayload(format!("Unknown spatial audio mode: {}", payload[44])));
+                return Err(BossAudioModesCodecError::InvalidPayload(format!(
+                    "Unknown spatial audio mode: {}",
+                    payload[44]
+                )));
             };
             return Ok(BossAudioModeConfig {
                 mode_index: payload[0] as i32,
@@ -373,14 +623,25 @@ impl BossAudioModesCodec {
                     cnc_level: payload[42] as i32,
                     auto_cnc_enabled: payload[43] != 0,
                     spatial_audio_mode,
-                    wind_block_enabled: if payload.len() >= 47 { payload[46] != 0 } else { false },
-                    anc_toggle_enabled: if payload.len() >= 48 { payload[47] != 0 } else { false },
+                    wind_block_enabled: if payload.len() >= 47 {
+                        payload[46] != 0
+                    } else {
+                        false
+                    },
+                    anc_toggle_enabled: if payload.len() >= 48 {
+                        payload[47] != 0
+                    } else {
+                        false
+                    },
                 },
             });
         }
         if payload.len() >= 40 {
             let Some(spatial_audio_mode) = BossSpatialAudioMode::from_raw(payload[37]) else {
-                return Err(BossAudioModesCodecError::InvalidPayload(format!("Unknown spatial audio mode: {}", payload[37])));
+                return Err(BossAudioModesCodecError::InvalidPayload(format!(
+                    "Unknown spatial audio mode: {}",
+                    payload[37]
+                )));
             };
             return Ok(BossAudioModeConfig {
                 mode_index: payload[0] as i32,
@@ -398,19 +659,33 @@ impl BossAudioModesCodec {
                 },
             });
         }
-        Err(BossAudioModesCodecError::InvalidPayload("Expected at least 40 payload bytes for audio mode config".into()))
+        Err(BossAudioModesCodecError::InvalidPayload(
+            "Expected at least 40 payload bytes for audio mode config".into(),
+        ))
     }
 
-    pub fn encode_settings_config(config: &BossAudioModeSettingsConfig) -> Result<Bytes, BossAudioModesCodecError> {
+    pub fn encode_settings_config(
+        config: &BossAudioModeSettingsConfig,
+    ) -> Result<Bytes, BossAudioModesCodecError> {
         if !(0..=10).contains(&config.cnc_level) {
-            return Err(BossAudioModesCodecError::InvalidPayload("CNC level must be in range 0...10".into()));
+            return Err(BossAudioModesCodecError::InvalidPayload(
+                "CNC level must be in range 0...10".into(),
+            ));
         }
         Ok(vec![
             config.cnc_level as u8,
             if config.auto_cnc_enabled { 0x01 } else { 0x00 },
             config.spatial_audio_mode.raw_value(),
-            if config.wind_block_enabled { 0x01 } else { 0x00 },
-            if config.anc_toggle_enabled { 0x01 } else { 0x00 },
+            if config.wind_block_enabled {
+                0x01
+            } else {
+                0x00
+            },
+            if config.anc_toggle_enabled {
+                0x01
+            } else {
+                0x00
+            },
         ])
     }
 
@@ -421,7 +696,9 @@ impl BossAudioModesCodec {
         settings: &BossAudioModeSettingsConfig,
     ) -> Result<Bytes, BossAudioModesCodecError> {
         if !(0..=255).contains(&mode_index) {
-            return Err(BossAudioModesCodecError::InvalidPayload("Mode index must be in range 0...255".into()));
+            return Err(BossAudioModesCodecError::InvalidPayload(
+                "Mode index must be in range 0...255".into(),
+            ));
         }
         let mut payload = Vec::with_capacity(40);
         payload.push(mode_index as u8);
@@ -432,14 +709,19 @@ impl BossAudioModesCodec {
         Ok(payload)
     }
 
-    pub fn parse_supported_prompts(packet: &BmapPacket) -> Result<Vec<BossAudioModePrompt>, BossAudioModesCodecError> {
+    pub fn parse_supported_prompts(
+        packet: &BmapPacket,
+    ) -> Result<Vec<BossAudioModePrompt>, BossAudioModesCodecError> {
         Self::require_status(packet)?;
         let mut prompts = Vec::new();
         for (byte_index, byte) in packet.payload.iter().copied().take(5).enumerate() {
             let max_bit = if byte_index == 4 { 4 } else { 7 };
             for bit_index in 0..=max_bit {
                 if ((byte >> bit_index) & 1) == 1 {
-                    prompts.push(BossAudioModePrompt::known(0, (byte_index * 8 + bit_index) as u8));
+                    prompts.push(BossAudioModePrompt::known(
+                        0,
+                        (byte_index * 8 + bit_index) as u8,
+                    ));
                 }
             }
         }
@@ -449,7 +731,9 @@ impl BossAudioModesCodec {
     pub fn parse_favorites(packet: &BmapPacket) -> Result<Vec<i32>, BossAudioModesCodecError> {
         Self::require_status(packet)?;
         let Some(number_of_modes) = packet.payload.first().copied() else {
-            return Err(BossAudioModesCodecError::InvalidPayload("Expected at least one payload byte for audio mode favorites".into()));
+            return Err(BossAudioModesCodecError::InvalidPayload(
+                "Expected at least one payload byte for audio mode favorites".into(),
+            ));
         };
         let number_of_modes = number_of_modes as usize;
         let bitmask_byte_count = number_of_modes.div_ceil(8);
@@ -474,15 +758,23 @@ impl BossAudioModesCodec {
         Ok(favorites)
     }
 
-    pub fn encode_favorites(number_of_modes: i32, favorite_mode_indices: &[i32]) -> Result<Bytes, BossAudioModesCodecError> {
+    pub fn encode_favorites(
+        number_of_modes: i32,
+        favorite_mode_indices: &[i32],
+    ) -> Result<Bytes, BossAudioModesCodecError> {
         if !(0..=255).contains(&number_of_modes) {
-            return Err(BossAudioModesCodecError::InvalidPayload("Number of audio modes must be in range 0...255".into()));
+            return Err(BossAudioModesCodecError::InvalidPayload(
+                "Number of audio modes must be in range 0...255".into(),
+            ));
         }
         let number_of_modes = number_of_modes as usize;
         let mut unique = favorite_mode_indices.to_vec();
         unique.sort();
         unique.dedup();
-        if !unique.iter().all(|index| *index >= 0 && (*index as usize) < number_of_modes) {
+        if !unique
+            .iter()
+            .all(|index| *index >= 0 && (*index as usize) < number_of_modes)
+        {
             return Err(BossAudioModesCodecError::InvalidPayload(format!(
                 "Favorite mode indices must be in range 0..<{}",
                 number_of_modes
@@ -499,19 +791,36 @@ impl BossAudioModesCodec {
         Ok(payload)
     }
 
-    pub fn parse_volume_control_status(packet: &BmapPacket) -> Result<BossVolumeControlStatus, BossAudioModesCodecError> {
+    pub fn parse_volume_control_status(
+        packet: &BmapPacket,
+    ) -> Result<BossVolumeControlStatus, BossAudioModesCodecError> {
         Self::require_status(packet)?;
         let Some(first) = packet.payload.first().copied() else {
-            return Err(BossAudioModesCodecError::InvalidPayload("Expected at least one payload byte for volume control".into()));
+            return Err(BossAudioModesCodecError::InvalidPayload(
+                "Expected at least one payload byte for volume control".into(),
+            ));
         };
-        let value = BossVolumeControlValue::from_raw(first).unwrap_or(BossVolumeControlValue::Disabled);
+        let value =
+            BossVolumeControlValue::from_raw(first).unwrap_or(BossVolumeControlValue::Disabled);
         let supported_values = if packet.payload.len() > 1 {
             let bitmask = packet.payload[1];
             Some(
                 [
-                    if (bitmask & 0x01) == 0x01 { Some(BossVolumeControlValue::Button) } else { None },
-                    if (bitmask & 0x02) == 0x02 { Some(BossVolumeControlValue::CapTouch) } else { None },
-                    if (bitmask & 0x04) == 0x04 { Some(BossVolumeControlValue::Imu) } else { None },
+                    if (bitmask & 0x01) == 0x01 {
+                        Some(BossVolumeControlValue::Button)
+                    } else {
+                        None
+                    },
+                    if (bitmask & 0x02) == 0x02 {
+                        Some(BossVolumeControlValue::CapTouch)
+                    } else {
+                        None
+                    },
+                    if (bitmask & 0x04) == 0x04 {
+                        Some(BossVolumeControlValue::Imu)
+                    } else {
+                        None
+                    },
                 ]
                 .into_iter()
                 .flatten()
@@ -520,19 +829,28 @@ impl BossAudioModesCodec {
         } else {
             None
         };
-        Ok(BossVolumeControlStatus { value, supported_values })
+        Ok(BossVolumeControlStatus {
+            value,
+            supported_values,
+        })
     }
 
     fn require_status(packet: &BmapPacket) -> Result<(), BossAudioModesCodecError> {
         if packet.operator != BmapOperator::Status {
-            return Err(BossAudioModesCodecError::UnexpectedOperator { expected: BmapOperator::Status, actual: packet.operator });
+            return Err(BossAudioModesCodecError::UnexpectedOperator {
+                expected: BmapOperator::Status,
+                actual: packet.operator,
+            });
         }
         Ok(())
     }
 
     fn parse_mode_name(payload: &[u8], range: std::ops::Range<usize>) -> String {
         let name_field = &payload[range];
-        let zero_index = name_field.iter().position(|byte| *byte == 0).unwrap_or(name_field.len());
+        let zero_index = name_field
+            .iter()
+            .position(|byte| *byte == 0)
+            .unwrap_or(name_field.len());
         String::from_utf8_lossy(&name_field[..zero_index]).to_string()
     }
 

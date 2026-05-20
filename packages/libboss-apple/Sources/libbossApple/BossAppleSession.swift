@@ -39,7 +39,7 @@ public struct BossAppleWorkspaceSnapshot: Sendable, Equatable {
 public actor BossAppleSession {
     private struct ConnectedLink {
         let transport: AppleBleBossTransport
-        let link: BleBmapLink
+        var link: BleBmapLink?
         var packetSession: BossPacketSession?
         var bossSession: BossSession?
         let preference: AppleBossCharacteristicPreference
@@ -72,8 +72,18 @@ public actor BossAppleSession {
             return cachedBootstrappedDevice
         }
 
-        let bootstrappedDevice = try await withRawLinkRetrying(preferredPreferences: [.unsecure, .secure], preferActiveLink: false) { link in
-            try await BootstrapSession(link: link).bootstrap()
+        let bootstrappedDevice: BootstrappedDevice
+        if let rustBridge = BossRustSessionBridge.shared {
+            bootstrappedDevice = try await withRustBleTransportRetrying(
+                preferredPreferences: [.unsecure, .secure],
+                preferActiveLink: false
+            ) { transport in
+                try await rustBridge.bootstrap(on: transport)
+            }
+        } else {
+            bootstrappedDevice = try await withRawLinkRetrying(preferredPreferences: [.unsecure, .secure], preferActiveLink: false) { link in
+                try await BootstrapSession(link: link).bootstrap()
+            }
         }
         cachedBootstrappedDevice = bootstrappedDevice
         return bootstrappedDevice
@@ -81,17 +91,42 @@ public actor BossAppleSession {
 
     public func loadWorkspaceSnapshot() async throws -> BossAppleWorkspaceSnapshot {
         let bootstrappedDevice = try await bootstrap()
+        let modeWorkspace = try await refreshModeWorkspaceSnapshot()
+        let audioModes = try await audioModeConfigs()
+        return BossAppleWorkspaceSnapshot(
+            bootstrappedDevice: bootstrappedDevice,
+            modeWorkspace: modeWorkspace,
+            audioModes: audioModes
+        )
+    }
+
+    public func refreshModeWorkspaceSnapshot() async throws -> BossAppleModeWorkspaceSnapshot {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.refreshModeWorkspaceSnapshot(on: transport)
+            }
+        }
+
         return try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
             try await mapCoreErrors {
-                wrap(try await session.loadWorkspaceSnapshot(bootstrappedDevice: bootstrappedDevice))
+                wrap(try await session.refreshModeWorkspaceSnapshot())
             }
         }
     }
 
-    public func refreshModeWorkspaceSnapshot() async throws -> BossAppleModeWorkspaceSnapshot {
-        try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
-            try await mapCoreErrors {
-                wrap(try await session.refreshModeWorkspaceSnapshot())
+    public func settingsSnapshot() async throws -> BossSettingsSnapshot {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.settingsSnapshot(on: transport)
+            }
+        }
+
+        return try await withSessionLinkRetrying(preferredPreferences: appOperationPreferences()) { [self] packetSession in
+            try await mapSessionErrors {
+                try await packetSession.settingsSnapshot(
+                    timeout: .seconds(5),
+                    timeoutError: timeoutError(for: .seconds(5))
+                )
             }
         }
     }
@@ -121,7 +156,15 @@ public actor BossAppleSession {
     }
 
     public func currentAudioModeUpdateStream() -> AsyncThrowingStream<Int, Error> {
-        reconnectingCoreStream(
+        if let rustBridge = BossRustSessionBridge.shared {
+            return reconnectingRustStream(
+                initial: { try await self.readCurrentAudioMode() }
+            ) { transport in
+                rustBridge.currentAudioModeUpdateStream(on: transport)
+            }
+        }
+
+        return reconnectingCoreStream(
             preferredPreferences: appOperationPreferences(),
             initial: { session in try await session.currentAudioMode() }
         ) { session in
@@ -130,7 +173,15 @@ public actor BossAppleSession {
     }
 
     public func audioModeSettingsUpdateStream() -> AsyncThrowingStream<BossAudioModeSettingsConfig, Error> {
-        reconnectingCoreStream(
+        if let rustBridge = BossRustSessionBridge.shared {
+            return reconnectingRustStream(
+                initial: { try await self.readAudioModeSettingsConfig() }
+            ) { transport in
+                rustBridge.audioModeSettingsUpdateStream(on: transport)
+            }
+        }
+
+        return reconnectingCoreStream(
             preferredPreferences: appOperationPreferences(),
             initial: { session in try await session.audioModeSettingsConfig() }
         ) { session in
@@ -139,7 +190,15 @@ public actor BossAppleSession {
     }
 
     public func equalizerUpdateStream() -> AsyncThrowingStream<BossEqualizerSettings, Error> {
-        reconnectingCoreStream(
+        if let rustBridge = BossRustSessionBridge.shared {
+            return reconnectingRustStream(
+                initial: { try await self.readEqualizerSettingsIfAvailable() }
+            ) { transport in
+                rustBridge.equalizerUpdateStream(on: transport)
+            }
+        }
+
+        return reconnectingCoreStream(
             preferredPreferences: appOperationPreferences(),
             initial: { session in try await session.equalizerSettingsIfAvailable() }
         ) { session in
@@ -148,7 +207,15 @@ public actor BossAppleSession {
     }
 
     public func deviceSettingsUpdateStream() -> AsyncThrowingStream<BossAppleDeviceSettingsReport, Error> {
-        reconnectingCoreStream(
+        if let rustBridge = BossRustSessionBridge.shared {
+            return reconnectingRustStream(
+                initial: { try await self.readDeviceSettingsReport() }
+            ) { transport in
+                rustBridge.deviceSettingsUpdateStream(on: transport)
+            }
+        }
+
+        return reconnectingCoreStream(
             preferredPreferences: appOperationPreferences(),
             initial: { [self] session in wrap(try await session.refreshDeviceSettingsReport()) }
         ) { [self] session in
@@ -174,7 +241,15 @@ public actor BossAppleSession {
     }
 
     public func audioModeCatalogUpdateStream() -> AsyncThrowingStream<[BossAudioModeConfig], Error> {
-        reconnectingCoreStream(
+        if let rustBridge = BossRustSessionBridge.shared {
+            return reconnectingRustStream(
+                initial: { try await self.readAudioModeConfigs() }
+            ) { transport in
+                rustBridge.audioModeCatalogUpdateStream(on: transport)
+            }
+        }
+
+        return reconnectingCoreStream(
             preferredPreferences: appOperationPreferences(),
             initial: { session in try await session.audioModeConfigs() }
         ) { session in
@@ -183,23 +258,161 @@ public actor BossAppleSession {
     }
 
     public func supportedAudioModePrompts() async throws -> [BossAudioModePrompt] {
-        try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
+        try await readSupportedAudioModePrompts()
+    }
+
+    public func audioModeConfigs() async throws -> [BossAudioModeConfig] {
+        try await readAudioModeConfigs()
+    }
+
+    public func firmwareVersion(port: Int = 0, deviceID: Int = 0) async throws -> FirmwareVersionInfo {
+        try await readFirmwareVersion(port: port, deviceID: deviceID)
+    }
+
+    public func standbyTimer() async throws -> BossStandbyTimerValue? {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.standbyTimer(on: transport)
+            }
+        }
+
+        return try await withRawLinkRetrying(preferredPreferences: appOperationPreferences()) { link in
+            try await BossAppleController.standbyTimerIfAvailable(on: link, timeout: .seconds(5))
+        }
+    }
+
+    public func setStandbyTimer(minutes: Int) async throws -> BossStandbyTimerValue {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+                try await rustBridge.setStandbyTimer(on: transport, minutes: minutes)
+            }
+        }
+
+        return try await withRawLinkRetrying(preferredPreferences: [.secure, .unsecure]) { link in
+            let response = try await BossAppleController.sendAndAwaitSameFunction(
+                packet: try BossSettingsCodec.standbyTimerSetGetPacket(minutes: minutes),
+                on: link,
+                timeout: .seconds(5)
+            )
+            return try BossSettingsCodec.parseStandbyTimer(from: response)
+        }
+    }
+
+    public func equalizer() async throws -> BossEqualizerSettings? {
+        try await readEqualizerSettingsIfAvailable()
+    }
+
+    public func deviceSettingsReport() async throws -> BossAppleDeviceSettingsReport {
+        try await readDeviceSettingsReport()
+    }
+
+    public func onHeadDetection() async throws -> BossOnHeadDetectionValue? {
+        try await readDeviceSettingsReport().wearDetection.value
+    }
+
+    public func wearDetection() async throws -> BossOnHeadDetectionValue? {
+        try await onHeadDetection()
+    }
+
+    public func autoAware() async throws -> Bool? {
+        try await readDeviceSettingsReport().autoAwareEnabled.value
+    }
+
+    public func autoPlayPause() async throws -> Bool? {
+        try await readDeviceSettingsReport().autoPlayPauseEnabled.value
+    }
+
+    public func autoAnswer() async throws -> Bool? {
+        try await readDeviceSettingsReport().autoAnswerEnabled.value
+    }
+
+    public func volumeControl() async throws -> BossVolumeControlStatus? {
+        try await readDeviceSettingsReport().volumeControl.value
+    }
+
+    public func currentAudioMode() async throws -> Int {
+        try await readCurrentAudioMode()
+    }
+
+    public func audioModeSettings() async throws -> BossAudioModeSettingsConfig {
+        try await readAudioModeSettingsConfig()
+    }
+
+    public func favoriteAudioModeIndices() async throws -> [Int] {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.favoriteAudioModeIndices(on: transport)
+            }
+        }
+
+        return try await withSessionLinkRetrying(preferredPreferences: appOperationPreferences()) { [self] packetSession in
+            try await requiredFavoriteAudioModeIndices(on: packetSession, timeout: .seconds(5))
+        }
+    }
+
+    public func audioModeCapabilities() async throws -> BossAudioModesCapabilities {
+        try await withSessionLinkRetrying(preferredPreferences: appOperationPreferences()) { [self] packetSession in
+            try await requiredAudioModeCapabilities(on: packetSession, timeout: .seconds(5))
+        }
+    }
+
+    public func setFavoriteAudioModeIndices(
+        _ indices: [Int],
+        numberOfModes requestedNumberOfModes: Int? = nil
+    ) async throws -> [Int] {
+        let numberOfModes: Int
+        if let requestedNumberOfModes {
+            numberOfModes = requestedNumberOfModes
+        } else {
+            numberOfModes = try await audioModeCapabilities().totalModes
+        }
+
+        return try await withSessionLinkRetrying(preferredPreferences: appOperationPreferences()) { [self] packetSession in
+            try await sendAudioModeFavoritesSetGet(
+                numberOfModes: numberOfModes,
+                favoriteModeIndices: indices,
+                on: packetSession,
+                timeout: .seconds(5)
+            )
+        }
+    }
+
+    private func readSupportedAudioModePrompts() async throws -> [BossAudioModePrompt] {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.supportedAudioModePrompts(on: transport)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
             try await mapCoreErrors {
                 try await session.supportedAudioModePrompts()
             }
         }
     }
 
-    public func audioModeConfigs() async throws -> [BossAudioModeConfig] {
-        try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
+    private func readAudioModeConfigs() async throws -> [BossAudioModeConfig] {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.audioModeConfigs(on: transport)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
             try await mapCoreErrors {
                 try await session.audioModeConfigs()
             }
         }
     }
 
-    public func firmwareVersion(port: Int = 0, deviceID: Int = 0) async throws -> FirmwareVersionInfo {
-        try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
+    private func readFirmwareVersion(port: Int, deviceID: Int) async throws -> FirmwareVersionInfo {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.firmwareVersion(on: transport, port: port, deviceID: deviceID)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
             try await mapCoreErrors {
                 try await session.firmwareVersion(port: port, deviceID: deviceID)
             }
@@ -211,9 +424,9 @@ public actor BossAppleSession {
         playVoicePrompt: Bool = false
     ) async throws -> BossAppleCurrentAudioModeWriteResult {
         if let rustBridge = BossRustSessionBridge.shared {
-            return try await withRawLinkRetrying(preferredPreferences: [.secure, .unsecure]) { link in
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
                 try await rustBridge.setCurrentAudioMode(
-                    on: link,
+                    on: transport,
                     targetIndex: targetIndex,
                     playVoicePrompt: playVoicePrompt
                 )
@@ -231,8 +444,8 @@ public actor BossAppleSession {
         _ update: BossAudioModeSettingsConfigPatch
     ) async throws -> BossAppleAudioModeSettingsWriteResult {
         if let rustBridge = BossRustSessionBridge.shared {
-            return try await withRawLinkRetrying(preferredPreferences: [.secure, .unsecure]) { link in
-                try await rustBridge.setAudioModeSettings(on: link, update: update)
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+                try await rustBridge.setAudioModeSettings(on: transport, update: update)
             }
         }
 
@@ -246,15 +459,125 @@ public actor BossAppleSession {
     public func setEqualizer(
         _ update: BossEqualizerSettingsPatch
     ) async throws -> BossAppleEqualizerWriteResult {
-        try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+                try await rustBridge.setEqualizer(on: transport, update: update)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
             try await mapCoreErrors {
                 wrap(try await session.setEqualizer(update))
             }
         }
     }
 
+    public func setWearDetection(_ value: BossOnHeadDetectionValue) async throws -> BossOnHeadDetectionValue {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+                try await rustBridge.setWearDetection(on: transport, value: value)
+            }
+        }
+
+        return try await withSessionLinkRetrying(preferredPreferences: [.secure, .unsecure]) { [self] packetSession in
+            try await mapSessionErrors {
+                try await packetSession.setOnHeadDetection(
+                    value,
+                    timeout: .seconds(5),
+                    timeoutError: timeoutError(for: .seconds(5))
+                )
+            }
+        }
+    }
+
+    public func setWearDetection(_ patch: BossOnHeadDetectionPatch) async throws -> BossOnHeadDetectionValue {
+        guard !patch.isEmpty else {
+            guard let current = try await wearDetection() else {
+                throw BossAppleControlError.unsupportedOperation("Wear detection is not exposed by this device/session")
+            }
+            return current
+        }
+
+        do {
+            let current = try await wearDetection() ?? BossOnHeadDetectionValue(
+                isEnabled: false,
+                isAutoPlayEnabled: nil,
+                isAutoAnswerEnabled: nil,
+                isAutoTransparencyEnabled: nil
+            )
+            return try await setWearDetection(patch.merged(with: current))
+        } catch {
+            guard BossAppleController.isCompositeInPlaceDetectionUnsupported(error) else {
+                throw error
+            }
+        }
+
+        guard patch.isEnabled == nil else {
+            throw BossAppleControlError.unsupportedOperation(
+                "This device does not expose the master wear-detection toggle over BMAP; only auto-play, auto-answer, and auto-transparency subsettings are writable"
+            )
+        }
+
+        throw BossAppleControlError.unsupportedOperation(
+            "This device does not expose a composite wear-detection state over BMAP; use updateWearDetectionRelatedSettings(_:) for subordinate auto-play, auto-answer, and auto-transparency writes"
+        )
+    }
+
+    public func updateWearDetectionRelatedSettings(_ patch: BossOnHeadDetectionPatch) async throws -> BossAppleDeviceSettingsReport {
+        if patch.isEmpty {
+            return try await deviceSettingsReport()
+        }
+        do {
+            let current = try await wearDetection() ?? BossOnHeadDetectionValue(
+                isEnabled: false,
+                isAutoPlayEnabled: nil,
+                isAutoAnswerEnabled: nil,
+                isAutoTransparencyEnabled: nil
+            )
+            _ = try await setWearDetection(patch.merged(with: current))
+            return try await deviceSettingsReport()
+        } catch {
+            guard BossAppleController.isCompositeInPlaceDetectionUnsupported(error) else {
+                throw error
+            }
+        }
+
+        guard patch.isEnabled == nil else {
+            throw BossAppleControlError.unsupportedOperation(
+                "This device does not expose the master wear-detection toggle over BMAP; only auto-play, auto-answer, and auto-transparency subsettings are writable"
+            )
+        }
+
+        if let enabled = patch.isAutoPlayEnabled {
+            _ = try await setAutoPlayPause(enabled)
+        }
+        if let enabled = patch.isAutoAnswerEnabled {
+            _ = try await setAutoAnswer(enabled)
+        }
+        if let enabled = patch.isAutoTransparencyEnabled {
+            do {
+                _ = try await setAutoAware(enabled)
+            } catch {
+                if BossAppleController.isCompositeInPlaceDetectionUnsupported(error) || BossAppleController.isUnavailableSettingReadError(error) {
+                    throw BossAppleControlError.unsupportedOperation(
+                        "Auto-transparency is not exposed by this device/session over the standalone auto-aware setting path"
+                    )
+                }
+                throw error
+            }
+        }
+
+        return try await deviceSettingsReport()
+    }
+
     public func setWearDetectionEnabled(_ enabled: Bool) async throws -> BossOnHeadDetectionValue {
-        try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+                try await rustBridge.setWearDetectionEnabled(on: transport, enabled: enabled)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
             try await mapCoreErrors {
                 try await session.setWearDetectionEnabled(enabled)
             }
@@ -274,7 +597,13 @@ public actor BossAppleSession {
     }
 
     public func setVolumeControl(_ value: BossVolumeControlValue) async throws -> BossVolumeControlStatus {
-        try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+                try await rustBridge.setVolumeControl(on: transport, value: value)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
             try await mapCoreErrors {
                 try await session.setVolumeControl(value)
             }
@@ -290,6 +619,12 @@ public actor BossAppleSession {
     }
 
     public func deleteCustomAudioMode(slot: Int) async throws -> BossAudioModeConfig {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+                try await rustBridge.deleteCustomAudioMode(on: transport, slot: slot)
+            }
+        }
+
         let configs = try await audioModeConfigs()
         guard let existing = configs.first(where: { $0.modeIndex == slot }) else {
             throw BossAppleControlError.customAudioModeSlotNotFound(slot)
@@ -316,6 +651,18 @@ public actor BossAppleSession {
         prompt: BossAudioModePrompt = .none,
         slot requestedSlot: Int? = nil
     ) async throws -> BossAudioModeConfig {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+                try await rustBridge.saveCustomAudioMode(
+                    on: transport,
+                    name: name,
+                    settings: settings,
+                    prompt: prompt,
+                    requestedSlot: requestedSlot
+                )
+            }
+        }
+
         let configs = try await audioModeConfigs()
         let slot: Int
         if let requestedSlot {
@@ -333,8 +680,55 @@ public actor BossAppleSession {
         return try await writeCustomAudioMode(slot: slot, name: name, settings: settings, prompt: prompt)
     }
 
+    public func renameCustomAudioMode(
+        slot: Int,
+        name: String,
+        prompt: BossAudioModePrompt? = nil
+    ) async throws -> BossAudioModeConfig {
+        let configs = try await audioModeConfigs()
+        guard let existing = configs.first(where: { $0.modeIndex == slot }) else {
+            throw BossAppleControlError.customAudioModeSlotNotFound(slot)
+        }
+        guard existing.userConfigurable else {
+            throw BossAppleControlError.customAudioModeSlotNotEditable(slot)
+        }
+        return try await writeCustomAudioMode(
+            slot: slot,
+            name: name,
+            settings: existing.settings,
+            prompt: prompt ?? existing.prompt
+        )
+    }
+
+    public func updateCustomAudioMode(
+        slot: Int,
+        name: String? = nil,
+        settings: BossAudioModeSettingsConfig? = nil,
+        prompt: BossAudioModePrompt? = nil
+    ) async throws -> BossAudioModeConfig {
+        let configs = try await audioModeConfigs()
+        guard let existing = configs.first(where: { $0.modeIndex == slot }) else {
+            throw BossAppleControlError.customAudioModeSlotNotFound(slot)
+        }
+        guard existing.userConfigurable else {
+            throw BossAppleControlError.customAudioModeSlotNotEditable(slot)
+        }
+        return try await writeCustomAudioMode(
+            slot: slot,
+            name: name ?? existing.name,
+            settings: settings ?? existing.settings,
+            prompt: prompt ?? existing.prompt
+        )
+    }
+
     private func setEnabledSetting(functionRaw: UInt8, enabled: Bool) async throws -> Bool {
-        try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+                try await rustBridge.setEnabledSetting(on: transport, functionRaw: functionRaw, enabled: enabled)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: [.secure, .unsecure]) { [self] session in
             try await mapCoreErrors {
                 switch functionRaw {
                 case BossSettingsCodec.autoAwareFunctionRaw:
@@ -351,7 +745,13 @@ public actor BossAppleSession {
     }
 
     private func setAudioModeFavorite(index: Int, isFavorite: Bool) async throws -> [Int] {
-        try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.setAudioModeFavorite(on: transport, index: index, isFavorite: isFavorite)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
             try await mapCoreErrors {
                 if isFavorite {
                     return try await session.favoriteAudioMode(index: index)
@@ -379,6 +779,62 @@ public actor BossAppleSession {
         }
     }
 
+    private func readCurrentAudioMode() async throws -> Int {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.currentAudioMode(on: transport)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
+            try await mapCoreErrors {
+                try await session.currentAudioMode()
+            }
+        }
+    }
+
+    private func readAudioModeSettingsConfig() async throws -> BossAudioModeSettingsConfig {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.audioModeSettingsConfig(on: transport)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
+            try await mapCoreErrors {
+                try await session.audioModeSettingsConfig()
+            }
+        }
+    }
+
+    private func readEqualizerSettingsIfAvailable() async throws -> BossEqualizerSettings? {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.equalizerSettingsIfAvailable(on: transport)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
+            try await mapCoreErrors {
+                try await session.equalizerSettingsIfAvailable()
+            }
+        }
+    }
+
+    private func readDeviceSettingsReport() async throws -> BossAppleDeviceSettingsReport {
+        if let rustBridge = BossRustSessionBridge.shared {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.deviceSettingsReport(on: transport)
+            }
+        }
+
+        return try await withCoreSessionRetrying(preferredPreferences: appOperationPreferences()) { [self] session in
+            try await mapCoreErrors {
+                wrap(try await session.refreshDeviceSettingsReport())
+            }
+        }
+    }
+
     private func withSessionLinkRetrying<T: Sendable>(
         preferredPreferences: [AppleBossCharacteristicPreference],
         preferActiveLink: Bool = true,
@@ -392,6 +848,53 @@ public actor BossAppleSession {
                 do {
                     let packetSession = try await ensurePacketSession(preference: preference, forceReconnect: attempt > 0)
                     return try await operation(packetSession)
+                } catch {
+                    lastError = error
+
+                    if BossAppleController.retrySecureCharacteristicIfNeeded(error, preference) {
+                        await invalidateLink(for: preference)
+                        break
+                    }
+
+                    if shouldFallbackToNextPreference(for: error, activePreference: preference) {
+                        await invalidateLink(for: preference)
+                        break
+                    }
+
+                    if shouldReconnectCurrentSession(for: error), attempt == 0 {
+                        await invalidateLink(for: preference)
+                        continue
+                    }
+
+                    throw error
+                }
+            }
+        }
+
+        throw lastError ?? AppleBleBossTransportError.transportClosed
+    }
+
+    private func withRustBleTransportRetrying<T: Sendable>(
+        preferredPreferences: [AppleBossCharacteristicPreference],
+        preferActiveLink: Bool = true,
+        operation: @escaping @Sendable (AppleBleBossTransport) async throws -> T
+    ) async throws -> T {
+        let preferences = normalizedPreferences(preferredPreferences, preferActiveLink: preferActiveLink)
+        var lastError: Error?
+
+        for preference in preferences {
+            for attempt in 0..<2 {
+                do {
+                    let hasSwiftConsumer = connectedLink?.preference == preference && (
+                        connectedLink?.link != nil ||
+                            connectedLink?.packetSession != nil ||
+                            connectedLink?.bossSession != nil
+                    )
+                    let connected = try await ensureConnected(
+                        preference: preference,
+                        forceReconnect: attempt > 0 || hasSwiftConsumer
+                    )
+                    return try await operation(connected.transport)
                 } catch {
                     lastError = error
 
@@ -469,7 +972,8 @@ public actor BossAppleSession {
             for attempt in 0..<2 {
                 do {
                     let connected = try await ensureConnected(preference: preference, forceReconnect: attempt > 0)
-                    return try await operation(connected.link)
+                    let link = try ensureBleLink(for: connected, preference: preference)
+                    return try await operation(link)
                 } catch {
                     lastError = error
 
@@ -516,16 +1020,31 @@ public actor BossAppleSession {
             ),
             characteristicPreference: preference
         )
-        let link = BleBmapLink(transport: transport)
         let connected = ConnectedLink(
             transport: transport,
-            link: link,
+            link: nil,
             packetSession: nil,
             bossSession: nil,
             preference: preference
         )
         connectedLink = connected
         return connected
+    }
+
+    private func ensureBleLink(
+        for connected: ConnectedLink,
+        preference: AppleBossCharacteristicPreference
+    ) throws -> BleBmapLink {
+        if let link = connected.link {
+            return link
+        }
+
+        let link = BleBmapLink(transport: connected.transport)
+        if var stored = connectedLink, stored.preference == preference {
+            stored.link = link
+            connectedLink = stored
+        }
+        return link
     }
 
     private func ensurePacketSession(
@@ -537,7 +1056,8 @@ public actor BossAppleSession {
             return packetSession
         }
 
-        let packetSession = BossPacketSession(link: connected.link)
+        let link = try ensureBleLink(for: connected, preference: preference)
+        let packetSession = BossPacketSession(link: link)
         if var stored = connectedLink, stored.preference == preference {
             stored.packetSession = packetSession
             connectedLink = stored
@@ -558,7 +1078,8 @@ public actor BossAppleSession {
         if let existing = connected.packetSession {
             packetSession = existing
         } else {
-            packetSession = BossPacketSession(link: connected.link)
+            let link = try ensureBleLink(for: connected, preference: preference)
+            packetSession = BossPacketSession(link: link)
         }
 
         let bossSession = BossSession(packetSession: packetSession)
@@ -667,6 +1188,113 @@ public actor BossAppleSession {
                         }
 
                         // The underlying packet stream ended. Force a reconnect and resume.
+                        await owner.closeCurrentLink()
+                        try? await Task.sleep(for: .milliseconds(250))
+                    } catch is CancellationError {
+                        continuation.finish()
+                        return
+                    } catch {
+                        if await owner.shouldReconnectCurrentSession(for: error) {
+                            await owner.closeCurrentLink()
+                            try? await Task.sleep(for: .milliseconds(250))
+                            continue
+                        }
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                }
+
+                continuation.finish()
+            }
+
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+
+    private func reconnectingRustPollingStream<Element: Sendable & Equatable>(
+        interval: Duration = .seconds(2),
+        read: @escaping @Sendable () async throws -> Element?
+    ) -> AsyncThrowingStream<Element, Error> {
+        let owner = self
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                var lastElement: Element?
+
+                while !Task.isCancelled {
+                    do {
+                        if let element = try await read(), element != lastElement {
+                            lastElement = element
+                            continuation.yield(element)
+                        }
+                        try await Task.sleep(for: interval)
+                    } catch is CancellationError {
+                        continuation.finish()
+                        return
+                    } catch {
+                        if await owner.shouldReconnectCurrentSession(for: error) {
+                            await owner.closeCurrentLink()
+                            try? await Task.sleep(for: .milliseconds(250))
+                            continue
+                        }
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                }
+
+                continuation.finish()
+            }
+
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+
+    private func reconnectingRustStream<Element: Sendable & Equatable>(
+        initial: @escaping @Sendable () async throws -> Element?,
+        stream: @escaping @Sendable (AppleBleBossTransport) -> AsyncThrowingStream<Element, Error>
+    ) -> AsyncThrowingStream<Element, Error> {
+        let owner = self
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                var lastElement: Element?
+                while !Task.isCancelled {
+                    do {
+                        let transport = try await owner.withRustBleTransportRetrying(
+                            preferredPreferences: owner.appOperationPreferences()
+                        ) { transport in
+                            transport
+                        }
+
+                        if let initialElement = try await initial() {
+                            guard !Task.isCancelled else {
+                                continuation.finish()
+                                return
+                            }
+                            if initialElement != lastElement {
+                                lastElement = initialElement
+                                continuation.yield(initialElement)
+                            }
+                        }
+
+                        for try await element in stream(transport) {
+                            guard !Task.isCancelled else {
+                                continuation.finish()
+                                return
+                            }
+                            if element != lastElement {
+                                lastElement = element
+                                continuation.yield(element)
+                            }
+                        }
+
+                        if Task.isCancelled {
+                            continuation.finish()
+                            return
+                        }
+
                         await owner.closeCurrentLink()
                         try? await Task.sleep(for: .milliseconds(250))
                     } catch is CancellationError {

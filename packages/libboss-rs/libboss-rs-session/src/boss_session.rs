@@ -1,13 +1,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use libboss_rs_core::{
-    BmapFunctionBlock, BmapPacket, BossAudioModeConfig, BossAudioModePrompt, BossAudioModeSettingsConfig,
-    BossAudioModeSettingsConfigPatch, BossAudioModesCodec, BossEqualizerBand, BossEqualizerSettings,
-    BossEqualizerSettingsPatch, BossOnHeadDetectionValue, BossSettingsCodec, BossVolumeControlStatus,
-    BossVolumeControlValue, FirmwareVersionInfo,
+    BmapFunctionBlock, BmapPacket, BossAudioModeConfig, BossAudioModePrompt,
+    BossAudioModeSettingsConfig, BossAudioModeSettingsConfigPatch, BossAudioModesCapabilities,
+    BossAudioModesCodec, BossEqualizerBand, BossEqualizerSettings, BossEqualizerSettingsPatch,
+    BossOnHeadDetectionValue, BossSettingsCodec, BossSettingsSnapshot, BossStandbyTimerValue,
+    BossVolumeControlStatus, BossVolumeControlValue, FirmwareVersionInfo,
 };
 
-use crate::{BossLink, BossObservedSetting, BossSettingSource, BossSessionError, BossDeviceSettingsReport, PacketSession};
+use crate::{
+    BossDeviceSettingsReport, BossLink, BossObservedSetting, BossSessionError, BossSettingSource,
+    PacketSession,
+};
 
 pub struct BossSession<L: BossLink> {
     packet_session: PacketSession<L>,
@@ -18,28 +22,86 @@ impl<L: BossLink> BossSession<L> {
         Self { packet_session }
     }
 
-    pub async fn firmware_version(&self, port: i32, device_id: i32, timeout_millis: u64) -> Result<FirmwareVersionInfo, BossSessionError> {
-        self.packet_session.firmware_version(port, device_id, timeout_millis).await
+    pub async fn firmware_version(
+        &self,
+        port: i32,
+        device_id: i32,
+        timeout_millis: u64,
+    ) -> Result<FirmwareVersionInfo, BossSessionError> {
+        self.packet_session
+            .firmware_version(port, device_id, timeout_millis)
+            .await
     }
 
     pub async fn current_audio_mode(&self, timeout_millis: u64) -> Result<i32, BossSessionError> {
         self.packet_session.current_audio_mode(timeout_millis).await
     }
 
-    pub async fn supported_audio_mode_prompts(&self, timeout_millis: u64) -> Result<Vec<BossAudioModePrompt>, BossSessionError> {
-        self.packet_session.supported_audio_mode_prompts(timeout_millis).await
+    pub async fn standby_timer(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossStandbyTimerValue, BossSessionError> {
+        self.packet_session.standby_timer(timeout_millis).await
     }
 
-    pub async fn audio_mode_configs(&self, timeout_millis: u64) -> Result<Vec<BossAudioModeConfig>, BossSessionError> {
+    pub async fn settings_snapshot(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossSettingsSnapshot, BossSessionError> {
+        self.packet_session.settings_snapshot(timeout_millis).await
+    }
+
+    pub async fn set_standby_timer(
+        &self,
+        minutes: i32,
+        timeout_millis: u64,
+    ) -> Result<BossStandbyTimerValue, BossSessionError> {
+        self.packet_session
+            .set_standby_timer(minutes, timeout_millis)
+            .await
+    }
+
+    pub async fn supported_audio_mode_prompts(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<Vec<BossAudioModePrompt>, BossSessionError> {
+        self.packet_session
+            .supported_audio_mode_prompts(timeout_millis)
+            .await
+    }
+
+    pub async fn audio_mode_capabilities(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossAudioModesCapabilities, BossSessionError> {
+        self.packet_session
+            .audio_mode_capabilities(timeout_millis)
+            .await
+    }
+
+    pub async fn audio_mode_configs(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<Vec<BossAudioModeConfig>, BossSessionError> {
         self.packet_session.audio_mode_configs(timeout_millis).await
     }
 
-    pub async fn audio_mode_settings_config(&self, timeout_millis: u64) -> Result<BossAudioModeSettingsConfig, BossSessionError> {
-        self.packet_session.audio_mode_settings_config(timeout_millis).await
+    pub async fn audio_mode_settings_config(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossAudioModeSettingsConfig, BossSessionError> {
+        self.packet_session
+            .audio_mode_settings_config(timeout_millis)
+            .await
     }
 
-    pub async fn favorite_audio_mode_indices(&self, timeout_millis: u64) -> Result<Vec<i32>, BossSessionError> {
-        self.packet_session.favorite_audio_mode_indices(timeout_millis).await
+    pub async fn favorite_audio_mode_indices(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<Vec<i32>, BossSessionError> {
+        self.packet_session
+            .favorite_audio_mode_indices(timeout_millis)
+            .await
     }
 
     pub async fn set_favorite_audio_mode_indices(
@@ -53,7 +115,10 @@ impl<L: BossLink> BossSession<L> {
             .await
     }
 
-    pub async fn equalizer_settings(&self, timeout_millis: u64) -> Result<BossEqualizerSettings, BossSessionError> {
+    pub async fn equalizer_settings(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossEqualizerSettings, BossSessionError> {
         self.packet_session.equalizer_settings(timeout_millis).await
     }
 
@@ -62,15 +127,26 @@ impl<L: BossLink> BossSession<L> {
         requests: &[(BossEqualizerBand, i32)],
         timeout_millis: u64,
     ) -> Result<BossEqualizerSettings, BossSessionError> {
-        self.packet_session.set_equalizer(requests, timeout_millis).await
+        self.packet_session
+            .set_equalizer(requests, timeout_millis)
+            .await
     }
 
-    pub async fn on_head_detection(&self, timeout_millis: u64) -> Result<BossOnHeadDetectionValue, BossSessionError> {
+    pub async fn on_head_detection(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossOnHeadDetectionValue, BossSessionError> {
         self.packet_session.on_head_detection(timeout_millis).await
     }
 
-    pub async fn enabled_setting(&self, function_raw: u8, timeout_millis: u64) -> Result<bool, BossSessionError> {
-        self.packet_session.enabled_setting(function_raw, timeout_millis).await
+    pub async fn enabled_setting(
+        &self,
+        function_raw: u8,
+        timeout_millis: u64,
+    ) -> Result<bool, BossSessionError> {
+        self.packet_session
+            .enabled_setting(function_raw, timeout_millis)
+            .await
     }
 
     pub async fn set_enabled_setting(
@@ -79,7 +155,9 @@ impl<L: BossLink> BossSession<L> {
         enabled: bool,
         timeout_millis: u64,
     ) -> Result<bool, BossSessionError> {
-        self.packet_session.set_enabled_setting(function_raw, enabled, timeout_millis).await
+        self.packet_session
+            .set_enabled_setting(function_raw, enabled, timeout_millis)
+            .await
     }
 
     pub async fn set_on_head_detection(
@@ -87,11 +165,74 @@ impl<L: BossLink> BossSession<L> {
         value: &BossOnHeadDetectionValue,
         timeout_millis: u64,
     ) -> Result<BossOnHeadDetectionValue, BossSessionError> {
-        self.packet_session.set_on_head_detection(value, timeout_millis).await
+        self.packet_session
+            .set_on_head_detection(value, timeout_millis)
+            .await
     }
 
-    pub async fn volume_control_status(&self, timeout_millis: u64) -> Result<BossVolumeControlStatus, BossSessionError> {
-        self.packet_session.volume_control_status(timeout_millis).await
+    pub async fn volume_control_status(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossVolumeControlStatus, BossSessionError> {
+        self.packet_session
+            .volume_control_status(timeout_millis)
+            .await
+    }
+
+    pub async fn refresh_device_settings_report(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossDeviceSettingsReport, BossSessionError> {
+        let wear_detection = self
+            .observe_direct_setting(timeout_millis, || async {
+                self.on_head_detection(timeout_millis).await
+            })
+            .await?;
+        let auto_aware_enabled = self
+            .observe_direct_setting(timeout_millis, || async {
+                self.enabled_setting(BossSettingsCodec::AUTO_AWARE_FUNCTION_RAW, timeout_millis)
+                    .await
+            })
+            .await?;
+        let auto_play_pause_enabled = self
+            .observe_direct_setting(timeout_millis, || async {
+                self.enabled_setting(
+                    BossSettingsCodec::AUTO_PLAY_PAUSE_FUNCTION_RAW,
+                    timeout_millis,
+                )
+                .await
+            })
+            .await?;
+        let auto_answer_enabled = if let Some(derived) = wear_detection
+            .value
+            .as_ref()
+            .and_then(|value| value.is_auto_answer_enabled)
+        {
+            BossObservedSetting {
+                value: Some(derived),
+                source: Some(BossSettingSource::DirectGet),
+                unavailable_reason: None,
+            }
+        } else {
+            self.observe_direct_setting(timeout_millis, || async {
+                self.enabled_setting(BossSettingsCodec::AUTO_ANSWER_FUNCTION_RAW, timeout_millis)
+                    .await
+            })
+            .await?
+        };
+        let volume_control = self
+            .observe_direct_setting(timeout_millis, || async {
+                self.volume_control_status(timeout_millis).await
+            })
+            .await?;
+
+        Ok(BossDeviceSettingsReport {
+            wear_detection,
+            auto_aware_enabled,
+            auto_play_pause_enabled,
+            auto_answer_enabled,
+            volume_control,
+        })
     }
 
     pub async fn set_volume_control(
@@ -99,7 +240,107 @@ impl<L: BossLink> BossSession<L> {
         value: BossVolumeControlValue,
         timeout_millis: u64,
     ) -> Result<BossVolumeControlStatus, BossSessionError> {
-        self.packet_session.set_volume_control(value, timeout_millis).await
+        self.packet_session
+            .set_volume_control(value, timeout_millis)
+            .await
+    }
+
+    pub async fn set_audio_mode_favorite(
+        &self,
+        index: i32,
+        is_favorite: bool,
+        timeout_millis: u64,
+    ) -> Result<Vec<i32>, BossSessionError> {
+        let capabilities = self.audio_mode_capabilities(timeout_millis).await?;
+        let number_of_modes = capabilities.bose_modes + capabilities.user_modes;
+        let mut favorites: BTreeSet<i32> = self
+            .favorite_audio_mode_indices(timeout_millis)
+            .await?
+            .into_iter()
+            .collect();
+        if is_favorite {
+            favorites.insert(index);
+        } else {
+            favorites.remove(&index);
+        }
+        let requested: Vec<i32> = favorites.into_iter().collect();
+        self.set_favorite_audio_mode_indices(number_of_modes, &requested, timeout_millis)
+            .await
+    }
+
+    pub async fn favorite_audio_mode(
+        &self,
+        index: i32,
+        timeout_millis: u64,
+    ) -> Result<Vec<i32>, BossSessionError> {
+        self.set_audio_mode_favorite(index, true, timeout_millis)
+            .await
+    }
+
+    pub async fn unfavorite_audio_mode(
+        &self,
+        index: i32,
+        timeout_millis: u64,
+    ) -> Result<Vec<i32>, BossSessionError> {
+        self.set_audio_mode_favorite(index, false, timeout_millis)
+            .await
+    }
+
+    pub async fn save_custom_audio_mode(
+        &self,
+        name: &str,
+        settings: &BossAudioModeSettingsConfig,
+        prompt: BossAudioModePrompt,
+        requested_slot: Option<i32>,
+        timeout_millis: u64,
+    ) -> Result<BossAudioModeConfig, BossSessionError> {
+        let configs = self.audio_mode_configs(timeout_millis).await?;
+        let slot = if let Some(requested_slot) = requested_slot {
+            if configs
+                .iter()
+                .find(|config| config.mode_index == requested_slot)
+                .map(|config| config.user_configurable)
+                != Some(true)
+            {
+                return Err(BossSessionError::CustomAudioModeSlotNotEditable(
+                    requested_slot,
+                ));
+            }
+            requested_slot
+        } else {
+            Self::first_free_custom_audio_mode_slot(&configs)
+                .ok_or(BossSessionError::NoFreeCustomAudioModeSlot)?
+        };
+
+        self.write_custom_audio_mode(slot, name, settings, prompt, timeout_millis)
+            .await
+    }
+
+    pub async fn delete_custom_audio_mode(
+        &self,
+        slot: i32,
+        timeout_millis: u64,
+    ) -> Result<BossAudioModeConfig, BossSessionError> {
+        let configs = self.audio_mode_configs(timeout_millis).await?;
+        let Some(existing) = configs.iter().find(|config| config.mode_index == slot) else {
+            return Err(BossSessionError::CustomAudioModeSlotNotFound(slot));
+        };
+        if !existing.user_configurable {
+            return Err(BossSessionError::CustomAudioModeSlotNotEditable(slot));
+        }
+
+        if existing.favorite {
+            let _ = self.unfavorite_audio_mode(slot, timeout_millis).await?;
+        }
+
+        self.write_custom_audio_mode(
+            slot,
+            "",
+            &existing.deleted_settings_baseline(),
+            BossAudioModePrompt::NONE,
+            timeout_millis,
+        )
+        .await
     }
 
     pub async fn set_current_audio_mode(
@@ -121,9 +362,13 @@ impl<L: BossLink> BossSession<L> {
             Ok(response) => {
                 if response.operator == libboss_rs_core::BmapOperator::Result {
                     if let Some(response_mode_index) = response.payload.first() {
-                        return Ok(BossCurrentAudioModeWriteResult::Updated(*response_mode_index as i32));
+                        return Ok(BossCurrentAudioModeWriteResult::Updated(
+                            *response_mode_index as i32,
+                        ));
                     }
-                    let verified = self.verify_current_audio_mode(target_index, 2_000, 3).await?;
+                    let verified = self
+                        .verify_current_audio_mode(target_index, 2_000, 3)
+                        .await?;
                     return Ok(BossCurrentAudioModeWriteResult::Updated(verified));
                 }
                 Ok(BossCurrentAudioModeWriteResult::Updated(
@@ -182,7 +427,9 @@ impl<L: BossLink> BossSession<L> {
                 if update.matches(&verified) {
                     return Ok(BossAudioModeSettingsWriteResult::Updated(verified));
                 }
-                Ok(BossAudioModeSettingsWriteResult::VerificationInconclusive(target))
+                Ok(BossAudioModeSettingsWriteResult::VerificationInconclusive(
+                    target,
+                ))
             }
         }
     }
@@ -203,7 +450,9 @@ impl<L: BossLink> BossSession<L> {
                 .iter()
                 .cloned()
                 .map(|range| {
-                    if let Some((_, requested_level)) = requested.iter().find(|(band, _)| *band == range.band) {
+                    if let Some((_, requested_level)) =
+                        requested.iter().find(|(band, _)| *band == range.band)
+                    {
                         if range.current_level != *requested_level {
                             changed = true;
                         }
@@ -243,7 +492,11 @@ impl<L: BossLink> BossSession<L> {
                 if !Self::is_recoverable_equalizer_error(&error) {
                     return Err(error);
                 }
-                let verified = self.packet_session.equalizer_settings(5_000).await.unwrap_or(target.clone());
+                let verified = self
+                    .packet_session
+                    .equalizer_settings(5_000)
+                    .await
+                    .unwrap_or(target.clone());
                 if update.matches(&verified) {
                     return Ok(BossEqualizerWriteResult::Updated(verified));
                 }
@@ -256,15 +509,20 @@ impl<L: BossLink> BossSession<L> {
         catalog: &[BossAudioModeConfig],
         packet: &BmapPacket,
     ) -> Result<Option<Vec<BossAudioModeConfig>>, BossSessionError> {
-        if packet.function_block != BmapFunctionBlock::AudioModes || packet.operator != libboss_rs_core::BmapOperator::Status {
+        if packet.function_block != BmapFunctionBlock::AudioModes
+            || packet.operator != libboss_rs_core::BmapOperator::Status
+        {
             return Ok(None);
         }
 
         match packet.function.raw_value() {
             BossAudioModesCodec::MODE_CONFIG_FUNCTION_RAW => {
                 let mode = BossAudioModesCodec::parse_mode_config_detail(packet)?;
-                let mut updated: BTreeMap<i32, BossAudioModeConfig> =
-                    catalog.iter().cloned().map(|mode| (mode.mode_index, mode)).collect();
+                let mut updated: BTreeMap<i32, BossAudioModeConfig> = catalog
+                    .iter()
+                    .cloned()
+                    .map(|mode| (mode.mode_index, mode))
+                    .collect();
                 updated.insert(mode.mode_index, mode);
                 Ok(Some(updated.into_values().collect()))
             }
@@ -290,7 +548,9 @@ impl<L: BossLink> BossSession<L> {
         report: &BossDeviceSettingsReport,
         packet: &BmapPacket,
     ) -> Result<Option<BossDeviceSettingsReport>, BossSessionError> {
-        if packet.function_block != BmapFunctionBlock::Settings || packet.operator != libboss_rs_core::BmapOperator::Status {
+        if packet.function_block != BmapFunctionBlock::Settings
+            || packet.operator != libboss_rs_core::BmapOperator::Status
+        {
             return Ok(None);
         }
 
@@ -302,17 +562,18 @@ impl<L: BossLink> BossSession<L> {
                     source: Some(BossSettingSource::Snapshot),
                     unavailable_reason: None,
                 };
-                let auto_answer_enabled = if report.auto_answer_enabled.source == Some(BossSettingSource::Snapshot) {
-                    report.auto_answer_enabled.clone()
-                } else if let Some(derived) = value.is_auto_answer_enabled {
-                    BossObservedSetting {
-                        value: Some(derived),
-                        source: Some(BossSettingSource::CompositeSnapshot),
-                        unavailable_reason: None,
-                    }
-                } else {
-                    report.auto_answer_enabled.clone()
-                };
+                let auto_answer_enabled =
+                    if report.auto_answer_enabled.source == Some(BossSettingSource::Snapshot) {
+                        report.auto_answer_enabled.clone()
+                    } else if let Some(derived) = value.is_auto_answer_enabled {
+                        BossObservedSetting {
+                            value: Some(derived),
+                            source: Some(BossSettingSource::CompositeSnapshot),
+                            unavailable_reason: None,
+                        }
+                    } else {
+                        report.auto_answer_enabled.clone()
+                    };
                 Ok(Some(BossDeviceSettingsReport {
                     wear_detection,
                     auto_aware_enabled: report.auto_aware_enabled.clone(),
@@ -343,11 +604,96 @@ impl<L: BossLink> BossSession<L> {
                 auto_answer_enabled: report.auto_answer_enabled.clone(),
                 volume_control: report.volume_control.clone(),
             })),
+            BossSettingsCodec::AUTO_ANSWER_FUNCTION_RAW => Ok(Some(BossDeviceSettingsReport {
+                wear_detection: report.wear_detection.clone(),
+                auto_aware_enabled: report.auto_aware_enabled.clone(),
+                auto_play_pause_enabled: report.auto_play_pause_enabled.clone(),
+                auto_answer_enabled: BossObservedSetting {
+                    value: Some(BossSettingsCodec::parse_enabled_flag(packet)?),
+                    source: Some(BossSettingSource::Snapshot),
+                    unavailable_reason: None,
+                },
+                volume_control: report.volume_control.clone(),
+            })),
+            BossSettingsCodec::VOLUME_CONTROL_FUNCTION_RAW => Ok(Some(BossDeviceSettingsReport {
+                wear_detection: report.wear_detection.clone(),
+                auto_aware_enabled: report.auto_aware_enabled.clone(),
+                auto_play_pause_enabled: report.auto_play_pause_enabled.clone(),
+                auto_answer_enabled: report.auto_answer_enabled.clone(),
+                volume_control: BossObservedSetting {
+                    value: Some(BossAudioModesCodec::parse_volume_control_status(packet)?),
+                    source: Some(BossSettingSource::Snapshot),
+                    unavailable_reason: None,
+                },
+            })),
             _ => Ok(None),
         }
     }
 
-    async fn current_audio_mode_if_available(&self, timeout_millis: u64) -> Result<Option<i32>, BossSessionError> {
+    fn unavailable_reason_for_error(
+        error: &BossSessionError,
+    ) -> Option<crate::BossSettingUnavailableReason> {
+        match error {
+            BossSessionError::ResponseTimedOut { .. } => {
+                Some(crate::BossSettingUnavailableReason::TimedOut)
+            }
+            BossSessionError::ResponseStreamEnded => {
+                Some(crate::BossSettingUnavailableReason::ResponseStreamEnded)
+            }
+            BossSessionError::BmapErrorResponse(response) => match response.code() {
+                Some(libboss_rs_core::BmapErrorCode::FblockNotSupp)
+                | Some(libboss_rs_core::BmapErrorCode::FuncNotSupp) => {
+                    Some(crate::BossSettingUnavailableReason::FunctionUnsupported)
+                }
+                Some(libboss_rs_core::BmapErrorCode::OpNotSupp) => {
+                    Some(crate::BossSettingUnavailableReason::OperatorUnsupported)
+                }
+                Some(libboss_rs_core::BmapErrorCode::DataUnavailable) => {
+                    Some(crate::BossSettingUnavailableReason::DataUnavailable)
+                }
+                Some(libboss_rs_core::BmapErrorCode::InsecureTransport) => {
+                    Some(crate::BossSettingUnavailableReason::InsecureTransport)
+                }
+                code => Some(crate::BossSettingUnavailableReason::BmapError(code)),
+            },
+            _ => None,
+        }
+    }
+
+    async fn observe_direct_setting<T, F, Fut>(
+        &self,
+        _timeout_millis: u64,
+        read: F,
+    ) -> Result<BossObservedSetting<T>, BossSessionError>
+    where
+        T: Clone,
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<T, BossSessionError>>,
+    {
+        match read().await {
+            Ok(value) => Ok(BossObservedSetting {
+                value: Some(value),
+                source: Some(BossSettingSource::DirectGet),
+                unavailable_reason: None,
+            }),
+            Err(error) => {
+                if let Some(reason) = Self::unavailable_reason_for_error(&error) {
+                    Ok(BossObservedSetting {
+                        value: None,
+                        source: None,
+                        unavailable_reason: Some(reason),
+                    })
+                } else {
+                    Err(error)
+                }
+            }
+        }
+    }
+
+    async fn current_audio_mode_if_available(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<Option<i32>, BossSessionError> {
         match self.packet_session.current_audio_mode(timeout_millis).await {
             Ok(value) => Ok(Some(value)),
             Err(error) => {
@@ -367,9 +713,15 @@ impl<L: BossLink> BossSession<L> {
         attempts: usize,
     ) -> Result<i32, BossSessionError> {
         let mut last_observed_index = None;
-        let mut last_error = BossSessionError::ResponseTimedOut { seconds: (timeout_per_attempt / 1000) as i64 };
+        let mut last_error = BossSessionError::ResponseTimedOut {
+            seconds: (timeout_per_attempt / 1000) as i64,
+        };
         for _ in 0..attempts {
-            match self.packet_session.current_audio_mode(timeout_per_attempt).await {
+            match self
+                .packet_session
+                .current_audio_mode(timeout_per_attempt)
+                .await
+            {
                 Ok(current_index) => {
                     last_observed_index = Some(current_index);
                     if current_index == target_index {
@@ -393,12 +745,20 @@ impl<L: BossLink> BossSession<L> {
         attempts: usize,
         timeout_per_attempt: u64,
     ) -> Result<BossAudioModeSettingsConfig, BossSessionError> {
-        let mut last_error = BossSessionError::ResponseTimedOut { seconds: (timeout_per_attempt / 1000) as i64 };
+        let mut last_error = BossSessionError::ResponseTimedOut {
+            seconds: (timeout_per_attempt / 1000) as i64,
+        };
         for attempt in 0..attempts {
-            match self.packet_session.audio_mode_settings_config(timeout_per_attempt).await {
+            match self
+                .packet_session
+                .audio_mode_settings_config(timeout_per_attempt)
+                .await
+            {
                 Ok(config) => return Ok(config),
                 Err(error) => {
-                    if !Self::is_recoverable_audio_mode_settings_config_error(&error) || attempt == attempts - 1 {
+                    if !Self::is_recoverable_audio_mode_settings_config_error(&error)
+                        || attempt == attempts - 1
+                    {
                         return Err(error);
                     }
                     last_error = error;
@@ -409,7 +769,10 @@ impl<L: BossLink> BossSession<L> {
     }
 
     fn should_fallback_for_audio_mode_write(error: &BossSessionError) -> bool {
-        matches!(error, BossSessionError::ResponseTimedOut { .. } | BossSessionError::ResponseStreamEnded)
+        matches!(
+            error,
+            BossSessionError::ResponseTimedOut { .. } | BossSessionError::ResponseStreamEnded
+        )
     }
 
     fn is_recoverable_audio_mode_settings_config_error(error: &BossSessionError) -> bool {
@@ -507,6 +870,28 @@ impl<L: BossLink> BossSession<L> {
             config.wind_block_enabled,
             config.anc_toggle_enabled
         )
+    }
+
+    async fn write_custom_audio_mode(
+        &self,
+        slot: i32,
+        name: &str,
+        settings: &BossAudioModeSettingsConfig,
+        prompt: BossAudioModePrompt,
+        timeout_millis: u64,
+    ) -> Result<BossAudioModeConfig, BossSessionError> {
+        self.packet_session
+            .set_audio_mode_config(slot, prompt, name, settings, timeout_millis)
+            .await
+    }
+
+    fn first_free_custom_audio_mode_slot(configs: &[BossAudioModeConfig]) -> Option<i32> {
+        configs
+            .iter()
+            .find(|config| {
+                config.user_configurable && !config.user_configured && config.name.is_empty()
+            })
+            .map(|config| config.mode_index)
     }
 }
 

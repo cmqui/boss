@@ -24,10 +24,16 @@ pub enum BleSegmentationError {
 pub enum BleReassemblyError {
     EmptySegment,
     SegmentTooShort(usize),
-    InconsistentSegmentSeries { expected_max_index: usize, actual_max_index: usize },
+    InconsistentSegmentSeries {
+        expected_max_index: usize,
+        actual_max_index: usize,
+    },
     InvalidSegmentIndex(usize),
     DuplicateSegmentIndex(usize),
-    MissingSegments { expected: usize, actual: usize },
+    MissingSegments {
+        expected: usize,
+        actual: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

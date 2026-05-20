@@ -58,7 +58,10 @@ fn stream_decoder_handles_multiple_packets_and_leftovers() {
     assert_eq!(partial.len(), 1);
     let remainder = decoder.push(&combined[5..]).unwrap();
     assert_eq!(remainder.len(), 1);
-    assert_eq!(remainder[0].function, BmapFunction::ProductInfoProductIdVariants);
+    assert_eq!(
+        remainder[0].function,
+        BmapFunction::ProductInfoProductIdVariants
+    );
 }
 
 #[test]
@@ -114,23 +117,49 @@ fn standby_timer_and_on_head_detection_codecs_match() {
 fn equalizer_parser_reads_signed_range_levels() {
     let packet = BmapPacket::new(
         BmapFunctionBlock::Settings,
-        BmapFunction::Unknown { block: BmapFunctionBlock::Settings, raw_value: BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW },
+        BmapFunction::Unknown {
+            block: BmapFunctionBlock::Settings,
+            raw_value: BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW,
+        },
         0,
         0,
         BmapOperator::Status,
-        vec![0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFE, 0x01, 0xF6, 0x0A, 0x05, 0x02],
+        vec![
+            0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFE, 0x01, 0xF6, 0x0A, 0x05, 0x02,
+        ],
     );
     let equalizer = BossSettingsCodec::parse_equalizer(&packet).unwrap();
-    assert_eq!(equalizer.range(&BossEqualizerBand::Bass).unwrap().current_level, 3);
-    assert_eq!(equalizer.range(&BossEqualizerBand::Mid).unwrap().current_level, -2);
-    assert_eq!(equalizer.range(&BossEqualizerBand::Treble).unwrap().current_level, 5);
+    assert_eq!(
+        equalizer
+            .range(&BossEqualizerBand::Bass)
+            .unwrap()
+            .current_level,
+        3
+    );
+    assert_eq!(
+        equalizer
+            .range(&BossEqualizerBand::Mid)
+            .unwrap()
+            .current_level,
+        -2
+    );
+    assert_eq!(
+        equalizer
+            .range(&BossEqualizerBand::Treble)
+            .unwrap()
+            .current_level,
+        5
+    );
 }
 
 #[test]
 fn audio_mode_codecs_match_supported_prompt_and_favorites_logic() {
     let packet = BmapPacket::new(
         BmapFunctionBlock::AudioModes,
-        BmapFunction::Unknown { block: BmapFunctionBlock::AudioModes, raw_value: BossAudioModesCodec::NAMES_SUPPORTED_FUNCTION_RAW },
+        BmapFunction::Unknown {
+            block: BmapFunctionBlock::AudioModes,
+            raw_value: BossAudioModesCodec::NAMES_SUPPORTED_FUNCTION_RAW,
+        },
         0,
         0,
         BmapOperator::Status,
@@ -144,7 +173,10 @@ fn audio_mode_codecs_match_supported_prompt_and_favorites_logic() {
     let payload = BossAudioModesCodec::encode_favorites(10, &[0, 1, 9]).unwrap();
     let favorites = BossAudioModesCodec::parse_favorites(&BmapPacket::new(
         BmapFunctionBlock::AudioModes,
-        BmapFunction::Unknown { block: BmapFunctionBlock::AudioModes, raw_value: BossAudioModesCodec::FAVORITES_FUNCTION_RAW },
+        BmapFunction::Unknown {
+            block: BmapFunctionBlock::AudioModes,
+            raw_value: BossAudioModesCodec::FAVORITES_FUNCTION_RAW,
+        },
         0,
         0,
         BmapOperator::Status,
@@ -174,7 +206,10 @@ fn audio_mode_config_parser_reads_index_name_and_flags() {
 
     let packet = BmapPacket::new(
         BmapFunctionBlock::AudioModes,
-        BmapFunction::Unknown { block: BmapFunctionBlock::AudioModes, raw_value: BossAudioModesCodec::MODE_CONFIG_FUNCTION_RAW },
+        BmapFunction::Unknown {
+            block: BmapFunctionBlock::AudioModes,
+            raw_value: BossAudioModesCodec::MODE_CONFIG_FUNCTION_RAW,
+        },
         0,
         0,
         BmapOperator::Status,
@@ -188,7 +223,10 @@ fn audio_mode_config_parser_reads_index_name_and_flags() {
     assert!(config.user_configurable);
     assert!(!config.user_configured);
     assert_eq!(config.settings.cnc_level, 5);
-    assert_eq!(config.settings.spatial_audio_mode, BossSpatialAudioMode::Head);
+    assert_eq!(
+        config.settings.spatial_audio_mode,
+        BossSpatialAudioMode::Head
+    );
     assert!(config.settings.wind_block_enabled);
     assert!(config.settings.anc_toggle_enabled);
 }
@@ -200,7 +238,10 @@ fn settings_snapshot_falls_back_to_composite_auto_answer() {
         BossSettingsCodec::ON_HEAD_DETECTION_FUNCTION_RAW,
         BmapPacket::new(
             BmapFunctionBlock::Settings,
-            BmapFunction::Unknown { block: BmapFunctionBlock::Settings, raw_value: BossSettingsCodec::ON_HEAD_DETECTION_FUNCTION_RAW },
+            BmapFunction::Unknown {
+                block: BmapFunctionBlock::Settings,
+                raw_value: BossSettingsCodec::ON_HEAD_DETECTION_FUNCTION_RAW,
+            },
             0,
             0,
             BmapOperator::Status,

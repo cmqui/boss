@@ -2,17 +2,19 @@
 mod tests {
     use futures::executor::block_on;
     use libboss_rs_core::{
-        BmapErrorCode, BmapFunction, BmapFunctionBlock, BmapOperator, BmapPacket, BossAudioModeConfig,
-        BossAudioModePrompt, BossAudioModeSettingsConfig, BossAudioModeSettingsConfigPatch, BossAudioModesCodec,
-        BossEqualizerBand, BossEqualizerSettingsPatch, BossOnHeadDetectionValue, BossSettingsCodec,
+        BmapErrorCode, BmapFunction, BmapFunctionBlock, BmapOperator, BmapPacket,
+        BossAudioModeConfig, BossAudioModePrompt, BossAudioModeSettingsConfig,
+        BossAudioModeSettingsConfigPatch, BossAudioModesCodec, BossEqualizerBand,
+        BossEqualizerSettingsPatch, BossOnHeadDetectionValue, BossSettingsCodec,
         BossSpatialAudioMode, BossVolumeControlValue,
     };
 
     use crate::test_support::MockLink;
     use crate::{
-        BossAudioModeSettingsWriteResult, BossCurrentAudioModeWriteResult, BossDeviceSettingsReport,
-        BossEqualizerWriteResult, BossObservedSetting, BossSession, BossSessionError, BossSettingSource,
-        BossSettingUnavailableReason, BootstrapSession, BootstrapSessionError, BootstrapTimeoutError, PacketSession,
+        BootstrapSession, BootstrapSessionError, BootstrapTimeoutError,
+        BossAudioModeSettingsWriteResult, BossCurrentAudioModeWriteResult,
+        BossDeviceSettingsReport, BossEqualizerWriteResult, BossObservedSetting, BossSession,
+        BossSessionError, BossSettingSource, BossSettingUnavailableReason, PacketSession,
         SessionConfiguration,
     };
 
@@ -166,9 +168,17 @@ mod tests {
             let device = session.bootstrap().await.unwrap();
             assert_eq!(device.bmap_version.version, "1.0.0");
             assert_eq!(device.product_id, 0x4082);
-            assert_eq!(device.product_variant.variant_name, Some("WolverineWhiteSmoke"));
-            assert!(device.supported_function_blocks.contains(BmapFunctionBlock::Settings));
-            assert_eq!(device.transport_kind, libboss_rs_core::BossTransportKind::Stream);
+            assert_eq!(
+                device.product_variant.variant_name,
+                Some("WolverineWhiteSmoke")
+            );
+            assert!(device
+                .supported_function_blocks
+                .contains(BmapFunctionBlock::Settings));
+            assert_eq!(
+                device.transport_kind,
+                libboss_rs_core::BossTransportKind::Stream
+            );
             assert_eq!(link.sent_packets().len(), 3);
         });
     }
@@ -298,7 +308,10 @@ mod tests {
             );
             let session = PacketSession::new(MockLink::new(vec![Ok(Some(packet))]));
             let prompts = session.supported_audio_mode_prompts(1_000).await.unwrap();
-            assert_eq!(prompts.iter().map(|prompt| prompt.name).collect::<Vec<_>>(), vec!["None", "Quiet", "Aware"]);
+            assert_eq!(
+                prompts.iter().map(|prompt| prompt.name).collect::<Vec<_>>(),
+                vec!["None", "Quiet", "Aware"]
+            );
         });
     }
 
@@ -342,7 +355,10 @@ mod tests {
                 BmapOperator::Result,
                 vec![],
             );
-            let session = PacketSession::new(MockLink::new(vec![Ok(Some(status_packet)), Ok(Some(result_packet))]));
+            let session = PacketSession::new(MockLink::new(vec![
+                Ok(Some(status_packet)),
+                Ok(Some(result_packet)),
+            ]));
             let configs = session.audio_mode_configs(1_000).await.unwrap();
             assert_eq!(configs.len(), 1);
             assert_eq!(configs[0].name, "Immersion");
@@ -376,6 +392,46 @@ mod tests {
                     anc_toggle_enabled: false,
                 }
             );
+        });
+    }
+
+    #[test]
+    fn packet_session_reads_and_sets_standby_timer() {
+        block_on(async {
+            let read_packet = BmapPacket::new(
+                BmapFunctionBlock::Settings,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::Settings,
+                    raw_value: BossSettingsCodec::STANDBY_TIMER_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Status,
+                vec![0x1E],
+            );
+            let write_packet = BmapPacket::new(
+                BmapFunctionBlock::Settings,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::Settings,
+                    raw_value: BossSettingsCodec::STANDBY_TIMER_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Status,
+                vec![0x2C, 0x00, 0x01],
+            );
+            let session = PacketSession::new(MockLink::new(vec![
+                Ok(Some(read_packet)),
+                Ok(Some(write_packet)),
+            ]));
+
+            let current = session.standby_timer(1_000).await.unwrap();
+            assert_eq!(current.minutes, 30);
+            assert!(!current.supports_two_byte_minutes);
+
+            let updated = session.set_standby_timer(300, 1_000).await.unwrap();
+            assert_eq!(updated.minutes, 300);
+            assert!(updated.supports_two_byte_minutes);
         });
     }
 
@@ -428,7 +484,10 @@ mod tests {
         let reduced = BossSession::<MockLink>::reduce_audio_mode_catalog(&initial, &packet)
             .unwrap()
             .unwrap();
-        assert_eq!(reduced.iter().map(|mode| mode.favorite).collect::<Vec<_>>(), vec![false, true]);
+        assert_eq!(
+            reduced.iter().map(|mode| mode.favorite).collect::<Vec<_>>(),
+            vec![false, true]
+        );
     }
 
     #[test]
@@ -452,7 +511,13 @@ mod tests {
         payload.extend_from_slice(&[0x03, 0x00, 0x00]);
         payload.extend_from_slice(b"Custom");
         payload.extend(std::iter::repeat(0x00).take(32 - 6));
-        payload.extend_from_slice(&[0x06, 0x01, BossSpatialAudioMode::Head.raw_value(), 0x01, 0x01]);
+        payload.extend_from_slice(&[
+            0x06,
+            0x01,
+            BossSpatialAudioMode::Head.raw_value(),
+            0x01,
+            0x01,
+        ]);
         let packet = BmapPacket::new(
             BmapFunctionBlock::AudioModes,
             BmapFunction::Unknown {
@@ -468,9 +533,18 @@ mod tests {
         let reduced = BossSession::<MockLink>::reduce_audio_mode_catalog(&initial, &packet)
             .unwrap()
             .unwrap();
-        assert_eq!(reduced.iter().map(|mode| mode.mode_index).collect::<Vec<_>>(), vec![1, 3]);
+        assert_eq!(
+            reduced
+                .iter()
+                .map(|mode| mode.mode_index)
+                .collect::<Vec<_>>(),
+            vec![1, 3]
+        );
         assert_eq!(reduced.last().unwrap().name, "Custom");
-        assert_eq!(reduced.last().unwrap().settings.spatial_audio_mode, BossSpatialAudioMode::Head);
+        assert_eq!(
+            reduced.last().unwrap().settings.spatial_audio_mode,
+            BossSpatialAudioMode::Head
+        );
     }
 
     #[test]
@@ -517,7 +591,10 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(reduced.auto_aware_enabled.value, Some(true));
-        assert_eq!(reduced.auto_aware_enabled.source, Some(BossSettingSource::Snapshot));
+        assert_eq!(
+            reduced.auto_aware_enabled.source,
+            Some(BossSettingSource::Snapshot)
+        );
         assert_eq!(reduced.wear_detection, initial.wear_detection);
     }
 
@@ -573,9 +650,15 @@ mod tests {
                 is_auto_transparency_enabled: None,
             })
         );
-        assert_eq!(reduced.wear_detection.source, Some(BossSettingSource::Snapshot));
+        assert_eq!(
+            reduced.wear_detection.source,
+            Some(BossSettingSource::Snapshot)
+        );
         assert_eq!(reduced.auto_answer_enabled.value, Some(true));
-        assert_eq!(reduced.auto_answer_enabled.source, Some(BossSettingSource::CompositeSnapshot));
+        assert_eq!(
+            reduced.auto_answer_enabled.source,
+            Some(BossSettingSource::CompositeSnapshot)
+        );
     }
 
     #[test]
@@ -642,8 +725,14 @@ mod tests {
                 BmapOperator::Status,
                 vec![0x00],
             );
-            let session = PacketSession::new(MockLink::new(vec![Ok(Some(get_packet)), Ok(Some(set_packet))]));
-            assert!(session.enabled_setting(BossSettingsCodec::AUTO_AWARE_FUNCTION_RAW, 1_000).await.unwrap());
+            let session = PacketSession::new(MockLink::new(vec![
+                Ok(Some(get_packet)),
+                Ok(Some(set_packet)),
+            ]));
+            assert!(session
+                .enabled_setting(BossSettingsCodec::AUTO_AWARE_FUNCTION_RAW, 1_000)
+                .await
+                .unwrap());
             assert!(!session
                 .set_enabled_setting(BossSettingsCodec::AUTO_AWARE_FUNCTION_RAW, false, 1_000)
                 .await
@@ -676,7 +765,10 @@ mod tests {
                 BmapOperator::Status,
                 vec![0x0F, 0x05],
             );
-            let session = PacketSession::new(MockLink::new(vec![Ok(Some(get_packet)), Ok(Some(set_packet))]));
+            let session = PacketSession::new(MockLink::new(vec![
+                Ok(Some(get_packet)),
+                Ok(Some(set_packet)),
+            ]));
             let read = session.on_head_detection(1_000).await.unwrap();
             assert_eq!(read.is_auto_answer_enabled, Some(true));
 
@@ -723,10 +815,19 @@ mod tests {
                 BmapOperator::Status,
                 vec![BossVolumeControlValue::Button.raw_value(), 0x03],
             );
-            let session = PacketSession::new(MockLink::new(vec![Ok(Some(get_packet)), Ok(Some(set_packet))]));
+            let session = PacketSession::new(MockLink::new(vec![
+                Ok(Some(get_packet)),
+                Ok(Some(set_packet)),
+            ]));
             let read = session.volume_control_status(1_000).await.unwrap();
             assert_eq!(read.value, BossVolumeControlValue::CapTouch);
-            assert_eq!(read.supported_values.unwrap(), vec![BossVolumeControlValue::Button, BossVolumeControlValue::CapTouch]);
+            assert_eq!(
+                read.supported_values.unwrap(),
+                vec![
+                    BossVolumeControlValue::Button,
+                    BossVolumeControlValue::CapTouch
+                ]
+            );
 
             let updated = session
                 .set_volume_control(BossVolumeControlValue::Button, 1_000)
@@ -748,7 +849,9 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
             let response_two = BmapPacket::new(
                 BmapFunctionBlock::Settings,
@@ -759,15 +862,35 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFD, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFD, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
-            let session = PacketSession::new(MockLink::new(vec![Ok(Some(response_one)), Ok(Some(response_two))]));
+            let session = PacketSession::new(MockLink::new(vec![
+                Ok(Some(response_one)),
+                Ok(Some(response_two)),
+            ]));
             let settings = session
-                .set_equalizer(&[(BossEqualizerBand::Bass, 3), (BossEqualizerBand::Mid, -3)], 1_000)
+                .set_equalizer(
+                    &[(BossEqualizerBand::Bass, 3), (BossEqualizerBand::Mid, -3)],
+                    1_000,
+                )
                 .await
                 .unwrap();
-            assert_eq!(settings.range(&BossEqualizerBand::Bass).unwrap().current_level, 3);
-            assert_eq!(settings.range(&BossEqualizerBand::Mid).unwrap().current_level, -3);
+            assert_eq!(
+                settings
+                    .range(&BossEqualizerBand::Bass)
+                    .unwrap()
+                    .current_level,
+                3
+            );
+            assert_eq!(
+                settings
+                    .range(&BossEqualizerBand::Mid)
+                    .unwrap()
+                    .current_level,
+                -3
+            );
         });
     }
 
@@ -785,7 +908,9 @@ mod tests {
                 BmapOperator::Status,
                 vec![0x02],
             );
-            let session = BossSession::new(PacketSession::new(MockLink::new(vec![Ok(Some(current_packet))])));
+            let session = BossSession::new(PacketSession::new(MockLink::new(vec![Ok(Some(
+                current_packet,
+            ))])));
 
             let result = session.set_current_audio_mode(2, false).await.unwrap();
             assert_eq!(result, BossCurrentAudioModeWriteResult::Unchanged(2));
@@ -877,7 +1002,9 @@ mod tests {
                 BmapOperator::Status,
                 vec![0x05, 0x01, 0x02, 0x01, 0x00],
             );
-            let session = BossSession::new(PacketSession::new(MockLink::new(vec![Ok(Some(current_packet))])));
+            let session = BossSession::new(PacketSession::new(MockLink::new(vec![Ok(Some(
+                current_packet,
+            ))])));
 
             let result = session
                 .set_audio_mode_settings(BossAudioModeSettingsConfigPatch {
@@ -967,9 +1094,13 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFD, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFD, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
-            let session = BossSession::new(PacketSession::new(MockLink::new(vec![Ok(Some(current_packet))])));
+            let session = BossSession::new(PacketSession::new(MockLink::new(vec![Ok(Some(
+                current_packet,
+            ))])));
 
             let result = session
                 .set_equalizer_verified(BossEqualizerSettingsPatch {
@@ -982,9 +1113,27 @@ mod tests {
 
             match result {
                 BossEqualizerWriteResult::Unchanged(settings) => {
-                    assert_eq!(settings.range(&BossEqualizerBand::Bass).unwrap().current_level, 3);
-                    assert_eq!(settings.range(&BossEqualizerBand::Mid).unwrap().current_level, -3);
-                    assert_eq!(settings.range(&BossEqualizerBand::Treble).unwrap().current_level, 0);
+                    assert_eq!(
+                        settings
+                            .range(&BossEqualizerBand::Bass)
+                            .unwrap()
+                            .current_level,
+                        3
+                    );
+                    assert_eq!(
+                        settings
+                            .range(&BossEqualizerBand::Mid)
+                            .unwrap()
+                            .current_level,
+                        -3
+                    );
+                    assert_eq!(
+                        settings
+                            .range(&BossEqualizerBand::Treble)
+                            .unwrap()
+                            .current_level,
+                        0
+                    );
                 }
                 other => panic!("unexpected result: {other:?}"),
             }
@@ -1003,7 +1152,9 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x00, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x00, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
             let updated_packet = BmapPacket::new(
                 BmapFunctionBlock::Settings,
@@ -1014,7 +1165,9 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFD, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFD, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
             let session = BossSession::new(PacketSession::new(MockLink::new(vec![
                 Ok(Some(current_packet)),
@@ -1033,8 +1186,20 @@ mod tests {
 
             match result {
                 BossEqualizerWriteResult::Updated(settings) => {
-                    assert_eq!(settings.range(&BossEqualizerBand::Bass).unwrap().current_level, 3);
-                    assert_eq!(settings.range(&BossEqualizerBand::Mid).unwrap().current_level, -3);
+                    assert_eq!(
+                        settings
+                            .range(&BossEqualizerBand::Bass)
+                            .unwrap()
+                            .current_level,
+                        3
+                    );
+                    assert_eq!(
+                        settings
+                            .range(&BossEqualizerBand::Mid)
+                            .unwrap()
+                            .current_level,
+                        -3
+                    );
                 }
                 other => panic!("unexpected result: {other:?}"),
             }
@@ -1042,7 +1207,8 @@ mod tests {
     }
 
     #[test]
-    fn boss_session_set_current_audio_mode_returns_verification_inconclusive_when_target_is_not_observed() {
+    fn boss_session_set_current_audio_mode_returns_verification_inconclusive_when_target_is_not_observed(
+    ) {
         block_on(async {
             let initial_current = BmapPacket::new(
                 BmapFunctionBlock::AudioModes,
@@ -1148,7 +1314,8 @@ mod tests {
     }
 
     #[test]
-    fn boss_session_set_audio_mode_settings_returns_verification_inconclusive_when_reread_does_not_match() {
+    fn boss_session_set_audio_mode_settings_returns_verification_inconclusive_when_reread_does_not_match(
+    ) {
         block_on(async {
             let current_packet = BmapPacket::new(
                 BmapFunctionBlock::AudioModes,
@@ -1201,13 +1368,15 @@ mod tests {
 
             assert_eq!(
                 result,
-                BossAudioModeSettingsWriteResult::VerificationInconclusive(BossAudioModeSettingsConfig {
-                    cnc_level: 7,
-                    auto_cnc_enabled: true,
-                    spatial_audio_mode: BossSpatialAudioMode::Head,
-                    wind_block_enabled: true,
-                    anc_toggle_enabled: false,
-                })
+                BossAudioModeSettingsWriteResult::VerificationInconclusive(
+                    BossAudioModeSettingsConfig {
+                        cnc_level: 7,
+                        auto_cnc_enabled: true,
+                        spatial_audio_mode: BossSpatialAudioMode::Head,
+                        wind_block_enabled: true,
+                        anc_toggle_enabled: false,
+                    }
+                )
             );
         });
     }
@@ -1224,7 +1393,9 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x00, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x00, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
             let busy_packet = BmapPacket::new(
                 BmapFunctionBlock::Settings,
@@ -1246,7 +1417,9 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFD, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFD, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
             let session = BossSession::new(PacketSession::new(MockLink::new(vec![
                 Ok(Some(current_packet)),
@@ -1265,8 +1438,20 @@ mod tests {
 
             match result {
                 BossEqualizerWriteResult::Updated(settings) => {
-                    assert_eq!(settings.range(&BossEqualizerBand::Bass).unwrap().current_level, 3);
-                    assert_eq!(settings.range(&BossEqualizerBand::Mid).unwrap().current_level, -3);
+                    assert_eq!(
+                        settings
+                            .range(&BossEqualizerBand::Bass)
+                            .unwrap()
+                            .current_level,
+                        3
+                    );
+                    assert_eq!(
+                        settings
+                            .range(&BossEqualizerBand::Mid)
+                            .unwrap()
+                            .current_level,
+                        -3
+                    );
                 }
                 other => panic!("unexpected result: {other:?}"),
             }
@@ -1285,7 +1470,9 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x00, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x00, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
             let mismatched_updated_packet = BmapPacket::new(
                 BmapFunctionBlock::Settings,
@@ -1296,7 +1483,9 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
             let verified_stale_packet = BmapPacket::new(
                 BmapFunctionBlock::Settings,
@@ -1307,7 +1496,9 @@ mod tests {
                 0,
                 0,
                 BmapOperator::Status,
-                vec![0xF6, 0x0A, 0x00, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02],
+                vec![
+                    0xF6, 0x0A, 0x00, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
             );
             let session = BossSession::new(PacketSession::new(MockLink::new(vec![
                 Ok(Some(current_packet)),
@@ -1327,8 +1518,20 @@ mod tests {
 
             match result {
                 BossEqualizerWriteResult::VerificationInconclusive(settings) => {
-                    assert_eq!(settings.range(&BossEqualizerBand::Bass).unwrap().current_level, 3);
-                    assert_eq!(settings.range(&BossEqualizerBand::Mid).unwrap().current_level, -3);
+                    assert_eq!(
+                        settings
+                            .range(&BossEqualizerBand::Bass)
+                            .unwrap()
+                            .current_level,
+                        3
+                    );
+                    assert_eq!(
+                        settings
+                            .range(&BossEqualizerBand::Mid)
+                            .unwrap()
+                            .current_level,
+                        -3
+                    );
                 }
                 other => panic!("unexpected result: {other:?}"),
             }

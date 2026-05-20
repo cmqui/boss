@@ -129,7 +129,10 @@ pub enum BmapFunction {
     ProductInfoProductIdVariants,
     ProductInfoGetAllFunctions,
     ProductInfoFirmwareVersion,
-    Unknown { block: BmapFunctionBlock, raw_value: u8 },
+    Unknown {
+        block: BmapFunctionBlock,
+        raw_value: u8,
+    },
 }
 
 impl BmapFunction {
@@ -141,7 +144,10 @@ impl BmapFunction {
             (BmapFunctionBlock::ProductInfo, 3) => Self::ProductInfoProductIdVariants,
             (BmapFunctionBlock::ProductInfo, 4) => Self::ProductInfoGetAllFunctions,
             (BmapFunctionBlock::ProductInfo, 5) => Self::ProductInfoFirmwareVersion,
-            _ => Self::Unknown { block, raw_value: raw },
+            _ => Self::Unknown {
+                block,
+                raw_value: raw,
+            },
         }
     }
 
@@ -177,7 +183,9 @@ impl BmapFunction {
             Self::ProductInfoProductIdVariants => "ProductInfoProductIdVariants".into(),
             Self::ProductInfoGetAllFunctions => "ProductInfoGetAllFunctions".into(),
             Self::ProductInfoFirmwareVersion => "ProductInfoFirmwareVersion".into(),
-            Self::Unknown { block, raw_value } => format!("Unknown({}:{raw_value})", block.raw_value()),
+            Self::Unknown { block, raw_value } => {
+                format!("Unknown({}:{raw_value})", block.raw_value())
+            }
         }
     }
 }
@@ -234,7 +242,9 @@ impl BmapOperator {
     pub fn operator_type(self) -> BmapOperatorType {
         match self {
             Self::Set | Self::Get | Self::SetGet | Self::Start => BmapOperatorType::Command,
-            Self::Status | Self::Error | Self::Result | Self::Processing => BmapOperatorType::Response,
+            Self::Status | Self::Error | Self::Result | Self::Processing => {
+                BmapOperatorType::Response
+            }
             Self::Unknown(_) => BmapOperatorType::Unknown,
         }
     }
@@ -261,7 +271,14 @@ impl BmapPacket {
         operator: BmapOperator,
         payload: Bytes,
     ) -> Self {
-        Self { function_block, function, device_id, port, operator, payload }
+        Self {
+            function_block,
+            function,
+            device_id,
+            port,
+            operator,
+            payload,
+        }
     }
 }
 
@@ -298,10 +315,15 @@ impl BmapCodec {
         let payload_length = bytes[3] as usize;
         let expected_length = BmapPacket::HEADER_SIZE + payload_length;
         if bytes.len() < expected_length {
-            return Err(PacketDecodeError::PayloadLengthMismatch { expected: expected_length, actual: bytes.len() });
+            return Err(PacketDecodeError::PayloadLengthMismatch {
+                expected: expected_length,
+                actual: bytes.len(),
+            });
         }
         if bytes.len() > expected_length {
-            return Err(PacketDecodeError::TrailingBytes(bytes.len() - expected_length));
+            return Err(PacketDecodeError::TrailingBytes(
+                bytes.len() - expected_length,
+            ));
         }
         let block = BmapFunctionBlock::from_raw(bytes[0]);
         let function = BmapFunction::from_raw(block, bytes[1]);
@@ -310,7 +332,9 @@ impl BmapCodec {
         let port = ((packed >> 4) & 0x03) as i32;
         let operator = BmapOperator::from_raw(packed & 0x0F);
         let payload = bytes[BmapPacket::HEADER_SIZE..expected_length].to_vec();
-        Ok(BmapPacket::new(block, function, device_id, port, operator, payload))
+        Ok(BmapPacket::new(
+            block, function, device_id, port, operator, payload,
+        ))
     }
 }
 

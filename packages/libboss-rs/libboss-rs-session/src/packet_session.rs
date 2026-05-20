@@ -1,14 +1,18 @@
 use std::collections::BTreeMap;
 
 use libboss_rs_core::{
-    BmapFunction, BmapFunctionBlock, BmapOperator, BmapOperatorType, BmapPacket, BossAudioModeConfig,
-    BossAudioModePrompt, BossAudioModeSettingsConfig, BossAudioModesCapabilities, BossAudioModesCodec, BossEqualizerBand,
-    BossEqualizerSettings, BossOnHeadDetectionValue, BossSettingsCodec, BossSettingsSnapshot,
+    BmapFunction, BmapFunctionBlock, BmapOperator, BmapOperatorType, BmapPacket,
+    BossAudioModeConfig, BossAudioModePrompt, BossAudioModeSettingsConfig,
+    BossAudioModesCapabilities, BossAudioModesCodec, BossEqualizerBand, BossEqualizerSettings,
+    BossOnHeadDetectionValue, BossSettingsCodec, BossSettingsSnapshot, BossStandbyTimerValue,
     BossVolumeControlStatus, BossVolumeControlValue, FirmwareVersionInfo, ProductInfoCommands,
     ProductInfoParser, UnexpectedOperatorError,
 };
 
-use crate::{duration_seconds, hex_string, link_error_to_session_error, BmapResponseError, BossLink, BossSessionError};
+use crate::{
+    duration_seconds, hex_string, link_error_to_session_error, BmapResponseError, BossLink,
+    BossSessionError,
+};
 
 pub struct PacketSession<L: BossLink> {
     link: L,
@@ -116,15 +120,20 @@ impl<L: BossLink> PacketSession<L> {
             )
             .await?;
         if response.operator != BmapOperator::Status {
-            return Err(BossSessionError::UnexpectedOperator(UnexpectedOperatorError {
-                expected: BmapOperator::Status,
-                actual: response.operator,
-            }));
+            return Err(BossSessionError::UnexpectedOperator(
+                UnexpectedOperatorError {
+                    expected: BmapOperator::Status,
+                    actual: response.operator,
+                },
+            ));
         }
         Ok(response)
     }
 
-    pub async fn settings_snapshot(&self, timeout_millis: u64) -> Result<BossSettingsSnapshot, BossSessionError> {
+    pub async fn settings_snapshot(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossSettingsSnapshot, BossSessionError> {
         self.send_packet(&BossSettingsCodec::settings_packet(
             BossSettingsCodec::SETTINGS_GET_ALL_FUNCTION_RAW,
             BmapOperator::Start,
@@ -136,16 +145,23 @@ impl<L: BossLink> PacketSession<L> {
         let mut snapshot = BTreeMap::new();
         loop {
             let packet = self
-                .first_packet_matching(|packet| packet.function_block == BmapFunctionBlock::Settings, timeout_millis)
+                .first_packet_matching(
+                    |packet| packet.function_block == BmapFunctionBlock::Settings,
+                    timeout_millis,
+                )
                 .await?;
             let raw_function = packet.function.raw_value();
-            if raw_function == BossSettingsCodec::SETTINGS_GET_ALL_FUNCTION_RAW && packet.operator == BmapOperator::Error {
+            if raw_function == BossSettingsCodec::SETTINGS_GET_ALL_FUNCTION_RAW
+                && packet.operator == BmapOperator::Error
+            {
                 return Err(BossSessionError::BmapErrorResponse(BmapResponseError {
                     context: "settings.SettingsGetAll".into(),
                     payload_hex: hex_string(&packet.payload),
                 }));
             }
-            if raw_function == BossSettingsCodec::SETTINGS_GET_ALL_FUNCTION_RAW && packet.operator == BmapOperator::Result {
+            if raw_function == BossSettingsCodec::SETTINGS_GET_ALL_FUNCTION_RAW
+                && packet.operator == BmapOperator::Result
+            {
                 return Ok(BossSettingsSnapshot::new(snapshot));
             }
             if packet.operator == BmapOperator::Status {
@@ -161,16 +177,53 @@ impl<L: BossLink> PacketSession<L> {
         timeout_millis: u64,
     ) -> Result<FirmwareVersionInfo, BossSessionError> {
         let response = self
-            .response_packet(&ProductInfoCommands::firmware_version(port, device_id), timeout_millis)
+            .response_packet(
+                &ProductInfoCommands::firmware_version(port, device_id),
+                timeout_millis,
+            )
             .await?;
         Ok(ProductInfoParser::parse_firmware_version(&response)?)
     }
 
     pub async fn current_audio_mode(&self, timeout_millis: u64) -> Result<i32, BossSessionError> {
         let response = self
-            .response_packet(&BossAudioModesCodec::current_mode_get_packet(), timeout_millis)
+            .response_packet(
+                &BossAudioModesCodec::current_mode_get_packet(),
+                timeout_millis,
+            )
             .await?;
         Ok(BossAudioModesCodec::parse_current_mode(&response)?)
+    }
+
+    pub async fn standby_timer(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossStandbyTimerValue, BossSessionError> {
+        let response = self
+            .response_packet(
+                &BossSettingsCodec::settings_packet(
+                    BossSettingsCodec::STANDBY_TIMER_FUNCTION_RAW,
+                    BmapOperator::Get,
+                    vec![],
+                ),
+                timeout_millis,
+            )
+            .await?;
+        Ok(BossSettingsCodec::parse_standby_timer(&response)?)
+    }
+
+    pub async fn set_standby_timer(
+        &self,
+        minutes: i32,
+        timeout_millis: u64,
+    ) -> Result<BossStandbyTimerValue, BossSessionError> {
+        let response = self
+            .response_packet(
+                &BossSettingsCodec::standby_timer_set_get_packet(minutes)?,
+                timeout_millis,
+            )
+            .await?;
+        Ok(BossSettingsCodec::parse_standby_timer(&response)?)
     }
 
     pub async fn supported_audio_mode_prompts(
@@ -178,7 +231,10 @@ impl<L: BossLink> PacketSession<L> {
         timeout_millis: u64,
     ) -> Result<Vec<BossAudioModePrompt>, BossSessionError> {
         let response = self
-            .response_packet(&BossAudioModesCodec::names_supported_get_packet(), timeout_millis)
+            .response_packet(
+                &BossAudioModesCodec::names_supported_get_packet(),
+                timeout_millis,
+            )
             .await?;
         Ok(BossAudioModesCodec::parse_supported_prompts(&response)?)
     }
@@ -188,12 +244,18 @@ impl<L: BossLink> PacketSession<L> {
         timeout_millis: u64,
     ) -> Result<BossAudioModesCapabilities, BossSessionError> {
         let response = self
-            .response_packet(&BossAudioModesCodec::capabilities_get_packet(), timeout_millis)
+            .response_packet(
+                &BossAudioModesCodec::capabilities_get_packet(),
+                timeout_millis,
+            )
             .await?;
         Ok(BossAudioModesCodec::parse_capabilities(&response)?)
     }
 
-    pub async fn audio_mode_configs(&self, timeout_millis: u64) -> Result<Vec<BossAudioModeConfig>, BossSessionError> {
+    pub async fn audio_mode_configs(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<Vec<BossAudioModeConfig>, BossSessionError> {
         self.send_packet(&BossAudioModesCodec::mode_config_start_packet())
             .await
             .map_err(link_error_to_session_error)?;
@@ -204,7 +266,8 @@ impl<L: BossLink> PacketSession<L> {
                 .first_packet_matching(
                     |packet| {
                         packet.function_block == BmapFunctionBlock::AudioModes
-                            && packet.function.raw_value() == BossAudioModesCodec::MODE_CONFIG_FUNCTION_RAW
+                            && packet.function.raw_value()
+                                == BossAudioModesCodec::MODE_CONFIG_FUNCTION_RAW
                     },
                     timeout_millis,
                 )
@@ -230,7 +293,10 @@ impl<L: BossLink> PacketSession<L> {
         timeout_millis: u64,
     ) -> Result<BossAudioModeSettingsConfig, BossSessionError> {
         let response = self
-            .response_packet(&BossAudioModesCodec::settings_config_get_packet(), timeout_millis)
+            .response_packet(
+                &BossAudioModesCodec::settings_config_get_packet(),
+                timeout_millis,
+            )
             .await?;
         Ok(BossAudioModesCodec::parse_settings_config(&response)?)
     }
@@ -245,7 +311,24 @@ impl<L: BossLink> PacketSession<L> {
         Ok(BossAudioModesCodec::parse_settings_config(&response)?)
     }
 
-    pub async fn favorite_audio_mode_indices(&self, timeout_millis: u64) -> Result<Vec<i32>, BossSessionError> {
+    pub async fn set_audio_mode_config(
+        &self,
+        mode_index: i32,
+        prompt: BossAudioModePrompt,
+        name: &str,
+        settings: &BossAudioModeSettingsConfig,
+        timeout_millis: u64,
+    ) -> Result<BossAudioModeConfig, BossSessionError> {
+        let packet =
+            BossAudioModesCodec::mode_config_set_get_packet(mode_index, prompt, name, settings)?;
+        let response = self.response_packet(&packet, timeout_millis).await?;
+        Ok(BossAudioModesCodec::parse_mode_config_detail(&response)?)
+    }
+
+    pub async fn favorite_audio_mode_indices(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<Vec<i32>, BossSessionError> {
         let response = self
             .response_packet(&BossAudioModesCodec::favorites_get_packet(), timeout_millis)
             .await?;
@@ -267,10 +350,17 @@ impl<L: BossLink> PacketSession<L> {
         Ok(BossAudioModesCodec::parse_favorites(&response)?)
     }
 
-    pub async fn equalizer_settings(&self, timeout_millis: u64) -> Result<BossEqualizerSettings, BossSessionError> {
+    pub async fn equalizer_settings(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossEqualizerSettings, BossSessionError> {
         let response = self
             .response_packet(
-                &BossSettingsCodec::settings_packet(BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW, BmapOperator::Get, vec![]),
+                &BossSettingsCodec::settings_packet(
+                    BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW,
+                    BmapOperator::Get,
+                    vec![],
+                ),
                 timeout_millis,
             )
             .await?;
@@ -289,25 +379,41 @@ impl<L: BossLink> PacketSession<L> {
             last_settings = Some(BossSettingsCodec::parse_equalizer(&response)?);
         }
         last_settings.ok_or_else(|| {
-            BossSessionError::SettingsCodec(libboss_rs_core::BossSettingsCodecError::InvalidPayload(
-                "At least one equalizer band update is required".into(),
-            ))
+            BossSessionError::SettingsCodec(
+                libboss_rs_core::BossSettingsCodecError::InvalidPayload(
+                    "At least one equalizer band update is required".into(),
+                ),
+            )
         })
     }
 
-    pub async fn on_head_detection(&self, timeout_millis: u64) -> Result<BossOnHeadDetectionValue, BossSessionError> {
+    pub async fn on_head_detection(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossOnHeadDetectionValue, BossSessionError> {
         let response = self
             .response_packet(
-                &BossSettingsCodec::settings_packet(BossSettingsCodec::ON_HEAD_DETECTION_FUNCTION_RAW, BmapOperator::Get, vec![]),
+                &BossSettingsCodec::settings_packet(
+                    BossSettingsCodec::ON_HEAD_DETECTION_FUNCTION_RAW,
+                    BmapOperator::Get,
+                    vec![],
+                ),
                 timeout_millis,
             )
             .await?;
         Ok(BossSettingsCodec::parse_on_head_detection(&response)?)
     }
 
-    pub async fn enabled_setting(&self, function_raw: u8, timeout_millis: u64) -> Result<bool, BossSessionError> {
+    pub async fn enabled_setting(
+        &self,
+        function_raw: u8,
+        timeout_millis: u64,
+    ) -> Result<bool, BossSessionError> {
         let response = self
-            .response_packet(&BossSettingsCodec::settings_packet(function_raw, BmapOperator::Get, vec![]), timeout_millis)
+            .response_packet(
+                &BossSettingsCodec::settings_packet(function_raw, BmapOperator::Get, vec![]),
+                timeout_millis,
+            )
             .await?;
         Ok(BossSettingsCodec::parse_enabled_flag(&response)?)
     }
@@ -320,7 +426,11 @@ impl<L: BossLink> PacketSession<L> {
     ) -> Result<bool, BossSessionError> {
         let response = self
             .response_packet(
-                &BossSettingsCodec::settings_packet(function_raw, BmapOperator::SetGet, vec![if enabled { 0x01 } else { 0x00 }]),
+                &BossSettingsCodec::settings_packet(
+                    function_raw,
+                    BmapOperator::SetGet,
+                    vec![if enabled { 0x01 } else { 0x00 }],
+                ),
                 timeout_millis,
             )
             .await?;
@@ -333,15 +443,25 @@ impl<L: BossLink> PacketSession<L> {
         timeout_millis: u64,
     ) -> Result<BossOnHeadDetectionValue, BossSessionError> {
         let response = self
-            .response_packet(&BossSettingsCodec::on_head_detection_set_get_packet(value), timeout_millis)
+            .response_packet(
+                &BossSettingsCodec::on_head_detection_set_get_packet(value),
+                timeout_millis,
+            )
             .await?;
         Ok(BossSettingsCodec::parse_on_head_detection(&response)?)
     }
 
-    pub async fn volume_control_status(&self, timeout_millis: u64) -> Result<BossVolumeControlStatus, BossSessionError> {
+    pub async fn volume_control_status(
+        &self,
+        timeout_millis: u64,
+    ) -> Result<BossVolumeControlStatus, BossSessionError> {
         let response = self
             .response_packet(
-                &BossSettingsCodec::settings_packet(BossSettingsCodec::VOLUME_CONTROL_FUNCTION_RAW, BmapOperator::Get, vec![]),
+                &BossSettingsCodec::settings_packet(
+                    BossSettingsCodec::VOLUME_CONTROL_FUNCTION_RAW,
+                    BmapOperator::Get,
+                    vec![],
+                ),
                 timeout_millis,
             )
             .await?;

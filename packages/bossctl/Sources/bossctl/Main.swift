@@ -23,9 +23,7 @@ struct BossctlCLI {
     private static func run(_ command: Command) async throws {
         switch command {
         case .bootstrap(let options):
-            let device = try await withConnectedLink(options) { link in
-                try await BootstrapSession(link: link).bootstrap()
-            }
+            let device = try await BossAppleSession(connection: options.appleConnectionOptions()).bootstrap()
             printBootstrap(device)
 
         case .bmapSend(let options):
@@ -133,8 +131,8 @@ struct BossctlCLI {
                 return
 
             case .setVolumeControl(let value):
-                let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
-                let status = try await controller.setVolumeControl(value)
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                let status = try await session.setVolumeControl(value)
                 print("Volume control updated: \(status.value.displayName)")
                 if let supportedValues = status.supportedValues, !supportedValues.isEmpty {
                     print("Supported modes: \(supportedValues.map(\.displayName).joined(separator: ", "))")
@@ -150,8 +148,8 @@ struct BossctlCLI {
                 return
 
             case .setEqualizer(let patch):
-                let controller = BossAppleController(connection: command.connection.appleConnectionOptions())
-                let result = try await controller.setEqualizer(patch)
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                let result = try await session.setEqualizer(patch)
                 printEqualizerWriteResult(result)
                 return
 
@@ -160,6 +158,24 @@ struct BossctlCLI {
                 printWearDetectionFallbackPaths(for: patch)
                 let report = try await controller.updateWearDetectionRelatedSettings(patch)
                 printWearDetectionSettingsReport(report)
+                return
+
+            case .setAutoAware(let enabled):
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                let updated = try await session.setAutoAware(enabled)
+                print("Auto-aware updated: \(updated)")
+                return
+
+            case .setAutoPlayPause(let enabled):
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                let updated = try await session.setAutoPlayPause(enabled)
+                print("Auto-play-pause updated: \(updated)")
+                return
+
+            case .setAutoAnswer(let enabled):
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                let updated = try await session.setAutoAnswer(enabled)
+                print("Auto-answer updated: \(updated)")
                 return
 
             case .getOnHeadDetection:
@@ -301,7 +317,8 @@ struct BossctlCLI {
 
             case .setCurrent(let selection, let playVoicePrompt):
                 let targetIndex = try await resolveAudioModeSelection(selection, controller: controller)
-                let result = try await controller.setCurrentAudioMode(index: targetIndex, playVoicePrompt: playVoicePrompt)
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                let result = try await session.setCurrentAudioMode(index: targetIndex, playVoicePrompt: playVoicePrompt)
                 switch result {
                 case .unchanged(let modeIndex):
                     print("Current audio mode unchanged: \(modeIndex)")
@@ -316,7 +333,8 @@ struct BossctlCLI {
                 printAudioModeSettingsConfig(config)
 
             case .setSettingsConfig(let update, let output):
-                let result = try await controller.setAudioModeSettings(update)
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                let result = try await session.setAudioModeSettings(update)
                 printAudioModeSettingsConfigWriteResult(result, output: output)
 
             case .getFavorites:
@@ -326,7 +344,12 @@ struct BossctlCLI {
 
             case .setFavorite(let selection, let isFavorite):
                 let targetIndex = try await resolveAudioModeSelection(selection, controller: controller)
-                let favorites = try await controller.setAudioModeFavorite(index: targetIndex, isFavorite: isFavorite)
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                let favorites = if isFavorite {
+                    try await session.favoriteAudioMode(index: targetIndex)
+                } else {
+                    try await session.unfavoriteAudioMode(index: targetIndex)
+                }
                 let modes = (try? await controller.displayableAudioModes()) ?? []
                 let action = isFavorite ? "favorited" : "unfavorited"
                 print("Audio mode \(targetIndex) \(action)")

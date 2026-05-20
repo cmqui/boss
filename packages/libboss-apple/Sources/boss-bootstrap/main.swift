@@ -33,37 +33,14 @@ struct BossBootstrapCLI {
         filter: AppleBossScanFilter,
         options: Options
     ) async throws -> BootstrappedDevice {
-        let preferences: [AppleBossCharacteristicPreference] = options.characteristicPreference == .automatic
-            ? [.unsecure, .secure]
-            : [options.characteristicPreference]
-        var lastError: Error?
-
-        for preference in preferences {
-            do {
-                let transport = try await AppleBleBossTransport.connect(
-                    filter: filter,
-                    characteristicPreference: preference
-                )
-                defer {
-                    Task {
-                        await transport.close()
-                    }
-                }
-
-                let link = BleBmapLink(transport: transport)
-                let session = BootstrapSession(link: link)
-                return try await session.bootstrap()
-            } catch {
-                lastError = error
-                if case BootstrapTimeoutError.bmapVersion = error, preference == .unsecure {
-                    fputs("boss-bootstrap retrying with secure characteristic\n", stderr)
-                    continue
-                }
-                throw error
-            }
-        }
-
-        throw lastError ?? AppleBleBossTransportError.transportClosed
+        _ = filter
+        let connection = BossAppleConnectionOptions(
+            nameContains: options.nameContains,
+            identifier: options.identifier,
+            scanTimeout: .seconds(options.timeoutSeconds),
+            characteristicPreference: options.characteristicPreference
+        )
+        return try await BossAppleSession(connection: connection).bootstrap()
     }
 
     private static func transportDescription(for filter: AppleBossScanFilter) -> String {

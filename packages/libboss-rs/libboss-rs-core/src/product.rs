@@ -40,7 +40,9 @@ impl FunctionBlockSet {
             .filter(|block| !matches!(block, BmapFunctionBlock::Unknown(_)))
             .collect();
         blocks.sort();
-        if self.contains(BmapFunctionBlock::ProductInfo) && !blocks.contains(&BmapFunctionBlock::ProductInfo) {
+        if self.contains(BmapFunctionBlock::ProductInfo)
+            && !blocks.contains(&BmapFunctionBlock::ProductInfo)
+        {
             blocks.insert(0, BmapFunctionBlock::ProductInfo);
         }
         blocks
@@ -110,50 +112,80 @@ pub struct ProductIdVariant {
 pub struct ProductInfoParser;
 
 impl ProductInfoParser {
-    pub fn parse_bmap_version(packet: &BmapPacket) -> Result<BmapVersionInfo, ProductInfoParseError> {
+    pub fn parse_bmap_version(
+        packet: &BmapPacket,
+    ) -> Result<BmapVersionInfo, ProductInfoParseError> {
         Self::ensure(packet, &BmapFunction::ProductInfoBmapVersion)?;
-        let version = String::from_utf8(packet.payload.clone()).map_err(|_| ProductInfoParseError::InvalidUtf8)?;
+        let version = String::from_utf8(packet.payload.clone())
+            .map_err(|_| ProductInfoParseError::InvalidUtf8)?;
         Ok(BmapVersionInfo { version })
     }
 
-    pub fn parse_product_id_variant(packet: &BmapPacket) -> Result<ProductIdVariant, ProductInfoParseError> {
+    pub fn parse_product_id_variant(
+        packet: &BmapPacket,
+    ) -> Result<ProductIdVariant, ProductInfoParseError> {
         Self::ensure(packet, &BmapFunction::ProductInfoProductIdVariants)?;
         if packet.payload.len() < 3 {
-            return Err(ProductInfoParseError::PacketDecode(PacketDecodeError::PayloadLengthMismatch {
-                expected: 3,
-                actual: packet.payload.len(),
-            }));
+            return Err(ProductInfoParseError::PacketDecode(
+                PacketDecodeError::PayloadLengthMismatch {
+                    expected: 3,
+                    actual: packet.payload.len(),
+                },
+            ));
         }
         let product_id = ((packet.payload[0] as u16) << 8) | (packet.payload[1] as u16);
         let variant = packet.payload[2];
         let product = product_for_id(product_id);
-        let variant_name = product.and_then(|product| product.variants.iter().find(|entry| entry.0 == variant).map(|entry| entry.1));
-        Ok(ProductIdVariant { product_id, variant, product, variant_name })
+        let variant_name = product.and_then(|product| {
+            product
+                .variants
+                .iter()
+                .find(|entry| entry.0 == variant)
+                .map(|entry| entry.1)
+        });
+        Ok(ProductIdVariant {
+            product_id,
+            variant,
+            product,
+            variant_name,
+        })
     }
 
-    pub fn parse_function_blocks(packet: &BmapPacket) -> Result<FunctionBlockSet, ProductInfoParseError> {
+    pub fn parse_function_blocks(
+        packet: &BmapPacket,
+    ) -> Result<FunctionBlockSet, ProductInfoParseError> {
         Self::ensure(packet, &BmapFunction::ProductInfoAllFblocks)?;
         Ok(FunctionBlockSet::from_bytes(&packet.payload))
     }
 
-    pub fn parse_firmware_version(packet: &BmapPacket) -> Result<FirmwareVersionInfo, ProductInfoParseError> {
+    pub fn parse_firmware_version(
+        packet: &BmapPacket,
+    ) -> Result<FirmwareVersionInfo, ProductInfoParseError> {
         Self::ensure(packet, &BmapFunction::ProductInfoFirmwareVersion)?;
-        let version = String::from_utf8(packet.payload.clone()).map_err(|_| ProductInfoParseError::InvalidUtf8)?;
-        Ok(FirmwareVersionInfo { version, port: packet.port })
+        let version = String::from_utf8(packet.payload.clone())
+            .map_err(|_| ProductInfoParseError::InvalidUtf8)?;
+        Ok(FirmwareVersionInfo {
+            version,
+            port: packet.port,
+        })
     }
 
     fn ensure(packet: &BmapPacket, function: &BmapFunction) -> Result<(), ProductInfoParseError> {
         if &packet.function != function {
-            return Err(ProductInfoParseError::UnsupportedFunction(UnsupportedFunctionError {
-                function_block: packet.function_block,
-                function: packet.function.clone(),
-            }));
+            return Err(ProductInfoParseError::UnsupportedFunction(
+                UnsupportedFunctionError {
+                    function_block: packet.function_block,
+                    function: packet.function.clone(),
+                },
+            ));
         }
         if packet.operator != BmapOperator::Status {
-            return Err(ProductInfoParseError::UnexpectedOperator(UnexpectedOperatorError {
-                expected: BmapOperator::Status,
-                actual: packet.operator,
-            }));
+            return Err(ProductInfoParseError::UnexpectedOperator(
+                UnexpectedOperatorError {
+                    expected: BmapOperator::Status,
+                    actual: packet.operator,
+                },
+            ));
         }
         Ok(())
     }

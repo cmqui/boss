@@ -1,7 +1,7 @@
 use libboss_rs_core::{product_for_id, ProductInfoCommands, ProductInfoParser};
 
 use crate::{
-    BootstrapSessionError, BootstrapTimeoutError, BossLink, BossSessionError, BootstrappedDevice,
+    BootstrapSessionError, BootstrapTimeoutError, BootstrappedDevice, BossLink, BossSessionError,
     PacketSession, SessionConfiguration,
 };
 
@@ -34,23 +34,22 @@ impl<L: BossLink> BootstrapSession<L> {
             .await
         {
             Ok(response) => response,
-            Err(BossSessionError::ResponseTimedOut { .. }) => {
-                self.packet_session
-                    .response_packet_for_function(
-                        &version_request,
-                        &version_request.function,
-                        self.configuration.retry_version_timeout_millis,
+            Err(BossSessionError::ResponseTimedOut { .. }) => self
+                .packet_session
+                .response_packet_for_function(
+                    &version_request,
+                    &version_request.function,
+                    self.configuration.retry_version_timeout_millis,
+                )
+                .await
+                .map_err(|error| {
+                    BootstrapSessionError::from_session_error_with_timeout(
+                        error,
+                        BootstrapTimeoutError::BmapVersion {
+                            timeout_milliseconds: self.configuration.retry_version_timeout_millis,
+                        },
                     )
-                    .await
-                    .map_err(|error| {
-                        BootstrapSessionError::from_session_error_with_timeout(
-                            error,
-                            BootstrapTimeoutError::BmapVersion {
-                                timeout_milliseconds: self.configuration.retry_version_timeout_millis,
-                            },
-                        )
-                    })?
-            }
+                })?,
             Err(error) => {
                 return Err(BootstrapSessionError::from_session_error_with_timeout(
                     error,

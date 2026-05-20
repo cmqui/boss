@@ -1,236 +1,28 @@
-use std::ffi::c_void;
-use std::ptr;
-use std::sync::Arc;
-
-use async_trait::async_trait;
 use futures::executor::block_on;
 use libboss_rs_core::{
-    BmapCodec, BmapPacket, BossAudioModeSettingsConfig, BossAudioModeSettingsConfigPatch,
-    BossEqualizerBand, BossEqualizerSettings, BossEqualizerSettingsPatch, BossTransportKind,
+    BmapCodec, BmapFunctionBlock, BmapPacket, BossAudioModeSettingsConfig, BossAudioModesCodec,
+    BossSettingsCodec, BossVolumeControlValue,
 };
 use libboss_rs_session::{
-    BossAudioModeSettingsWriteResult, BossCurrentAudioModeWriteResult, BossEqualizerWriteResult, BossLink,
-    BossLinkError, BossSession, BossSessionError, PacketSession,
+    BootstrapSession, BossAudioModeSettingsWriteResult, BossCurrentAudioModeWriteResult,
+    BossEqualizerWriteResult, BossLink, BossSession, BossSessionError, PacketSession,
+    SessionConfiguration,
 };
+use std::ffi::c_void;
+use std::ptr;
 
-#[repr(C)]
-pub struct BossBuffer {
-    pub data: *mut u8,
-    pub len: usize,
-}
+mod conversions;
+mod ffi_types;
+mod host_link;
+#[cfg(test)]
+mod tests;
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BossFfiLinkStatus {
-    Ok = 0,
-    TimedOut = 1,
-    StreamEnded = 2,
-    UnexpectedStreamTermination = 3,
-    Other = 4,
-}
+use conversions::*;
+use host_link::*;
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BossFfiErrorCode {
-    None = 0,
-    InvalidArgument = 1,
-    ResponseStreamEnded = 2,
-    ResponseTimedOut = 3,
-    BmapErrorResponse = 4,
-    UnexpectedOperator = 5,
-    ModeChangeNotObserved = 6,
-    EqualizerNotObserved = 7,
-    SettingsConfigNotObserved = 8,
-    ProductInfo = 9,
-    SettingsCodec = 10,
-    AudioModesCodec = 11,
-    UnsupportedOperation = 12,
-}
+pub use ffi_types::*;
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BossFfiWriteDisposition {
-    Unchanged = 0,
-    Updated = 1,
-    VerificationInconclusive = 2,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct BossFfiSessionCallbacks {
-    pub context: *mut c_void,
-    pub transport_kind: u8,
-    pub send_packet_bytes:
-        Option<extern "C" fn(context: *mut c_void, packet_data: *const u8, packet_len: usize) -> BossFfiLinkStatus>,
-    pub next_packet_bytes:
-        Option<extern "C" fn(context: *mut c_void, timeout_millis: u64, out_packet: *mut BossBuffer) -> BossFfiLinkStatus>,
-    pub release_context: Option<extern "C" fn(context: *mut c_void)>,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BossFfiAudioModeSettingsConfig {
-    pub cnc_level: i32,
-    pub auto_cnc_enabled: bool,
-    pub spatial_audio_mode: u8,
-    pub wind_block_enabled: bool,
-    pub anc_toggle_enabled: bool,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BossFfiAudioModeSettingsConfigPatch {
-    pub has_cnc_level: bool,
-    pub cnc_level: i32,
-    pub has_auto_cnc_enabled: bool,
-    pub auto_cnc_enabled: bool,
-    pub has_spatial_audio_mode: bool,
-    pub spatial_audio_mode: u8,
-    pub has_wind_block_enabled: bool,
-    pub wind_block_enabled: bool,
-    pub has_anc_toggle_enabled: bool,
-    pub anc_toggle_enabled: bool,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BossFfiEqualizerPatch {
-    pub has_bass: bool,
-    pub bass: i32,
-    pub has_mid: bool,
-    pub mid: i32,
-    pub has_treble: bool,
-    pub treble: i32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BossFfiEqualizerRange {
-    pub available: bool,
-    pub current_level: i32,
-    pub min_level: i32,
-    pub max_level: i32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BossFfiEqualizerSettings {
-    pub bass: BossFfiEqualizerRange,
-    pub mid: BossFfiEqualizerRange,
-    pub treble: BossFfiEqualizerRange,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BossFfiCurrentAudioModeWriteResult {
-    pub disposition: BossFfiWriteDisposition,
-    pub mode_index: i32,
-    pub target_index: i32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BossFfiAudioModeSettingsWriteResult {
-    pub disposition: BossFfiWriteDisposition,
-    pub config: BossFfiAudioModeSettingsConfig,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BossFfiEqualizerWriteResult {
-    pub disposition: BossFfiWriteDisposition,
-    pub settings: BossFfiEqualizerSettings,
-}
-
-#[repr(C)]
-pub struct BossFfiError {
-    pub code: BossFfiErrorCode,
-    pub message: BossBuffer,
-    pub has_bmap_error_code: bool,
-    pub bmap_error_code: u8,
-}
-
-struct FfiLinkInner {
-    callbacks: BossFfiSessionCallbacks,
-}
-
-impl Drop for FfiLinkInner {
-    fn drop(&mut self) {
-        if let Some(release_context) = self.callbacks.release_context {
-            release_context(self.callbacks.context);
-        }
-    }
-}
-
-// SAFETY: the host is responsible for supplying a thread-safe context when using the shared handle.
-unsafe impl Send for FfiLinkInner {}
-// SAFETY: the host is responsible for supplying a thread-safe context when using the shared handle.
-unsafe impl Sync for FfiLinkInner {}
-
-#[derive(Clone)]
-struct FfiLink {
-    inner: Arc<FfiLinkInner>,
-}
-
-#[async_trait]
-impl BossLink for FfiLink {
-    fn transport_kind(&self) -> BossTransportKind {
-        match self.inner.callbacks.transport_kind {
-            0 => BossTransportKind::Ble,
-            _ => BossTransportKind::Stream,
-        }
-    }
-
-    async fn send_packet(&self, packet: &BmapPacket) -> Result<(), BossLinkError> {
-        let packet_bytes = BmapCodec::encode(packet).map_err(|error| BossLinkError::Other(format!("{error:?}")))?;
-        let Some(send_packet_bytes) = self.inner.callbacks.send_packet_bytes else {
-            return Err(BossLinkError::Other("missing send_packet_bytes callback".into()));
-        };
-        match send_packet_bytes(
-            self.inner.callbacks.context,
-            packet_bytes.as_ptr(),
-            packet_bytes.len(),
-        ) {
-            BossFfiLinkStatus::Ok => Ok(()),
-            BossFfiLinkStatus::TimedOut => Err(BossLinkError::TimedOut),
-            BossFfiLinkStatus::StreamEnded => Err(BossLinkError::UnexpectedStreamTermination),
-            BossFfiLinkStatus::UnexpectedStreamTermination => Err(BossLinkError::UnexpectedStreamTermination),
-            BossFfiLinkStatus::Other => Err(BossLinkError::Other("host send callback returned other".into())),
-        }
-    }
-
-    async fn next_packet(&self, timeout_millis: u64) -> Result<Option<BmapPacket>, BossLinkError> {
-        let Some(next_packet_bytes) = self.inner.callbacks.next_packet_bytes else {
-            return Err(BossLinkError::Other("missing next_packet_bytes callback".into()));
-        };
-        let mut buffer = BossBuffer {
-            data: ptr::null_mut(),
-            len: 0,
-        };
-        match next_packet_bytes(self.inner.callbacks.context, timeout_millis, &mut buffer) {
-            BossFfiLinkStatus::Ok => {
-                if buffer.data.is_null() || buffer.len == 0 {
-                    return Err(BossLinkError::Other("host next_packet_bytes returned ok with empty packet".into()));
-                }
-                let packet_bytes = unsafe { std::slice::from_raw_parts(buffer.data, buffer.len) }.to_vec();
-                boss_buffer_free(buffer);
-                BmapCodec::decode(&packet_bytes)
-                    .map(Some)
-                    .map_err(|error| BossLinkError::Other(format!("{error:?}")))
-            }
-            BossFfiLinkStatus::TimedOut => Err(BossLinkError::TimedOut),
-            BossFfiLinkStatus::StreamEnded => Ok(None),
-            BossFfiLinkStatus::UnexpectedStreamTermination => Err(BossLinkError::UnexpectedStreamTermination),
-            BossFfiLinkStatus::Other => Err(BossLinkError::Other("host next_packet_bytes callback returned other".into())),
-        }
-    }
-}
-
-pub struct BossFfiSessionHandle {
-    session: BossSession<FfiLink>,
-}
-
-fn buffer_from_vec(mut owned: Vec<u8>) -> BossBuffer {
+pub(crate) fn buffer_from_vec(mut owned: Vec<u8>) -> BossBuffer {
     let buffer = BossBuffer {
         data: owned.as_mut_ptr(),
         len: owned.len(),
@@ -239,11 +31,28 @@ fn buffer_from_vec(mut owned: Vec<u8>) -> BossBuffer {
     buffer
 }
 
-fn buffer_from_string(message: impl Into<String>) -> BossBuffer {
+pub(crate) fn buffer_from_string(message: impl Into<String>) -> BossBuffer {
     buffer_from_vec(message.into().into_bytes())
 }
 
-fn write_error(out_error: *mut BossFfiError, error: BossFfiError) {
+fn buffer_from_i32_slice(values: &[i32]) -> BossBuffer {
+    let mut bytes = Vec::with_capacity(values.len() * std::mem::size_of::<i32>());
+    for value in values {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    buffer_from_vec(bytes)
+}
+
+fn buffer_from_struct_slice<T: Copy>(values: &[T]) -> BossBuffer {
+    let byte_len = std::mem::size_of_val(values);
+    let mut bytes = vec![0u8; byte_len];
+    unsafe {
+        ptr::copy_nonoverlapping(values.as_ptr() as *const u8, bytes.as_mut_ptr(), byte_len);
+    }
+    buffer_from_vec(bytes)
+}
+
+pub(crate) fn write_error(out_error: *mut BossFfiError, error: BossFfiError) {
     if out_error.is_null() {
         return;
     }
@@ -252,105 +61,12 @@ fn write_error(out_error: *mut BossFfiError, error: BossFfiError) {
     }
 }
 
-fn invalid_argument_error(message: impl Into<String>) -> BossFfiError {
+pub(crate) fn invalid_argument_error(message: impl Into<String>) -> BossFfiError {
     BossFfiError {
         code: BossFfiErrorCode::InvalidArgument,
         message: buffer_from_string(message),
         has_bmap_error_code: false,
         bmap_error_code: 0,
-    }
-}
-
-fn session_error_to_ffi(error: BossSessionError) -> BossFfiError {
-    let code = match error {
-        BossSessionError::ResponseStreamEnded => BossFfiErrorCode::ResponseStreamEnded,
-        BossSessionError::ResponseTimedOut { .. } => BossFfiErrorCode::ResponseTimedOut,
-        BossSessionError::BmapErrorResponse(_) => BossFfiErrorCode::BmapErrorResponse,
-        BossSessionError::UnexpectedOperator(_) => BossFfiErrorCode::UnexpectedOperator,
-        BossSessionError::ModeChangeNotObserved { .. } => BossFfiErrorCode::ModeChangeNotObserved,
-        BossSessionError::EqualizerNotObserved { .. } => BossFfiErrorCode::EqualizerNotObserved,
-        BossSessionError::SettingsConfigNotObserved { .. } => BossFfiErrorCode::SettingsConfigNotObserved,
-        BossSessionError::ProductInfo(_) => BossFfiErrorCode::ProductInfo,
-        BossSessionError::SettingsCodec(_) => BossFfiErrorCode::SettingsCodec,
-        BossSessionError::AudioModesCodec(_) => BossFfiErrorCode::AudioModesCodec,
-        BossSessionError::UnsupportedOperation(_) => BossFfiErrorCode::UnsupportedOperation,
-    };
-    let bmap_error_code = error.bmap_error_code().map(|code| code as u8);
-    BossFfiError {
-        code,
-        message: buffer_from_string(format!("{error:?}")),
-        has_bmap_error_code: bmap_error_code.is_some(),
-        bmap_error_code: bmap_error_code.unwrap_or(0),
-    }
-}
-
-fn with_session<T>(
-    handle: *mut BossFfiSessionHandle,
-    out_error: *mut BossFfiError,
-    f: impl FnOnce(&BossFfiSessionHandle) -> Result<T, BossSessionError>,
-) -> Option<T> {
-    let Some(handle) = (unsafe { handle.as_ref() }) else {
-        write_error(out_error, invalid_argument_error("session handle was null"));
-        return None;
-    };
-    match f(handle) {
-        Ok(value) => Some(value),
-        Err(error) => {
-            write_error(out_error, session_error_to_ffi(error));
-            None
-        }
-    }
-}
-
-fn ffi_config_from_core(config: BossAudioModeSettingsConfig) -> BossFfiAudioModeSettingsConfig {
-    BossFfiAudioModeSettingsConfig {
-        cnc_level: config.cnc_level,
-        auto_cnc_enabled: config.auto_cnc_enabled,
-        spatial_audio_mode: config.spatial_audio_mode.raw_value(),
-        wind_block_enabled: config.wind_block_enabled,
-        anc_toggle_enabled: config.anc_toggle_enabled,
-    }
-}
-
-fn core_patch_from_ffi(patch: BossFfiAudioModeSettingsConfigPatch) -> BossAudioModeSettingsConfigPatch {
-    BossAudioModeSettingsConfigPatch {
-        cnc_level: patch.has_cnc_level.then_some(patch.cnc_level),
-        auto_cnc_enabled: patch.has_auto_cnc_enabled.then_some(patch.auto_cnc_enabled),
-        spatial_audio_mode: patch
-            .has_spatial_audio_mode
-            .then(|| libboss_rs_core::BossSpatialAudioMode::from_raw(patch.spatial_audio_mode))
-            .flatten(),
-        wind_block_enabled: patch.has_wind_block_enabled.then_some(patch.wind_block_enabled),
-        anc_toggle_enabled: patch.has_anc_toggle_enabled.then_some(patch.anc_toggle_enabled),
-    }
-}
-
-fn core_equalizer_patch_from_ffi(patch: BossFfiEqualizerPatch) -> BossEqualizerSettingsPatch {
-    BossEqualizerSettingsPatch {
-        bass: patch.has_bass.then_some(patch.bass),
-        mid: patch.has_mid.then_some(patch.mid),
-        treble: patch.has_treble.then_some(patch.treble),
-    }
-}
-
-fn ffi_range(settings: &BossEqualizerSettings, band: BossEqualizerBand) -> BossFfiEqualizerRange {
-    if let Some(range) = settings.range(&band) {
-        BossFfiEqualizerRange {
-            available: true,
-            current_level: range.current_level,
-            min_level: range.min_level,
-            max_level: range.max_level,
-        }
-    } else {
-        BossFfiEqualizerRange::default()
-    }
-}
-
-fn ffi_equalizer_from_core(settings: BossEqualizerSettings) -> BossFfiEqualizerSettings {
-    BossFfiEqualizerSettings {
-        bass: ffi_range(&settings, BossEqualizerBand::Bass),
-        mid: ffi_range(&settings, BossEqualizerBand::Mid),
-        treble: ffi_range(&settings, BossEqualizerBand::Treble),
     }
 }
 
@@ -411,21 +127,40 @@ pub extern "C" fn boss_session_create(
     callbacks: BossFfiSessionCallbacks,
     out_error: *mut BossFfiError,
 ) -> *mut BossFfiSessionHandle {
-    if callbacks.send_packet_bytes.is_none() || callbacks.next_packet_bytes.is_none() {
-        write_error(
-            out_error,
-            invalid_argument_error("session callbacks must include send_packet_bytes and next_packet_bytes"),
-        );
+    let Some(link) = ffi_link_from_callbacks(callbacks, out_error) else {
         return ptr::null_mut();
-    }
-
-    let link = FfiLink {
-        inner: Arc::new(FfiLinkInner { callbacks }),
     };
     let handle = BossFfiSessionHandle {
         session: BossSession::new(PacketSession::new(link)),
     };
     Box::into_raw(Box::new(handle))
+}
+
+#[no_mangle]
+pub extern "C" fn boss_bootstrap_session(
+    callbacks: BossFfiSessionCallbacks,
+    out_device: *mut BossFfiBootstrappedDevice,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_device.is_null() {
+        write_error(out_error, invalid_argument_error("out_device was null"));
+        return false;
+    }
+    let Some(link) = ffi_link_from_callbacks(callbacks, out_error) else {
+        return false;
+    };
+    match block_on(BootstrapSession::new(link, SessionConfiguration::default()).bootstrap()) {
+        Ok(device) => {
+            unsafe {
+                *out_device = ffi_bootstrapped_device_from_core(device);
+            }
+            true
+        }
+        Err(error) => {
+            write_error(out_error, bootstrap_error_to_ffi(error));
+            false
+        }
+    }
 }
 
 #[no_mangle]
@@ -436,6 +171,266 @@ pub extern "C" fn boss_session_free(handle: *mut BossFfiSessionHandle) {
     unsafe {
         drop(Box::from_raw(handle));
     }
+}
+
+#[no_mangle]
+pub extern "C" fn boss_update_stream_create(
+    callbacks: BossFfiSessionCallbacks,
+    kind: BossFfiUpdateStreamKind,
+    out_error: *mut BossFfiError,
+) -> *mut BossFfiUpdateStreamHandle {
+    let Some(link) = ffi_link_from_callbacks(callbacks, out_error) else {
+        return ptr::null_mut();
+    };
+    Box::into_raw(Box::new(BossFfiUpdateStreamHandle {
+        link,
+        kind,
+        device_settings_report: None,
+        audio_mode_catalog: None,
+    }))
+}
+
+#[no_mangle]
+pub extern "C" fn boss_update_stream_free(handle: *mut BossFfiUpdateStreamHandle) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        drop(Box::from_raw(handle));
+    }
+}
+
+async fn next_stream_packet(
+    handle: &BossFfiUpdateStreamHandle,
+    timeout_millis: u64,
+) -> Result<BmapPacket, BossSessionError> {
+    loop {
+        let Some(packet) = handle
+            .link
+            .next_packet(timeout_millis)
+            .await
+            .map_err(ffi_link_error_to_session_error)?
+        else {
+            return Err(BossSessionError::ResponseStreamEnded);
+        };
+        let matches = match handle.kind {
+            BossFfiUpdateStreamKind::CurrentAudioMode => {
+                packet.function_block == BmapFunctionBlock::AudioModes
+                    && packet.function.raw_value() == BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW
+                    && packet.operator == libboss_rs_core::BmapOperator::Status
+            }
+            BossFfiUpdateStreamKind::AudioModeSettings => {
+                packet.function_block == BmapFunctionBlock::AudioModes
+                    && packet.function.raw_value()
+                        == BossAudioModesCodec::SETTINGS_CONFIG_FUNCTION_RAW
+                    && packet.operator == libboss_rs_core::BmapOperator::Status
+            }
+            BossFfiUpdateStreamKind::Equalizer => {
+                packet.function_block == BmapFunctionBlock::Settings
+                    && packet.function.raw_value() == BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW
+                    && packet.operator == libboss_rs_core::BmapOperator::Status
+            }
+            BossFfiUpdateStreamKind::DeviceSettings => {
+                packet.function_block == BmapFunctionBlock::Settings
+                    && packet.operator == libboss_rs_core::BmapOperator::Status
+            }
+            BossFfiUpdateStreamKind::AudioModeCatalog => {
+                packet.function_block == BmapFunctionBlock::AudioModes
+                    && packet.operator == libboss_rs_core::BmapOperator::Status
+            }
+        };
+        if matches {
+            return Ok(packet);
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn boss_update_stream_next_current_audio_mode(
+    handle: *mut BossFfiUpdateStreamHandle,
+    timeout_millis: u64,
+    out_mode_index: *mut i32,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_mode_index.is_null() {
+        write_error(out_error, invalid_argument_error("out_mode_index was null"));
+        return false;
+    }
+    let Some(result) = with_update_stream(handle, out_error, |handle| {
+        if handle.kind != BossFfiUpdateStreamKind::CurrentAudioMode {
+            return Err(BossSessionError::UnsupportedOperation(
+                "update stream kind did not match current audio mode".into(),
+            ));
+        }
+        block_on(async {
+            let packet = next_stream_packet(handle, timeout_millis).await?;
+            BossAudioModesCodec::parse_current_mode(&packet).map_err(Into::into)
+        })
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_mode_index = result;
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_update_stream_next_audio_mode_settings(
+    handle: *mut BossFfiUpdateStreamHandle,
+    timeout_millis: u64,
+    out_config: *mut BossFfiAudioModeSettingsConfig,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_config.is_null() {
+        write_error(out_error, invalid_argument_error("out_config was null"));
+        return false;
+    }
+    let Some(result) = with_update_stream(handle, out_error, |handle| {
+        if handle.kind != BossFfiUpdateStreamKind::AudioModeSettings {
+            return Err(BossSessionError::UnsupportedOperation(
+                "update stream kind did not match audio mode settings".into(),
+            ));
+        }
+        block_on(async {
+            let packet = next_stream_packet(handle, timeout_millis).await?;
+            BossAudioModesCodec::parse_settings_config(&packet).map_err(Into::into)
+        })
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_config = ffi_config_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_update_stream_next_equalizer(
+    handle: *mut BossFfiUpdateStreamHandle,
+    timeout_millis: u64,
+    out_settings: *mut BossFfiEqualizerSettings,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_settings.is_null() {
+        write_error(out_error, invalid_argument_error("out_settings was null"));
+        return false;
+    }
+    let Some(result) = with_update_stream(handle, out_error, |handle| {
+        if handle.kind != BossFfiUpdateStreamKind::Equalizer {
+            return Err(BossSessionError::UnsupportedOperation(
+                "update stream kind did not match equalizer".into(),
+            ));
+        }
+        block_on(async {
+            let packet = next_stream_packet(handle, timeout_millis).await?;
+            BossSettingsCodec::parse_equalizer(&packet).map_err(Into::into)
+        })
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_settings = ffi_equalizer_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_update_stream_next_device_settings(
+    handle: *mut BossFfiUpdateStreamHandle,
+    timeout_millis: u64,
+    out_report: *mut BossFfiDeviceSettingsReport,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_report.is_null() {
+        write_error(out_error, invalid_argument_error("out_report was null"));
+        return false;
+    }
+    let Some(result) = with_update_stream_mut(handle, out_error, |handle| {
+        if handle.kind != BossFfiUpdateStreamKind::DeviceSettings {
+            return Err(BossSessionError::UnsupportedOperation(
+                "update stream kind did not match device settings".into(),
+            ));
+        }
+        let session = BossSession::new(PacketSession::new(handle.link.clone()));
+        block_on(async {
+            if handle.device_settings_report.is_none() {
+                let initial = session.refresh_device_settings_report(5_000).await?;
+                handle.device_settings_report = Some(initial.clone());
+                return Ok(initial);
+            }
+            loop {
+                let packet = next_stream_packet(handle, timeout_millis).await?;
+                if let Some(updated) = BossSession::<FfiLink>::reduce_device_settings_report(
+                    handle
+                        .device_settings_report
+                        .as_ref()
+                        .expect("state initialized"),
+                    &packet,
+                )? {
+                    handle.device_settings_report = Some(updated.clone());
+                    return Ok(updated);
+                }
+            }
+        })
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_report = ffi_device_settings_report_from_core(&result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_update_stream_next_audio_mode_catalog(
+    handle: *mut BossFfiUpdateStreamHandle,
+    timeout_millis: u64,
+    out_catalog: *mut BossBuffer,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_catalog.is_null() {
+        write_error(out_error, invalid_argument_error("out_catalog was null"));
+        return false;
+    }
+    let Some(result) = with_update_stream_mut(handle, out_error, |handle| {
+        if handle.kind != BossFfiUpdateStreamKind::AudioModeCatalog {
+            return Err(BossSessionError::UnsupportedOperation(
+                "update stream kind did not match audio mode catalog".into(),
+            ));
+        }
+        let session = BossSession::new(PacketSession::new(handle.link.clone()));
+        block_on(async {
+            if handle.audio_mode_catalog.is_none() {
+                let initial = session.audio_mode_configs(30_000).await?;
+                handle.audio_mode_catalog = Some(initial.clone());
+                return Ok(initial);
+            }
+            loop {
+                let packet = next_stream_packet(handle, timeout_millis).await?;
+                if let Some(updated) = BossSession::<FfiLink>::reduce_audio_mode_catalog(
+                    handle
+                        .audio_mode_catalog
+                        .as_ref()
+                        .expect("state initialized"),
+                    &packet,
+                )? {
+                    handle.audio_mode_catalog = Some(updated.clone());
+                    return Ok(updated);
+                }
+            }
+        })
+    }) else {
+        return false;
+    };
+    let configs: Vec<BossFfiAudioModeConfig> = result
+        .into_iter()
+        .map(ffi_audio_mode_config_from_core)
+        .collect();
+    unsafe {
+        *out_catalog = buffer_from_struct_slice(&configs);
+    }
+    true
 }
 
 #[no_mangle]
@@ -451,27 +446,37 @@ pub extern "C" fn boss_session_set_current_audio_mode(
         return false;
     }
     let Some(result) = with_session(handle, out_error, |handle| {
-        block_on(handle.session.set_current_audio_mode(target_index, play_voice_prompt))
+        block_on(
+            handle
+                .session
+                .set_current_audio_mode(target_index, play_voice_prompt),
+        )
     }) else {
         return false;
     };
 
     let ffi_result = match result {
-        BossCurrentAudioModeWriteResult::Unchanged(mode_index) => BossFfiCurrentAudioModeWriteResult {
-            disposition: BossFfiWriteDisposition::Unchanged,
-            mode_index,
-            target_index: mode_index,
-        },
-        BossCurrentAudioModeWriteResult::Updated(mode_index) => BossFfiCurrentAudioModeWriteResult {
-            disposition: BossFfiWriteDisposition::Updated,
-            mode_index,
-            target_index: mode_index,
-        },
-        BossCurrentAudioModeWriteResult::VerificationInconclusive { target_index } => BossFfiCurrentAudioModeWriteResult {
-            disposition: BossFfiWriteDisposition::VerificationInconclusive,
-            mode_index: target_index,
-            target_index,
-        },
+        BossCurrentAudioModeWriteResult::Unchanged(mode_index) => {
+            BossFfiCurrentAudioModeWriteResult {
+                disposition: BossFfiWriteDisposition::Unchanged,
+                mode_index,
+                target_index: mode_index,
+            }
+        }
+        BossCurrentAudioModeWriteResult::Updated(mode_index) => {
+            BossFfiCurrentAudioModeWriteResult {
+                disposition: BossFfiWriteDisposition::Updated,
+                mode_index,
+                target_index: mode_index,
+            }
+        }
+        BossCurrentAudioModeWriteResult::VerificationInconclusive { target_index } => {
+            BossFfiCurrentAudioModeWriteResult {
+                disposition: BossFfiWriteDisposition::VerificationInconclusive,
+                mode_index: target_index,
+                target_index,
+            }
+        }
     };
     unsafe {
         *out_result = ffi_result;
@@ -493,29 +498,40 @@ pub extern "C" fn boss_session_set_audio_mode_settings(
     if patch.has_spatial_audio_mode
         && libboss_rs_core::BossSpatialAudioMode::from_raw(patch.spatial_audio_mode).is_none()
     {
-        write_error(out_error, invalid_argument_error("spatial_audio_mode was not recognized"));
+        write_error(
+            out_error,
+            invalid_argument_error("spatial_audio_mode was not recognized"),
+        );
         return false;
     }
 
     let Some(result) = with_session(handle, out_error, |handle| {
-        block_on(handle.session.set_audio_mode_settings(core_patch_from_ffi(patch)))
+        block_on(
+            handle
+                .session
+                .set_audio_mode_settings(core_patch_from_ffi(patch)),
+        )
     }) else {
         return false;
     };
 
     let ffi_result = match result {
-        BossAudioModeSettingsWriteResult::Unchanged(config) => BossFfiAudioModeSettingsWriteResult {
-            disposition: BossFfiWriteDisposition::Unchanged,
-            config: ffi_config_from_core(config),
-        },
+        BossAudioModeSettingsWriteResult::Unchanged(config) => {
+            BossFfiAudioModeSettingsWriteResult {
+                disposition: BossFfiWriteDisposition::Unchanged,
+                config: ffi_config_from_core(config),
+            }
+        }
         BossAudioModeSettingsWriteResult::Updated(config) => BossFfiAudioModeSettingsWriteResult {
             disposition: BossFfiWriteDisposition::Updated,
             config: ffi_config_from_core(config),
         },
-        BossAudioModeSettingsWriteResult::VerificationInconclusive(config) => BossFfiAudioModeSettingsWriteResult {
-            disposition: BossFfiWriteDisposition::VerificationInconclusive,
-            config: ffi_config_from_core(config),
-        },
+        BossAudioModeSettingsWriteResult::VerificationInconclusive(config) => {
+            BossFfiAudioModeSettingsWriteResult {
+                disposition: BossFfiWriteDisposition::VerificationInconclusive,
+                config: ffi_config_from_core(config),
+            }
+        }
     };
     unsafe {
         *out_result = ffi_result;
@@ -536,7 +552,11 @@ pub extern "C" fn boss_session_set_equalizer(
     }
 
     let Some(result) = with_session(handle, out_error, |handle| {
-        block_on(handle.session.set_equalizer_verified(core_equalizer_patch_from_ffi(patch)))
+        block_on(
+            handle
+                .session
+                .set_equalizer_verified(core_equalizer_patch_from_ffi(patch)),
+        )
     }) else {
         return false;
     };
@@ -550,10 +570,12 @@ pub extern "C" fn boss_session_set_equalizer(
             disposition: BossFfiWriteDisposition::Updated,
             settings: ffi_equalizer_from_core(settings),
         },
-        BossEqualizerWriteResult::VerificationInconclusive(settings) => BossFfiEqualizerWriteResult {
-            disposition: BossFfiWriteDisposition::VerificationInconclusive,
-            settings: ffi_equalizer_from_core(settings),
-        },
+        BossEqualizerWriteResult::VerificationInconclusive(settings) => {
+            BossFfiEqualizerWriteResult {
+                disposition: BossFfiWriteDisposition::VerificationInconclusive,
+                settings: ffi_equalizer_from_core(settings),
+            }
+        }
     };
     unsafe {
         *out_result = ffi_result;
@@ -561,107 +583,506 @@ pub extern "C" fn boss_session_set_equalizer(
     true
 }
 
-#[cfg(test)]
-mod tests {
-    use std::collections::VecDeque;
-    use std::sync::Mutex;
-
-    use libboss_rs_core::{BmapFunction, BmapFunctionBlock, BmapOperator};
-
-    use super::*;
-
-    struct HostContext {
-        incoming_packets: Mutex<VecDeque<Vec<u8>>>,
-        sent_packets: Mutex<Vec<Vec<u8>>>,
+#[no_mangle]
+pub extern "C" fn boss_session_set_enabled_setting(
+    handle: *mut BossFfiSessionHandle,
+    function_raw: u8,
+    enabled: bool,
+    out_enabled: *mut bool,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_enabled.is_null() {
+        write_error(out_error, invalid_argument_error("out_enabled was null"));
+        return false;
     }
-
-    extern "C" fn test_send_packet_bytes(
-        context: *mut c_void,
-        packet_data: *const u8,
-        packet_len: usize,
-    ) -> BossFfiLinkStatus {
-        let context = unsafe { &*(context as *mut HostContext) };
-        let packet = unsafe { std::slice::from_raw_parts(packet_data, packet_len) }.to_vec();
-        context.sent_packets.lock().unwrap().push(packet);
-        BossFfiLinkStatus::Ok
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(
+            handle
+                .session
+                .set_enabled_setting(function_raw, enabled, 5_000),
+        )
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_enabled = result;
     }
+    true
+}
 
-    extern "C" fn test_next_packet_bytes(
-        context: *mut c_void,
-        _timeout_millis: u64,
-        out_packet: *mut BossBuffer,
-    ) -> BossFfiLinkStatus {
-        let context = unsafe { &*(context as *mut HostContext) };
-        let Some(packet) = context.incoming_packets.lock().unwrap().pop_front() else {
-            return BossFfiLinkStatus::StreamEnded;
+#[no_mangle]
+pub extern "C" fn boss_session_enabled_setting(
+    handle: *mut BossFfiSessionHandle,
+    function_raw: u8,
+    out_enabled: *mut bool,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_enabled.is_null() {
+        write_error(out_error, invalid_argument_error("out_enabled was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.enabled_setting(function_raw, 5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_enabled = result;
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_current_audio_mode(
+    handle: *mut BossFfiSessionHandle,
+    out_mode_index: *mut i32,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_mode_index.is_null() {
+        write_error(out_error, invalid_argument_error("out_mode_index was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.current_audio_mode(5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_mode_index = result;
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_standby_timer(
+    handle: *mut BossFfiSessionHandle,
+    out_value: *mut BossFfiStandbyTimerValue,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_value.is_null() {
+        write_error(out_error, invalid_argument_error("out_value was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.standby_timer(5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_value = ffi_standby_timer_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_settings_snapshot(
+    handle: *mut BossFfiSessionHandle,
+    out_packets: *mut BossBuffer,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_packets.is_null() {
+        write_error(out_error, invalid_argument_error("out_packets was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.settings_snapshot(5_000))
+    }) else {
+        return false;
+    };
+    let mut bytes = Vec::new();
+    for packet in [
+        result.packet(BossSettingsCodec::STANDBY_TIMER_FUNCTION_RAW),
+        result.packet(BossSettingsCodec::AUTO_AWARE_FUNCTION_RAW),
+        result.packet(BossSettingsCodec::ON_HEAD_DETECTION_FUNCTION_RAW),
+        result.packet(BossSettingsCodec::AUTO_PLAY_PAUSE_FUNCTION_RAW),
+        result.packet(BossSettingsCodec::AUTO_ANSWER_FUNCTION_RAW),
+        result.packet(BossSettingsCodec::VOLUME_CONTROL_FUNCTION_RAW),
+        result.packet(BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let encoded = match BmapCodec::encode(packet) {
+            Ok(encoded) => encoded,
+            Err(error) => {
+                write_error(
+                    out_error,
+                    invalid_argument_error(format!("failed to encode settings snapshot packet: {error:?}")),
+                );
+                return false;
+            }
         };
-        unsafe {
-            *out_packet = buffer_from_vec(packet);
-        }
-        BossFfiLinkStatus::Ok
+        let len = encoded.len() as u32;
+        bytes.extend_from_slice(&len.to_le_bytes());
+        bytes.extend_from_slice(&encoded);
     }
-
-    extern "C" fn test_release_context(context: *mut c_void) {
-        unsafe {
-            drop(Box::from_raw(context as *mut HostContext));
-        }
+    unsafe {
+        *out_packets = buffer_from_vec(bytes);
     }
+    true
+}
 
-    fn packet_bytes(packet: BmapPacket) -> Vec<u8> {
-        BmapCodec::encode(&packet).unwrap()
+#[no_mangle]
+pub extern "C" fn boss_session_supported_audio_mode_prompts(
+    handle: *mut BossFfiSessionHandle,
+    out_prompts: *mut BossBuffer,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_prompts.is_null() {
+        write_error(out_error, invalid_argument_error("out_prompts was null"));
+        return false;
     }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.supported_audio_mode_prompts(5_000))
+    }) else {
+        return false;
+    };
+    let prompts: Vec<BossFfiAudioModePrompt> = result
+        .into_iter()
+        .map(ffi_audio_mode_prompt_from_core)
+        .collect();
+    unsafe {
+        *out_prompts = buffer_from_struct_slice(&prompts);
+    }
+    true
+}
 
-    #[test]
-    fn ffi_session_set_current_audio_mode_returns_updated_result() {
-        let context = Box::new(HostContext {
-            incoming_packets: Mutex::new(VecDeque::from(vec![
-                packet_bytes(BmapPacket::new(
-                    BmapFunctionBlock::AudioModes,
-                    BmapFunction::Unknown {
-                        block: BmapFunctionBlock::AudioModes,
-                        raw_value: libboss_rs_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
-                    },
-                    0,
-                    0,
-                    BmapOperator::Status,
-                    vec![0x01],
-                )),
-                packet_bytes(BmapPacket::new(
-                    BmapFunctionBlock::AudioModes,
-                    BmapFunction::Unknown {
-                        block: BmapFunctionBlock::AudioModes,
-                        raw_value: libboss_rs_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
-                    },
-                    0,
-                    0,
-                    BmapOperator::Result,
-                    vec![0x03],
-                )),
-            ])),
-            sent_packets: Mutex::new(Vec::new()),
-        });
-        let handle = boss_session_create(
-            BossFfiSessionCallbacks {
-                context: Box::into_raw(context) as *mut c_void,
-                transport_kind: 1,
-                send_packet_bytes: Some(test_send_packet_bytes),
-                next_packet_bytes: Some(test_next_packet_bytes),
-                release_context: Some(test_release_context),
-            },
-            ptr::null_mut(),
+#[no_mangle]
+pub extern "C" fn boss_session_audio_mode_configs(
+    handle: *mut BossFfiSessionHandle,
+    out_configs: *mut BossBuffer,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_configs.is_null() {
+        write_error(out_error, invalid_argument_error("out_configs was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.audio_mode_configs(30_000))
+    }) else {
+        return false;
+    };
+    let configs: Vec<BossFfiAudioModeConfig> = result
+        .into_iter()
+        .map(ffi_audio_mode_config_from_core)
+        .collect();
+    unsafe {
+        *out_configs = buffer_from_struct_slice(&configs);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_audio_mode_settings_config(
+    handle: *mut BossFfiSessionHandle,
+    out_config: *mut BossFfiAudioModeSettingsConfig,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_config.is_null() {
+        write_error(out_error, invalid_argument_error("out_config was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.audio_mode_settings_config(5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_config = ffi_config_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_firmware_version(
+    handle: *mut BossFfiSessionHandle,
+    port: i32,
+    device_id: i32,
+    out_info: *mut BossFfiFirmwareVersionInfo,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_info.is_null() {
+        write_error(out_error, invalid_argument_error("out_info was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.firmware_version(port, device_id, 5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_info = ffi_firmware_version_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_equalizer_settings(
+    handle: *mut BossFfiSessionHandle,
+    out_settings: *mut BossFfiEqualizerSettings,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_settings.is_null() {
+        write_error(out_error, invalid_argument_error("out_settings was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.equalizer_settings(5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_settings = ffi_equalizer_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_favorite_audio_mode_indices(
+    handle: *mut BossFfiSessionHandle,
+    out_indices: *mut BossBuffer,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_indices.is_null() {
+        write_error(out_error, invalid_argument_error("out_indices was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.favorite_audio_mode_indices(5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_indices = buffer_from_i32_slice(&result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_on_head_detection(
+    handle: *mut BossFfiSessionHandle,
+    out_value: *mut BossFfiOnHeadDetectionValue,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_value.is_null() {
+        write_error(out_error, invalid_argument_error("out_value was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.on_head_detection(5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_value = ffi_on_head_detection_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_set_on_head_detection(
+    handle: *mut BossFfiSessionHandle,
+    value: BossFfiOnHeadDetectionValue,
+    out_value: *mut BossFfiOnHeadDetectionValue,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_value.is_null() {
+        write_error(out_error, invalid_argument_error("out_value was null"));
+        return false;
+    }
+    let core_value = core_on_head_detection_from_ffi(value);
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.set_on_head_detection(&core_value, 5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_value = ffi_on_head_detection_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_volume_control_status(
+    handle: *mut BossFfiSessionHandle,
+    out_status: *mut BossFfiVolumeControlStatus,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_status.is_null() {
+        write_error(out_error, invalid_argument_error("out_status was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.volume_control_status(5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_status = ffi_volume_control_status_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_set_volume_control(
+    handle: *mut BossFfiSessionHandle,
+    value: u8,
+    out_status: *mut BossFfiVolumeControlStatus,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_status.is_null() {
+        write_error(out_error, invalid_argument_error("out_status was null"));
+        return false;
+    }
+    let Some(value) = BossVolumeControlValue::from_raw(value) else {
+        write_error(
+            out_error,
+            invalid_argument_error("volume control value was not recognized"),
         );
-
-        let mut result = BossFfiCurrentAudioModeWriteResult::default();
-        assert!(boss_session_set_current_audio_mode(
-            handle,
-            3,
-            false,
-            &mut result,
-            ptr::null_mut(),
-        ));
-        assert_eq!(result.disposition, BossFfiWriteDisposition::Updated);
-        assert_eq!(result.mode_index, 3);
-
-        boss_session_free(handle);
+        return false;
+    };
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.set_volume_control(value, 5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_status = ffi_volume_control_status_from_core(result);
     }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_set_standby_timer(
+    handle: *mut BossFfiSessionHandle,
+    minutes: i32,
+    out_value: *mut BossFfiStandbyTimerValue,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_value.is_null() {
+        write_error(out_error, invalid_argument_error("out_value was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.set_standby_timer(minutes, 5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_value = ffi_standby_timer_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_set_audio_mode_favorite(
+    handle: *mut BossFfiSessionHandle,
+    index: i32,
+    is_favorite: bool,
+    out_indices: *mut BossBuffer,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_indices.is_null() {
+        write_error(out_error, invalid_argument_error("out_indices was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(
+            handle
+                .session
+                .set_audio_mode_favorite(index, is_favorite, 5_000),
+        )
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_indices = buffer_from_i32_slice(&result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_save_custom_audio_mode(
+    handle: *mut BossFfiSessionHandle,
+    name_data: *const u8,
+    name_len: usize,
+    settings: BossFfiAudioModeSettingsConfig,
+    prompt_byte1: u8,
+    prompt_byte2: u8,
+    has_requested_slot: bool,
+    requested_slot: i32,
+    out_config: *mut BossFfiAudioModeConfig,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_config.is_null() {
+        write_error(out_error, invalid_argument_error("out_config was null"));
+        return false;
+    }
+    let name = if name_data.is_null() || name_len == 0 {
+        ""
+    } else {
+        let bytes = unsafe { std::slice::from_raw_parts(name_data, name_len) };
+        match std::str::from_utf8(bytes) {
+            Ok(value) => value,
+            Err(_) => {
+                write_error(
+                    out_error,
+                    invalid_argument_error("name was not valid UTF-8"),
+                );
+                return false;
+            }
+        }
+    };
+    let Some(spatial_audio_mode) =
+        libboss_rs_core::BossSpatialAudioMode::from_raw(settings.spatial_audio_mode)
+    else {
+        write_error(
+            out_error,
+            invalid_argument_error("spatial_audio_mode was not recognized"),
+        );
+        return false;
+    };
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.save_custom_audio_mode(
+            name,
+            &BossAudioModeSettingsConfig {
+                cnc_level: settings.cnc_level,
+                auto_cnc_enabled: settings.auto_cnc_enabled,
+                spatial_audio_mode,
+                wind_block_enabled: settings.wind_block_enabled,
+                anc_toggle_enabled: settings.anc_toggle_enabled,
+            },
+            libboss_rs_core::BossAudioModePrompt::known(prompt_byte1, prompt_byte2),
+            has_requested_slot.then_some(requested_slot),
+            5_000,
+        ))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_config = ffi_audio_mode_config_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_delete_custom_audio_mode(
+    handle: *mut BossFfiSessionHandle,
+    slot: i32,
+    out_config: *mut BossFfiAudioModeConfig,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_config.is_null() {
+        write_error(out_error, invalid_argument_error("out_config was null"));
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.delete_custom_audio_mode(slot, 5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_config = ffi_audio_mode_config_from_core(result);
+    }
+    true
 }

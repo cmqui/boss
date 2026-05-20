@@ -39,8 +39,12 @@ impl BossOnHeadDetectionPatch {
         BossOnHeadDetectionValue {
             is_enabled: self.is_enabled.unwrap_or(current.is_enabled),
             is_auto_play_enabled: self.is_auto_play_enabled.or(current.is_auto_play_enabled),
-            is_auto_answer_enabled: self.is_auto_answer_enabled.or(current.is_auto_answer_enabled),
-            is_auto_transparency_enabled: self.is_auto_transparency_enabled.or(current.is_auto_transparency_enabled),
+            is_auto_answer_enabled: self
+                .is_auto_answer_enabled
+                .or(current.is_auto_answer_enabled),
+            is_auto_transparency_enabled: self
+                .is_auto_transparency_enabled
+                .or(current.is_auto_transparency_enabled),
         }
     }
 }
@@ -56,7 +60,10 @@ pub struct BossDeviceSettings {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BossSettingsCodecError {
-    UnexpectedOperator { expected: BmapOperator, actual: BmapOperator },
+    UnexpectedOperator {
+        expected: BmapOperator,
+        actual: BmapOperator,
+    },
     InvalidPayload(String),
 }
 
@@ -74,10 +81,19 @@ impl BossSettingsCodec {
 
     pub fn settings_packet(function_raw: u8, operator: BmapOperator, payload: Bytes) -> BmapPacket {
         let block = BmapFunctionBlock::Settings;
-        BmapPacket::new(block, BmapFunction::from_raw(block, function_raw), 0, 0, operator, payload)
+        BmapPacket::new(
+            block,
+            BmapFunction::from_raw(block, function_raw),
+            0,
+            0,
+            operator,
+            payload,
+        )
     }
 
-    pub fn standby_timer_set_get_packet(minutes: i32) -> Result<BmapPacket, BossSettingsCodecError> {
+    pub fn standby_timer_set_get_packet(
+        minutes: i32,
+    ) -> Result<BmapPacket, BossSettingsCodecError> {
         Self::validate_standby_timer_minutes(minutes)?;
         Ok(Self::settings_packet(
             Self::STANDBY_TIMER_FUNCTION_RAW,
@@ -94,7 +110,10 @@ impl BossSettingsCodec {
         )
     }
 
-    pub fn equalizer_set_get_packet(target_level: i32, band: BossEqualizerBand) -> Result<BmapPacket, BossSettingsCodecError> {
+    pub fn equalizer_set_get_packet(
+        target_level: i32,
+        band: BossEqualizerBand,
+    ) -> Result<BmapPacket, BossSettingsCodecError> {
         if !(-128..=127).contains(&target_level) {
             return Err(BossSettingsCodecError::InvalidPayload(
                 "Equalizer target level must be in range -128...127".into(),
@@ -114,51 +133,91 @@ impl BossSettingsCodec {
         vec![(minutes & 0xFF) as u8, ((minutes >> 8) & 0xFF) as u8]
     }
 
-    pub fn parse_standby_timer(packet: &BmapPacket) -> Result<BossStandbyTimerValue, BossSettingsCodecError> {
+    pub fn parse_standby_timer(
+        packet: &BmapPacket,
+    ) -> Result<BossStandbyTimerValue, BossSettingsCodecError> {
         Self::require_status(packet)?;
         if packet.payload.is_empty() {
-            return Err(BossSettingsCodecError::InvalidPayload("Standby timer payload was empty".into()));
+            return Err(BossSettingsCodecError::InvalidPayload(
+                "Standby timer payload was empty".into(),
+            ));
         }
         if packet.payload.len() < 3 {
-            return Ok(BossStandbyTimerValue { minutes: packet.payload[0] as i32, supports_two_byte_minutes: false });
+            return Ok(BossStandbyTimerValue {
+                minutes: packet.payload[0] as i32,
+                supports_two_byte_minutes: false,
+            });
         }
         let minutes = ((packet.payload[2] as i32) << 8) | packet.payload[0] as i32;
-        Ok(BossStandbyTimerValue { minutes, supports_two_byte_minutes: true })
+        Ok(BossStandbyTimerValue {
+            minutes,
+            supports_two_byte_minutes: true,
+        })
     }
 
     pub fn parse_enabled_flag(packet: &BmapPacket) -> Result<bool, BossSettingsCodecError> {
         Self::require_status(packet)?;
         let Some(first) = packet.payload.first().copied() else {
-            return Err(BossSettingsCodecError::InvalidPayload("Expected at least one payload byte".into()));
+            return Err(BossSettingsCodecError::InvalidPayload(
+                "Expected at least one payload byte".into(),
+            ));
         };
         Ok((first & 0x01) == 0x01)
     }
 
-    pub fn parse_on_head_detection(packet: &BmapPacket) -> Result<BossOnHeadDetectionValue, BossSettingsCodecError> {
+    pub fn parse_on_head_detection(
+        packet: &BmapPacket,
+    ) -> Result<BossOnHeadDetectionValue, BossSettingsCodecError> {
         Self::require_status(packet)?;
         if packet.payload.len() < 2 {
-            return Err(BossSettingsCodecError::InvalidPayload("Expected at least two payload bytes for on-head detection".into()));
+            return Err(BossSettingsCodecError::InvalidPayload(
+                "Expected at least two payload bytes for on-head detection".into(),
+            ));
         }
         let flags = packet.payload[0];
         let values = packet.payload[1];
         Ok(BossOnHeadDetectionValue {
             is_enabled: (flags & 0x01) == 0x01,
-            is_auto_play_enabled: if (flags & 0x02) == 0x02 { Some((values & 0x01) == 0x01) } else { None },
-            is_auto_answer_enabled: if (flags & 0x04) == 0x04 { Some((values & 0x02) == 0x02) } else { None },
-            is_auto_transparency_enabled: if (flags & 0x08) == 0x08 { Some((values & 0x04) == 0x04) } else { None },
+            is_auto_play_enabled: if (flags & 0x02) == 0x02 {
+                Some((values & 0x01) == 0x01)
+            } else {
+                None
+            },
+            is_auto_answer_enabled: if (flags & 0x04) == 0x04 {
+                Some((values & 0x02) == 0x02)
+            } else {
+                None
+            },
+            is_auto_transparency_enabled: if (flags & 0x08) == 0x08 {
+                Some((values & 0x04) == 0x04)
+            } else {
+                None
+            },
         })
     }
 
     pub fn encode_on_head_detection(value: &BossOnHeadDetectionValue) -> Bytes {
         vec![
             if value.is_enabled { 0x01 } else { 0x00 },
-            (if value.is_auto_play_enabled == Some(true) { 0x01 } else { 0x00 })
-                | (if value.is_auto_answer_enabled == Some(true) { 0x02 } else { 0x00 })
-                | (if value.is_auto_transparency_enabled == Some(true) { 0x04 } else { 0x00 }),
+            (if value.is_auto_play_enabled == Some(true) {
+                0x01
+            } else {
+                0x00
+            }) | (if value.is_auto_answer_enabled == Some(true) {
+                0x02
+            } else {
+                0x00
+            }) | (if value.is_auto_transparency_enabled == Some(true) {
+                0x04
+            } else {
+                0x00
+            }),
         ]
     }
 
-    pub fn parse_equalizer(packet: &BmapPacket) -> Result<BossEqualizerSettings, BossSettingsCodecError> {
+    pub fn parse_equalizer(
+        packet: &BmapPacket,
+    ) -> Result<BossEqualizerSettings, BossSettingsCodecError> {
         Self::require_status(packet)?;
         if packet.payload.len() % 4 != 0 {
             return Err(BossSettingsCodecError::InvalidPayload(
@@ -188,7 +247,10 @@ impl BossSettingsCodec {
 
     fn require_status(packet: &BmapPacket) -> Result<(), BossSettingsCodecError> {
         if packet.operator != BmapOperator::Status {
-            return Err(BossSettingsCodecError::UnexpectedOperator { expected: BmapOperator::Status, actual: packet.operator });
+            return Err(BossSettingsCodecError::UnexpectedOperator {
+                expected: BmapOperator::Status,
+                actual: packet.operator,
+            });
         }
         Ok(())
     }
@@ -201,7 +263,9 @@ pub struct BossSettingsSnapshot {
 
 impl BossSettingsSnapshot {
     pub fn new(packets_by_function_raw: BTreeMap<u8, BmapPacket>) -> Self {
-        Self { packets_by_function_raw }
+        Self {
+            packets_by_function_raw,
+        }
     }
 
     pub fn packet(&self, function_raw: u8) -> Option<&BmapPacket> {
@@ -220,7 +284,9 @@ impl BossSettingsSnapshot {
             .transpose()
     }
 
-    pub fn on_head_detection(&self) -> Result<Option<BossOnHeadDetectionValue>, BossSettingsCodecError> {
+    pub fn on_head_detection(
+        &self,
+    ) -> Result<Option<BossOnHeadDetectionValue>, BossSettingsCodecError> {
         self.packet(BossSettingsCodec::ON_HEAD_DETECTION_FUNCTION_RAW)
             .map(BossSettingsCodec::parse_on_head_detection)
             .transpose()
@@ -236,10 +302,14 @@ impl BossSettingsSnapshot {
         if let Some(packet) = self.packet(BossSettingsCodec::AUTO_ANSWER_FUNCTION_RAW) {
             return BossSettingsCodec::parse_enabled_flag(packet).map(Some);
         }
-        Ok(self.on_head_detection()?.and_then(|value| value.is_auto_answer_enabled))
+        Ok(self
+            .on_head_detection()?
+            .and_then(|value| value.is_auto_answer_enabled))
     }
 
-    pub fn volume_control(&self) -> Result<Option<BossVolumeControlStatus>, BossAudioModesCodecError> {
+    pub fn volume_control(
+        &self,
+    ) -> Result<Option<BossVolumeControlStatus>, BossAudioModesCodecError> {
         self.packet(BossSettingsCodec::VOLUME_CONTROL_FUNCTION_RAW)
             .map(BossAudioModesCodec::parse_volume_control_status)
             .transpose()

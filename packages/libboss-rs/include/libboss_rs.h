@@ -32,6 +32,9 @@ typedef enum BossFfiErrorCode {
     BOSS_FFI_ERROR_SETTINGS_CODEC = 10,
     BOSS_FFI_ERROR_AUDIO_MODES_CODEC = 11,
     BOSS_FFI_ERROR_UNSUPPORTED_OPERATION = 12,
+    BOSS_FFI_ERROR_NO_FREE_CUSTOM_AUDIO_MODE_SLOT = 13,
+    BOSS_FFI_ERROR_CUSTOM_AUDIO_MODE_SLOT_NOT_EDITABLE = 14,
+    BOSS_FFI_ERROR_CUSTOM_AUDIO_MODE_SLOT_NOT_FOUND = 15,
 } BossFfiErrorCode;
 
 typedef enum BossFfiWriteDisposition {
@@ -39,6 +42,14 @@ typedef enum BossFfiWriteDisposition {
     BOSS_FFI_WRITE_DISPOSITION_UPDATED = 1,
     BOSS_FFI_WRITE_DISPOSITION_VERIFICATION_INCONCLUSIVE = 2,
 } BossFfiWriteDisposition;
+
+typedef enum BossFfiUpdateStreamKind {
+    BOSS_FFI_UPDATE_STREAM_KIND_CURRENT_AUDIO_MODE = 0,
+    BOSS_FFI_UPDATE_STREAM_KIND_AUDIO_MODE_SETTINGS = 1,
+    BOSS_FFI_UPDATE_STREAM_KIND_EQUALIZER = 2,
+    BOSS_FFI_UPDATE_STREAM_KIND_DEVICE_SETTINGS = 3,
+    BOSS_FFI_UPDATE_STREAM_KIND_AUDIO_MODE_CATALOG = 4,
+} BossFfiUpdateStreamKind;
 
 typedef struct BossFfiSessionCallbacks {
     void *context;
@@ -102,10 +113,105 @@ typedef struct BossFfiAudioModeSettingsWriteResult {
     BossFfiAudioModeSettingsConfig config;
 } BossFfiAudioModeSettingsWriteResult;
 
+typedef struct BossFfiAudioModeConfig {
+    int32_t mode_index;
+    uint8_t prompt_byte1;
+    uint8_t prompt_byte2;
+    size_t name_len;
+    uint8_t name_bytes[32];
+    bool favorite;
+    bool user_configurable;
+    bool user_configured;
+    BossFfiAudioModeSettingsConfig settings;
+} BossFfiAudioModeConfig;
+
+typedef struct BossFfiAudioModePrompt {
+    uint8_t byte1;
+    uint8_t byte2;
+    size_t name_len;
+    uint8_t name_bytes[32];
+} BossFfiAudioModePrompt;
+
 typedef struct BossFfiEqualizerWriteResult {
     BossFfiWriteDisposition disposition;
     BossFfiEqualizerSettings settings;
 } BossFfiEqualizerWriteResult;
+
+typedef struct BossFfiOnHeadDetectionValue {
+    bool is_enabled;
+    bool has_auto_play_enabled;
+    bool auto_play_enabled;
+    bool has_auto_answer_enabled;
+    bool auto_answer_enabled;
+    bool has_auto_transparency_enabled;
+    bool auto_transparency_enabled;
+} BossFfiOnHeadDetectionValue;
+
+typedef struct BossFfiVolumeControlStatus {
+    uint8_t value;
+    bool has_supported_values_mask;
+    uint8_t supported_values_mask;
+} BossFfiVolumeControlStatus;
+
+typedef struct BossFfiStandbyTimerValue {
+    int32_t minutes;
+    bool supports_two_byte_minutes;
+} BossFfiStandbyTimerValue;
+
+typedef struct BossFfiObservedBool {
+    bool has_value;
+    bool value;
+    bool has_source;
+    uint8_t source;
+    bool has_unavailable_reason;
+    uint8_t unavailable_reason;
+} BossFfiObservedBool;
+
+typedef struct BossFfiObservedOnHeadDetection {
+    bool has_value;
+    BossFfiOnHeadDetectionValue value;
+    bool has_source;
+    uint8_t source;
+    bool has_unavailable_reason;
+    uint8_t unavailable_reason;
+} BossFfiObservedOnHeadDetection;
+
+typedef struct BossFfiObservedVolumeControlStatus {
+    bool has_value;
+    BossFfiVolumeControlStatus value;
+    bool has_source;
+    uint8_t source;
+    bool has_unavailable_reason;
+    uint8_t unavailable_reason;
+} BossFfiObservedVolumeControlStatus;
+
+typedef struct BossFfiDeviceSettingsReport {
+    BossFfiObservedOnHeadDetection wear_detection;
+    BossFfiObservedBool auto_aware_enabled;
+    BossFfiObservedBool auto_play_pause_enabled;
+    BossFfiObservedBool auto_answer_enabled;
+    BossFfiObservedVolumeControlStatus volume_control;
+} BossFfiDeviceSettingsReport;
+
+typedef struct BossFfiFirmwareVersionInfo {
+    int32_t port;
+    size_t version_len;
+    uint8_t version_bytes[64];
+} BossFfiFirmwareVersionInfo;
+
+typedef struct BossFfiBootstrappedDevice {
+    size_t bmap_version_len;
+    uint8_t bmap_version_bytes[64];
+    uint16_t product_id;
+    uint8_t variant;
+    size_t product_name_len;
+    uint8_t product_name_bytes[64];
+    size_t function_blocks_len;
+    uint8_t function_blocks_bytes[32];
+    uint8_t transport_kind;
+    int32_t default_device_id;
+    int32_t default_port;
+} BossFfiBootstrappedDevice;
 
 typedef struct BossFfiError {
     BossFfiErrorCode code;
@@ -115,6 +221,7 @@ typedef struct BossFfiError {
 } BossFfiError;
 
 typedef struct BossFfiSessionHandle BossFfiSessionHandle;
+typedef struct BossFfiUpdateStreamHandle BossFfiUpdateStreamHandle;
 
 void boss_buffer_free(BossBuffer buffer);
 void boss_error_free(BossFfiError error);
@@ -123,6 +230,53 @@ BossBuffer boss_copy_bytes(const uint8_t *data, size_t len);
 
 BossFfiSessionHandle *boss_session_create(BossFfiSessionCallbacks callbacks, BossFfiError *out_error);
 void boss_session_free(BossFfiSessionHandle *handle);
+BossFfiUpdateStreamHandle *boss_update_stream_create(
+    BossFfiSessionCallbacks callbacks,
+    BossFfiUpdateStreamKind kind,
+    BossFfiError *out_error
+);
+void boss_update_stream_free(BossFfiUpdateStreamHandle *handle);
+
+bool boss_update_stream_next_current_audio_mode(
+    BossFfiUpdateStreamHandle *handle,
+    uint64_t timeout_millis,
+    int32_t *out_mode_index,
+    BossFfiError *out_error
+);
+
+bool boss_update_stream_next_audio_mode_settings(
+    BossFfiUpdateStreamHandle *handle,
+    uint64_t timeout_millis,
+    BossFfiAudioModeSettingsConfig *out_config,
+    BossFfiError *out_error
+);
+
+bool boss_update_stream_next_equalizer(
+    BossFfiUpdateStreamHandle *handle,
+    uint64_t timeout_millis,
+    BossFfiEqualizerSettings *out_settings,
+    BossFfiError *out_error
+);
+
+bool boss_update_stream_next_device_settings(
+    BossFfiUpdateStreamHandle *handle,
+    uint64_t timeout_millis,
+    BossFfiDeviceSettingsReport *out_report,
+    BossFfiError *out_error
+);
+
+bool boss_update_stream_next_audio_mode_catalog(
+    BossFfiUpdateStreamHandle *handle,
+    uint64_t timeout_millis,
+    BossBuffer *out_catalog,
+    BossFfiError *out_error
+);
+
+bool boss_bootstrap_session(
+    BossFfiSessionCallbacks callbacks,
+    BossFfiBootstrappedDevice *out_device,
+    BossFfiError *out_error
+);
 
 bool boss_session_set_current_audio_mode(
     BossFfiSessionHandle *handle,
@@ -143,6 +297,138 @@ bool boss_session_set_equalizer(
     BossFfiSessionHandle *handle,
     BossFfiEqualizerPatch patch,
     BossFfiEqualizerWriteResult *out_result,
+    BossFfiError *out_error
+);
+
+bool boss_session_set_enabled_setting(
+    BossFfiSessionHandle *handle,
+    uint8_t function_raw,
+    bool enabled,
+    bool *out_enabled,
+    BossFfiError *out_error
+);
+
+bool boss_session_enabled_setting(
+    BossFfiSessionHandle *handle,
+    uint8_t function_raw,
+    bool *out_enabled,
+    BossFfiError *out_error
+);
+
+bool boss_session_current_audio_mode(
+    BossFfiSessionHandle *handle,
+    int32_t *out_mode_index,
+    BossFfiError *out_error
+);
+
+bool boss_session_supported_audio_mode_prompts(
+    BossFfiSessionHandle *handle,
+    BossBuffer *out_prompts,
+    BossFfiError *out_error
+);
+
+bool boss_session_audio_mode_configs(
+    BossFfiSessionHandle *handle,
+    BossBuffer *out_configs,
+    BossFfiError *out_error
+);
+
+bool boss_session_audio_mode_settings_config(
+    BossFfiSessionHandle *handle,
+    BossFfiAudioModeSettingsConfig *out_config,
+    BossFfiError *out_error
+);
+
+bool boss_session_firmware_version(
+    BossFfiSessionHandle *handle,
+    int32_t port,
+    int32_t device_id,
+    BossFfiFirmwareVersionInfo *out_info,
+    BossFfiError *out_error
+);
+
+bool boss_session_standby_timer(
+    BossFfiSessionHandle *handle,
+    BossFfiStandbyTimerValue *out_value,
+    BossFfiError *out_error
+);
+
+bool boss_session_settings_snapshot(
+    BossFfiSessionHandle *handle,
+    BossBuffer *out_packets,
+    BossFfiError *out_error
+);
+
+bool boss_session_equalizer_settings(
+    BossFfiSessionHandle *handle,
+    BossFfiEqualizerSettings *out_settings,
+    BossFfiError *out_error
+);
+
+bool boss_session_favorite_audio_mode_indices(
+    BossFfiSessionHandle *handle,
+    BossBuffer *out_indices,
+    BossFfiError *out_error
+);
+
+bool boss_session_on_head_detection(
+    BossFfiSessionHandle *handle,
+    BossFfiOnHeadDetectionValue *out_value,
+    BossFfiError *out_error
+);
+
+bool boss_session_set_on_head_detection(
+    BossFfiSessionHandle *handle,
+    BossFfiOnHeadDetectionValue value,
+    BossFfiOnHeadDetectionValue *out_value,
+    BossFfiError *out_error
+);
+
+bool boss_session_volume_control_status(
+    BossFfiSessionHandle *handle,
+    BossFfiVolumeControlStatus *out_status,
+    BossFfiError *out_error
+);
+
+bool boss_session_set_volume_control(
+    BossFfiSessionHandle *handle,
+    uint8_t value,
+    BossFfiVolumeControlStatus *out_status,
+    BossFfiError *out_error
+);
+
+bool boss_session_set_standby_timer(
+    BossFfiSessionHandle *handle,
+    int32_t minutes,
+    BossFfiStandbyTimerValue *out_value,
+    BossFfiError *out_error
+);
+
+bool boss_session_set_audio_mode_favorite(
+    BossFfiSessionHandle *handle,
+    int32_t index,
+    bool is_favorite,
+    BossBuffer *out_indices,
+    BossFfiError *out_error
+);
+
+bool boss_session_save_custom_audio_mode(
+    BossFfiSessionHandle *handle,
+    const uint8_t *name_data,
+    size_t name_len,
+    BossFfiAudioModeSettingsConfig settings,
+    uint8_t prompt_byte1,
+    uint8_t prompt_byte2,
+    bool has_requested_slot,
+    int32_t requested_slot,
+    BossFfiAudioModeConfig *out_config,
+    BossFfiError *out_error
+);
+
+bool boss_session_delete_custom_audio_mode(
+    BossFfiSessionHandle *handle,
+    int32_t slot,
+    BossFfiAudioModeConfig *out_config,
     BossFfiError *out_error
 );
 

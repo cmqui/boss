@@ -12,8 +12,13 @@ pub enum BossLinkError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BootstrapTimeoutError {
-    BmapVersion { timeout_milliseconds: u64 },
-    Packet { function: String, timeout_milliseconds: u64 },
+    BmapVersion {
+        timeout_milliseconds: u64,
+    },
+    Packet {
+        function: String,
+        timeout_milliseconds: u64,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,12 +41,26 @@ impl BmapResponseError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BossSessionError {
     ResponseStreamEnded,
-    ResponseTimedOut { seconds: i64 },
+    ResponseTimedOut {
+        seconds: i64,
+    },
     BmapErrorResponse(BmapResponseError),
     UnexpectedOperator(UnexpectedOperatorError),
-    ModeChangeNotObserved { target_index: i32, observed_index: i32 },
-    EqualizerNotObserved { expected: String, observed: String },
-    SettingsConfigNotObserved { expected: String, observed: String },
+    ModeChangeNotObserved {
+        target_index: i32,
+        observed_index: i32,
+    },
+    EqualizerNotObserved {
+        expected: String,
+        observed: String,
+    },
+    SettingsConfigNotObserved {
+        expected: String,
+        observed: String,
+    },
+    NoFreeCustomAudioModeSlot,
+    CustomAudioModeSlotNotEditable(i32),
+    CustomAudioModeSlotNotFound(i32),
     ProductInfo(ProductInfoParseError),
     SettingsCodec(BossSettingsCodecError),
     AudioModesCodec(BossAudioModesCodecError),

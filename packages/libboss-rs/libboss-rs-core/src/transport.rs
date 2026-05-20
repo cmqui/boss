@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::{BleReassemblyError, BleSegmentationError, BmapCodec, BmapPacket, Bytes, PacketDecodeError};
+use crate::{
+    BleReassemblyError, BleSegmentationError, BmapCodec, BmapPacket, Bytes, PacketDecodeError,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BossTransportKind {
@@ -64,7 +66,10 @@ impl BleSegmentReassembler {
         }
         if let Some(expected) = self.expected_max_index {
             if expected != max_index {
-                return Err(BleReassemblyError::InconsistentSegmentSeries { expected_max_index: expected, actual_max_index: max_index });
+                return Err(BleReassemblyError::InconsistentSegmentSeries {
+                    expected_max_index: expected,
+                    actual_max_index: max_index,
+                });
             }
         }
         if self.segments.contains_key(&segment_index) {
@@ -78,13 +83,19 @@ impl BleSegmentReassembler {
         }
         let expected_count = max_index + 1;
         if self.segments.len() != expected_count {
-            return Err(BleReassemblyError::MissingSegments { expected: expected_count, actual: self.segments.len() });
+            return Err(BleReassemblyError::MissingSegments {
+                expected: expected_count,
+                actual: self.segments.len(),
+            });
         }
         let chunk_size = self.chunk_size.unwrap_or(0);
         let mut output = Vec::new();
         for index in 0..expected_count {
             let Some(chunk) = self.segments.get(&index) else {
-                return Err(BleReassemblyError::MissingSegments { expected: expected_count, actual: self.segments.len() });
+                return Err(BleReassemblyError::MissingSegments {
+                    expected: expected_count,
+                    actual: self.segments.len(),
+                });
             };
             if index < max_index && chunk.len() != chunk_size {
                 return Err(BleReassemblyError::SegmentTooShort(chunk.len() + 1));
