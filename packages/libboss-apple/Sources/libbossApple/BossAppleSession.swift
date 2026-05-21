@@ -45,6 +45,12 @@ public actor BossAppleSession {
         let preference: AppleBossCharacteristicPreference
     }
 
+    private enum RetryResolution {
+        case nextPreference
+        case reconnectCurrentPreference
+        case rethrow
+    }
+
     public let connection: BossAppleConnectionOptions
 
     private var connectedLink: ConnectedLink?
@@ -840,38 +846,14 @@ public actor BossAppleSession {
         preferActiveLink: Bool = true,
         operation: @escaping @Sendable (BossPacketSession) async throws -> T
     ) async throws -> T {
-        let preferences = normalizedPreferences(preferredPreferences, preferActiveLink: preferActiveLink)
-        var lastError: Error?
-
-        for preference in preferences {
-            for attempt in 0..<2 {
-                do {
-                    let packetSession = try await ensurePacketSession(preference: preference, forceReconnect: attempt > 0)
-                    return try await operation(packetSession)
-                } catch {
-                    lastError = error
-
-                    if BossAppleController.retrySecureCharacteristicIfNeeded(error, preference) {
-                        await invalidateLink(for: preference)
-                        break
-                    }
-
-                    if shouldFallbackToNextPreference(for: error, activePreference: preference) {
-                        await invalidateLink(for: preference)
-                        break
-                    }
-
-                    if shouldReconnectCurrentSession(for: error), attempt == 0 {
-                        await invalidateLink(for: preference)
-                        continue
-                    }
-
-                    throw error
-                }
-            }
-        }
-
-        throw lastError ?? AppleBleBossTransportError.transportClosed
+        try await withRetryingResource(
+            preferredPreferences: preferredPreferences,
+            preferActiveLink: preferActiveLink,
+            acquire: { [self] preference, attempt in
+                try await ensurePacketSession(preference: preference, forceReconnect: attempt > 0)
+            },
+            operation: operation
+        )
     }
 
     private func withRustBleTransportRetrying<T: Sendable>(
@@ -879,12 +861,10 @@ public actor BossAppleSession {
         preferActiveLink: Bool = true,
         operation: @escaping @Sendable (AppleBleBossTransport) async throws -> T
     ) async throws -> T {
-        let preferences = normalizedPreferences(preferredPreferences, preferActiveLink: preferActiveLink)
-        var lastError: Error?
-
-        for preference in preferences {
-            for attempt in 0..<2 {
-                do {
+        try await withRetryingResource(
+            preferredPreferences: preferredPreferences,
+            preferActiveLink: preferActiveLink,
+            acquire: { [self] preference, attempt in
                     let hasSwiftConsumer = connectedLink?.preference == preference && (
                         connectedLink?.link != nil ||
                             connectedLink?.packetSession != nil ||
@@ -894,31 +874,10 @@ public actor BossAppleSession {
                         preference: preference,
                         forceReconnect: attempt > 0 || hasSwiftConsumer
                     )
-                    return try await operation(connected.transport)
-                } catch {
-                    lastError = error
-
-                    if BossAppleController.retrySecureCharacteristicIfNeeded(error, preference) {
-                        await invalidateLink(for: preference)
-                        break
-                    }
-
-                    if shouldFallbackToNextPreference(for: error, activePreference: preference) {
-                        await invalidateLink(for: preference)
-                        break
-                    }
-
-                    if shouldReconnectCurrentSession(for: error), attempt == 0 {
-                        await invalidateLink(for: preference)
-                        continue
-                    }
-
-                    throw error
-                }
-            }
-        }
-
-        throw lastError ?? AppleBleBossTransportError.transportClosed
+                    return connected.transport
+            },
+            operation: operation
+        )
     }
 
     private func withCoreSessionRetrying<T: Sendable>(
@@ -926,38 +885,14 @@ public actor BossAppleSession {
         preferActiveLink: Bool = true,
         operation: @escaping @Sendable (BossSession) async throws -> T
     ) async throws -> T {
-        let preferences = normalizedPreferences(preferredPreferences, preferActiveLink: preferActiveLink)
-        var lastError: Error?
-
-        for preference in preferences {
-            for attempt in 0..<2 {
-                do {
-                    let bossSession = try await ensureBossSession(preference: preference, forceReconnect: attempt > 0)
-                    return try await operation(bossSession)
-                } catch {
-                    lastError = error
-
-                    if BossAppleController.retrySecureCharacteristicIfNeeded(error, preference) {
-                        await invalidateLink(for: preference)
-                        break
-                    }
-
-                    if shouldFallbackToNextPreference(for: error, activePreference: preference) {
-                        await invalidateLink(for: preference)
-                        break
-                    }
-
-                    if shouldReconnectCurrentSession(for: error), attempt == 0 {
-                        await invalidateLink(for: preference)
-                        continue
-                    }
-
-                    throw error
-                }
-            }
-        }
-
-        throw lastError ?? AppleBleBossTransportError.transportClosed
+        try await withRetryingResource(
+            preferredPreferences: preferredPreferences,
+            preferActiveLink: preferActiveLink,
+            acquire: { [self] preference, attempt in
+                try await ensureBossSession(preference: preference, forceReconnect: attempt > 0)
+            },
+            operation: operation
+        )
     }
 
     private func withRawLinkRetrying<T: Sendable>(
@@ -965,39 +900,69 @@ public actor BossAppleSession {
         preferActiveLink: Bool = true,
         operation: @escaping @Sendable (BleBmapLink) async throws -> T
     ) async throws -> T {
+        try await withRetryingResource(
+            preferredPreferences: preferredPreferences,
+            preferActiveLink: preferActiveLink,
+            acquire: { [self] preference, attempt in
+                let connected = try await ensureConnected(preference: preference, forceReconnect: attempt > 0)
+                return try ensureBleLink(for: connected, preference: preference)
+            },
+            operation: operation
+        )
+    }
+
+    private func withRetryingResource<Resource: Sendable, T: Sendable>(
+        preferredPreferences: [AppleBossCharacteristicPreference],
+        preferActiveLink: Bool,
+        acquire: @escaping (_ preference: AppleBossCharacteristicPreference, _ attempt: Int) async throws -> Resource,
+        operation: @escaping (Resource) async throws -> T
+    ) async throws -> T {
         let preferences = normalizedPreferences(preferredPreferences, preferActiveLink: preferActiveLink)
         var lastError: Error?
 
         for preference in preferences {
             for attempt in 0..<2 {
                 do {
-                    let connected = try await ensureConnected(preference: preference, forceReconnect: attempt > 0)
-                    let link = try ensureBleLink(for: connected, preference: preference)
-                    return try await operation(link)
+                    let resource = try await acquire(preference, attempt)
+                    return try await operation(resource)
                 } catch {
                     lastError = error
 
-                    if BossAppleController.retrySecureCharacteristicIfNeeded(error, preference) {
+                    switch retryResolution(for: error, preference: preference, attempt: attempt) {
+                    case .nextPreference:
                         await invalidateLink(for: preference)
                         break
-                    }
-
-                    if shouldFallbackToNextPreference(for: error, activePreference: preference) {
-                        await invalidateLink(for: preference)
-                        break
-                    }
-
-                    if shouldReconnectCurrentSession(for: error), attempt == 0 {
+                    case .reconnectCurrentPreference:
                         await invalidateLink(for: preference)
                         continue
+                    case .rethrow:
+                        throw error
                     }
-
-                    throw error
                 }
             }
         }
 
         throw lastError ?? AppleBleBossTransportError.transportClosed
+    }
+
+    private func retryResolution(
+        for error: Error,
+        preference: AppleBossCharacteristicPreference,
+        attempt: Int
+    ) -> RetryResolution {
+        if BossAppleController.retrySecureCharacteristicIfNeeded(error, preference) {
+            return .nextPreference
+        }
+
+        if shouldFallbackToNextPreference(for: error, activePreference: preference) {
+            return .nextPreference
+        }
+
+        if shouldReconnectCurrentSession(for: error), attempt == 0 {
+            return .reconnectCurrentPreference
+        }
+
+        return .rethrow
     }
 
     private func ensureConnected(
