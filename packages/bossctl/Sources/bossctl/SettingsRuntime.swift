@@ -1,9 +1,9 @@
 import Foundation
-import libboss
+import libbossApple
 
 extension BossctlCLI {
     static func awaitSettingsSnapshot(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossSettingsSnapshot {
         try await link.send(packet: BossSettingsCodec.settingsPacket(functionRaw: BossSettingsCodec.settingsGetAllFunctionRaw, operatorValue: .start))

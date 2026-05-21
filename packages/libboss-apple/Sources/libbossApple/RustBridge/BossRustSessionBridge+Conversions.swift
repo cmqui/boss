@@ -162,6 +162,13 @@ extension BossRustSessionBridge {
         )
     }
 
+    static func swiftAudioModeCapabilities(from ffi: BossFfiAudioModesCapabilities) -> BossAudioModesCapabilities {
+        BossAudioModesCapabilities(
+            boseModes: Int(ffi.bose_modes),
+            userModes: Int(ffi.user_modes)
+        )
+    }
+
     static func swiftFirmwareVersion(from ffi: BossFfiFirmwareVersionInfo) -> FirmwareVersionInfo {
         let version = withUnsafeBytes(of: ffi.version_bytes) { rawBuffer in
             String(decoding: rawBuffer.prefix(ffi.version_len), as: UTF8.self)
@@ -177,28 +184,11 @@ extension BossRustSessionBridge {
     }
 
     static func swiftSettingsSnapshot(from buffer: BossBuffer) throws -> BossSettingsSnapshot {
-        let bytes = readData(buffer)
-        var offset = 0
-        var packetsByFunctionRaw: [UInt8: BmapPacket] = [:]
-
-        while offset < bytes.count {
-            guard offset + 4 <= bytes.count else {
-                throw BossAppleControlError.unsupportedOperation("Rust FFI returned truncated settings snapshot length prefix")
-            }
-            let length = bytes[offset..<(offset + 4)].withUnsafeBytes { rawBuffer in
-                Int(UInt32(littleEndian: rawBuffer.load(as: UInt32.self)))
-            }
-            offset += 4
-            guard length >= BmapPacket.headerSize, offset + length <= bytes.count else {
-                throw BossAppleControlError.unsupportedOperation("Rust FFI returned invalid settings snapshot packet length")
-            }
-            let packetBytes = bytes[offset..<(offset + length)]
-            let packet = try BmapCodec.decode(Data(packetBytes))
-            packetsByFunctionRaw[packet.function.rawValue] = packet
-            offset += length
+        do {
+            return try BossSettingsSnapshot(encodedPackets: readData(buffer))
+        } catch let error as BossSettingsCodecError {
+            throw BossAppleControlError.unsupportedOperation(error.localizedDescription)
         }
-
-        return BossSettingsSnapshot(packetsByFunctionRaw: packetsByFunctionRaw)
     }
 
     static func swiftBootstrappedDevice(from ffi: BossFfiBootstrappedDevice) -> BootstrappedDevice {

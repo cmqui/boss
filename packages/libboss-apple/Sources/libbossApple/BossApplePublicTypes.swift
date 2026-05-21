@@ -1,0 +1,27 @@
+import Foundation
+@_exported import libboss
+
+public typealias BossAppleBmapErrorCode = BmapErrorCode
+public typealias BossAppleBmapPacket = BmapPacket
+public typealias BossAppleTransportKind = BossTransportKind
+
+public typealias BossAppleBootstrappedDevice = BootstrappedDevice
+public typealias BossAppleSettingsSnapshot = BossSettingsSnapshot
+public typealias BossAppleDeviceSettings = BossDeviceSettings
+public typealias BossAppleStandbyTimerValue = BossStandbyTimerValue
+public typealias BossAppleOnHeadDetectionValue = BossOnHeadDetectionValue
+public typealias BossAppleOnHeadDetectionPatch = BossOnHeadDetectionPatch
+public typealias BossAppleVolumeControlStatus = BossVolumeControlStatus
+public typealias BossAppleVolumeControlValue = BossVolumeControlValue
+
+public typealias BossAppleEqualizerSettings = BossEqualizerSettings
+public typealias BossAppleEqualizerSettingsPatch = BossEqualizerSettingsPatch
+public typealias BossAppleEqualizerBand = BossEqualizerBand
+
+public typealias BossAppleAudioModeInfo = BossAudioModeInfo
+public typealias BossAppleAudioModeConfig = BossAudioModeConfig
+public typealias BossAppleAudioModesCapabilities = BossAudioModesCapabilities
+public typealias BossAppleAudioModePrompt = BossAudioModePrompt
+public typealias BossAppleAudioModeSettingsConfig = BossAudioModeSettingsConfig
+public typealias BossAppleAudioModeSettingsConfigPatch = BossAudioModeSettingsConfigPatch
+public typealias BossAppleSpatialAudioMode = BossSpatialAudioMode

@@ -1,5 +1,4 @@
 import Foundation
-import libboss
 import libbossApple
 
 extension BossctlCLI {
@@ -25,7 +24,7 @@ extension BossctlCLI {
 
     static func withConnectedLink<T: Sendable>(
         _ options: ConnectionOptions,
-        operation: @escaping @Sendable (BleBmapLink) async throws -> T
+        operation: @escaping @Sendable (BossAppleLink) async throws -> T
     ) async throws -> T {
         try await withConnectedLinkRetrying(options, shouldRetry: { _, _ in false }, operation: operation)
     }
@@ -33,7 +32,7 @@ extension BossctlCLI {
     static func withConnectedLinkRetrying<T: Sendable>(
         _ options: ConnectionOptions,
         shouldRetry: @escaping @Sendable (Error, AppleBossCharacteristicPreference) -> Bool,
-        operation: @escaping @Sendable (BleBmapLink) async throws -> T
+        operation: @escaping @Sendable (BossAppleLink) async throws -> T
     ) async throws -> T {
         let preferences: [AppleBossCharacteristicPreference] = options.characteristicPreference == .automatic
             ? [.unsecure, .secure]
@@ -57,7 +56,7 @@ extension BossctlCLI {
 
     static func withConnectedLinkOnce<T: Sendable>(
         _ options: ConnectionOptions,
-        operation: @escaping @Sendable (BleBmapLink) async throws -> T
+        operation: @escaping @Sendable (BossAppleLink) async throws -> T
     ) async throws -> T {
         let filter = AppleBossScanFilter(
             peripheralIdentifier: options.identifier,
@@ -73,7 +72,7 @@ extension BossctlCLI {
                 await transport.close()
             }
         }
-        let link = BleBmapLink(transport: transport)
+        let link = BossAppleLink(transport: transport)
         return try await operation(link)
     }
 
@@ -136,7 +135,7 @@ extension BossctlCLI {
 
     static func sendAndAwaitSameFunction(
         packet: BmapPacket,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BmapPacket {
         try await link.send(packet: packet)

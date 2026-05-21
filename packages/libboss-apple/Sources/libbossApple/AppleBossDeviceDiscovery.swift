@@ -1,6 +1,5 @@
 @preconcurrency import CoreBluetooth
 import Foundation
-import libboss
 
 public struct BossAppleDiscoveredDevice: Sendable, Equatable, Identifiable {
     public let id: UUID
@@ -80,7 +79,7 @@ public final class AppleBossDeviceDiscovery: NSObject, @unchecked Sendable {
     }
 
     private func startDiscovery() {
-        let serviceUUID = CBUUID(nsuuid: BoseUUIDs.service)
+        let serviceUUID = CBUUID(nsuuid: AppleBoseUUIDs.service)
         let connected = central.retrieveConnectedPeripherals(withServices: [serviceUUID])
         for peripheral in connected {
             addDevice(id: peripheral.identifier, name: peripheral.name, isConnected: true)

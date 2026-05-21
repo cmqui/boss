@@ -3,7 +3,7 @@ import libboss
 
 extension BossAppleController {
     static func awaitAudioModeConfigs(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> [BossAudioModeConfig] {
         try await link.send(packet: BossAudioModesCodec.modeConfigStartPacket())
@@ -51,7 +51,7 @@ extension BossAppleController {
     }
 
     static func currentAudioModeIfAvailable(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> Int? {
         do {
@@ -70,7 +70,7 @@ extension BossAppleController {
     }
 
     static func requiredCurrentAudioMode(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> Int {
         let response = try await sendAndAwaitSameFunction(
@@ -82,7 +82,7 @@ extension BossAppleController {
     }
 
     static func requiredEqualizer(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossEqualizerSettings {
         let response = try await sendAndAwaitSameFunction(
@@ -94,7 +94,7 @@ extension BossAppleController {
     }
 
     static func requiredAudioModeSettingsConfig(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossAudioModeSettingsConfig {
         let response = try await sendAndAwaitSameFunction(
@@ -106,7 +106,7 @@ extension BossAppleController {
     }
 
     static func requiredFavoriteAudioModeIndices(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> [Int] {
         let response = try await sendAndAwaitSameFunction(
@@ -118,7 +118,7 @@ extension BossAppleController {
     }
 
     static func requiredAudioModeCapabilities(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossAudioModesCapabilities {
         let response = try await sendAndAwaitSameFunction(
@@ -174,7 +174,7 @@ extension BossAppleController {
     }
 
     static func readAudioModeSettingsConfig(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         attempts: Int,
         timeoutPerAttempt: Duration,
         retryDelay: Duration
@@ -311,7 +311,7 @@ extension BossAppleController {
 
     static func sendEqualizerSetGets(
         _ requests: [(BossEqualizerBand, Int)],
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossEqualizerSettings {
         var lastSettings: BossEqualizerSettings?
@@ -332,7 +332,7 @@ extension BossAppleController {
     static func sendEqualizerSetGet(
         targetLevel: Int,
         band: BossEqualizerBand,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossEqualizerSettings {
         let packet = try BossSettingsCodec.equalizerSetGetPacket(targetLevel: targetLevel, band: band)
@@ -342,7 +342,7 @@ extension BossAppleController {
 
     static func sendAudioModeSettingsConfigSetGet(
         _ config: BossAudioModeSettingsConfig,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossAudioModeSettingsConfig {
         let packet = try BossAudioModesCodec.settingsConfigSetGetPacket(config)
@@ -370,7 +370,7 @@ extension BossAppleController {
         prompt: BossAudioModePrompt,
         name: String,
         settings: BossAudioModeSettingsConfig,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossAudioModeConfig {
         let packet = try BossAudioModesCodec.modeConfigSetGetPacket(
@@ -386,7 +386,7 @@ extension BossAppleController {
     static func sendAudioModeFavoritesSetGet(
         numberOfModes: Int,
         favoriteModeIndices: [Int],
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> [Int] {
         let packet = try BossAudioModesCodec.favoritesSetGetPacket(
@@ -509,7 +509,7 @@ extension BossAppleController {
     }
 
     static func onHeadDetectionIfAvailable(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossOnHeadDetectionValue? {
         let response = try await sendAndAwaitSameFunction(
@@ -521,7 +521,7 @@ extension BossAppleController {
     }
 
     static func standbyTimerIfAvailable(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossStandbyTimerValue? {
         let response = try await sendAndAwaitSameFunction(
@@ -534,7 +534,7 @@ extension BossAppleController {
 
     static func enabledSettingIfAvailable(
         functionRaw: UInt8,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> Bool? {
         let response = try await sendAndAwaitSameFunction(
@@ -549,7 +549,7 @@ extension BossAppleController {
     }
 
     static func volumeControlIfAvailable(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossVolumeControlStatus? {
         let response = try await sendAndAwaitSameFunction(
@@ -561,6 +561,19 @@ extension BossAppleController {
             timeout: timeout
         )
         return try BossAudioModesCodec.parseVolumeControlStatus(from: response)
+    }
+
+    static func setOnHeadDetection(
+        _ value: BossOnHeadDetectionValue,
+        on link: BossAppleLink,
+        timeout: Duration
+    ) async throws -> BossOnHeadDetectionValue {
+        let response = try await sendAndAwaitSameFunction(
+            packet: BossSettingsCodec.onHeadDetectionSetGetPacket(value),
+            on: link,
+            timeout: timeout
+        )
+        return try BossSettingsCodec.parseOnHeadDetection(from: response)
     }
 
     static func setEnabledSetting(
@@ -584,7 +597,7 @@ extension BossAppleController {
 
     static func deviceSettingsReport(
         from snapshot: BossSettingsSnapshot,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossAppleDeviceSettingsReport {
         let wearDetection = try await observedWearDetection(from: snapshot, on: link, timeout: timeout)
@@ -616,7 +629,7 @@ extension BossAppleController {
 
     static func equalizerIfAvailable(
         from snapshot: BossSettingsSnapshot,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossEqualizerSettings? {
         if let value = try snapshot.equalizer() {
@@ -632,7 +645,7 @@ extension BossAppleController {
 
     static func observedWearDetection(
         from snapshot: BossSettingsSnapshot,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossAppleObservedSetting<BossOnHeadDetectionValue> {
         try await observedWearDetection(
@@ -647,7 +660,7 @@ extension BossAppleController {
         functionRaw: UInt8,
         snapshotValue: Bool?,
         snapshotPacketExists: Bool,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossAppleObservedSetting<Bool> {
         try await observedEnabledSetting(
@@ -661,7 +674,7 @@ extension BossAppleController {
 
     static func observedAutoAnswer(
         from snapshot: BossSettingsSnapshot,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossAppleObservedSetting<Bool> {
         try await observedAutoAnswer(
@@ -678,7 +691,7 @@ extension BossAppleController {
 
     static func observedVolumeControl(
         from snapshot: BossSettingsSnapshot,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossAppleObservedSetting<BossVolumeControlStatus> {
         try await observedVolumeControl(

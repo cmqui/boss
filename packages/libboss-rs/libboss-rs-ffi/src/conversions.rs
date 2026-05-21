@@ -1,8 +1,9 @@
 use libboss_rs_core::{
     BossAudioModeConfig, BossAudioModePrompt, BossAudioModeSettingsConfig,
     BossAudioModeSettingsConfigPatch, BossEqualizerBand, BossEqualizerSettings,
-    BossEqualizerSettingsPatch, BossOnHeadDetectionValue, BossStandbyTimerValue, BossTransportKind,
-    BossVolumeControlStatus, BossVolumeControlValue, FirmwareVersionInfo,
+    BossAudioModesCapabilities, BossEqualizerSettingsPatch, BossOnHeadDetectionValue,
+    BossStandbyTimerValue, BossTransportKind, BossVolumeControlStatus, BossVolumeControlValue,
+    FirmwareVersionInfo,
 };
 use libboss_rs_session::{
     BootstrapSessionError, BootstrappedDevice, BossDeviceSettingsReport, BossLinkError,
@@ -11,10 +12,11 @@ use libboss_rs_session::{
 
 use crate::{
     buffer_from_string, BossFfiAudioModeConfig, BossFfiAudioModePrompt,
-    BossFfiAudioModeSettingsConfig, BossFfiAudioModeSettingsConfigPatch, BossFfiBootstrappedDevice,
-    BossFfiDeviceSettingsReport, BossFfiEqualizerPatch, BossFfiEqualizerRange,
-    BossFfiEqualizerSettings, BossFfiError, BossFfiErrorCode, BossFfiFirmwareVersionInfo,
-    BossFfiObservedBool, BossFfiObservedOnHeadDetection, BossFfiObservedVolumeControlStatus,
+    BossFfiAudioModeSettingsConfig, BossFfiAudioModeSettingsConfigPatch,
+    BossFfiAudioModesCapabilities, BossFfiBootstrappedDevice, BossFfiDeviceSettingsReport,
+    BossFfiEqualizerPatch, BossFfiEqualizerRange, BossFfiEqualizerSettings, BossFfiError,
+    BossFfiErrorCode, BossFfiFirmwareVersionInfo, BossFfiObservedBool,
+    BossFfiObservedOnHeadDetection, BossFfiObservedVolumeControlStatus,
     BossFfiOnHeadDetectionValue, BossFfiStandbyTimerValue, BossFfiVolumeControlStatus,
 };
 
@@ -114,6 +116,15 @@ pub(crate) fn ffi_audio_mode_prompt_from_core(
         byte2: prompt.byte2,
         name_len,
         name_bytes,
+    }
+}
+
+pub(crate) fn ffi_audio_modes_capabilities_from_core(
+    capabilities: BossAudioModesCapabilities,
+) -> BossFfiAudioModesCapabilities {
+    BossFfiAudioModesCapabilities {
+        bose_modes: capabilities.bose_modes,
+        user_modes: capabilities.user_modes,
     }
 }
 

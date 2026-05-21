@@ -5,6 +5,7 @@
 .env*
 .build/
 .swiftpm/
+.swift-cache/
 **/.swiftpm/
 DerivedData/
 .derived-data/
@@ -12,8 +13,10 @@ DerivedData/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
-docs/
-decomp/
 dist/
 target/
 **/target/
+
+docs/
+decomp/
+libboss-rs-migration-checklist.md

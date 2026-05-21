@@ -13,18 +13,6 @@ final class BossRustSessionBridge: @unchecked Sendable {
 
     static let shared = BossRustFfiRuntime.shared.map(BossRustSessionBridge.init(runtime:))
 
-    private func sessionCallbacks(for packetSession: BossPacketSession) -> BossFfiSessionCallbacks {
-        let bridge = BossRustPacketSessionBridge(runtime: runtime, packetSession: packetSession)
-        let retained = Unmanaged.passRetained(bridge)
-        return BossFfiSessionCallbacks(
-            context: retained.toOpaque(),
-            transport_kind: packetSession.transportKind == .ble ? 0 : 1,
-            send_packet_bytes: bossRustSendPacketBytes,
-            next_packet_bytes: bossRustNextPacketBytes,
-            release_context: bossRustReleaseContext
-        )
-    }
-
     private func sessionCallbacks(for transport: AppleBleBossTransport) -> BossFfiSessionCallbacks {
         let bridge = BossRustBleTransportBridge(runtime: runtime, transport: transport)
         let retained = Unmanaged.passRetained(bridge)
@@ -35,19 +23,6 @@ final class BossRustSessionBridge: @unchecked Sendable {
             next_packet_bytes: bossRustNextPacketBytes,
             release_context: bossRustReleaseContext
         )
-    }
-
-    private func withSessionHandle<T>(
-        on packetSession: BossPacketSession,
-        _ operation: (UnsafeMutableRawPointer?) throws -> T
-    ) throws -> T {
-        var createError = emptyError()
-        guard let handle = runtime.bossSessionCreate(sessionCallbacks(for: packetSession), &createError) else {
-            defer { runtime.bossErrorFree(createError) }
-            throw map(error: createError)
-        }
-        defer { runtime.bossSessionFree(handle) }
-        return try operation(handle)
     }
 
     private func withSessionHandle<T>(
@@ -289,6 +264,20 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
+    func audioModeCapabilities(on transport: AppleBleBossTransport) async throws -> BossAudioModesCapabilities {
+        BossRustLogger.log("using Rust bridge for audioModeCapabilities")
+        return try withSessionHandle(on: transport) { handle in
+            var capabilities = BossFfiAudioModesCapabilities()
+            var operationError = emptyError()
+            let success = runtime.bossSessionAudioModeCapabilities(handle, &capabilities, &operationError)
+            guard success else {
+                defer { runtime.bossErrorFree(operationError) }
+                throw map(error: operationError)
+            }
+            return Self.swiftAudioModeCapabilities(from: capabilities)
+        }
+    }
+
     func audioModeSettingsConfig(on transport: AppleBleBossTransport) async throws -> BossAudioModeSettingsConfig {
         BossRustLogger.log("using Rust bridge for audioModeSettingsConfig")
         return try withSessionHandle(on: transport) { handle in
@@ -343,6 +332,35 @@ final class BossRustSessionBridge: @unchecked Sendable {
             var buffer = BossBuffer(data: nil, len: 0)
             var operationError = emptyError()
             let success = runtime.bossSessionFavoriteAudioModeIndices(handle, &buffer, &operationError)
+            guard success else {
+                defer { runtime.bossErrorFree(operationError) }
+                throw map(error: operationError)
+            }
+            defer { runtime.bossBufferFree(buffer) }
+            return Self.readI32Buffer(buffer)
+        }
+    }
+
+    func setFavoriteAudioModeIndices(
+        on transport: AppleBleBossTransport,
+        indices: [Int],
+        numberOfModes: Int
+    ) async throws -> [Int] {
+        BossRustLogger.log("using Rust bridge for setFavoriteAudioModeIndices")
+        return try withSessionHandle(on: transport) { handle in
+            let ffiIndices = indices.map(Int32.init)
+            var buffer = BossBuffer(data: nil, len: 0)
+            var operationError = emptyError()
+            let success = ffiIndices.withUnsafeBufferPointer { pointer in
+                runtime.bossSessionSetFavoriteAudioModeIndices(
+                    handle,
+                    Int32(numberOfModes),
+                    pointer.baseAddress,
+                    pointer.count,
+                    &buffer,
+                    &operationError
+                )
+            }
             guard success else {
                 defer { runtime.bossErrorFree(operationError) }
                 throw map(error: operationError)

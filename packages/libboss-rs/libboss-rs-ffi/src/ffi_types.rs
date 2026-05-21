@@ -7,6 +7,12 @@ pub struct BossBuffer {
 }
 
 #[repr(C)]
+pub struct BossBufferList {
+    pub data: *mut BossBuffer,
+    pub len: usize,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BossFfiLinkStatus {
     Ok = 0,
@@ -75,6 +81,13 @@ pub struct BossFfiSessionCallbacks {
         ) -> BossFfiLinkStatus,
     >,
     pub release_context: Option<extern "C" fn(context: *mut c_void)>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BossFfiAudioModesCapabilities {
+    pub bose_modes: i32,
+    pub user_modes: i32,
 }
 
 #[repr(C)]

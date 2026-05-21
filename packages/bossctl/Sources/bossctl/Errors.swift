@@ -1,5 +1,5 @@
 import Foundation
-import libboss
+import libbossApple
 
 struct UsageError: LocalizedError {
     let message: String

@@ -13,14 +13,12 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(path: "../libboss"),
         .package(path: "../libboss-apple"),
     ],
     targets: [
         .executableTarget(
             name: "Boss",
             dependencies: [
-                .product(name: "libboss", package: "libboss"),
                 .product(name: "libbossApple", package: "libboss-apple"),
             ],
             path: "Sources/BossMacOS",

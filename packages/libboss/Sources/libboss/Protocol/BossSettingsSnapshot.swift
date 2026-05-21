@@ -223,6 +223,33 @@ public struct BossSettingsSnapshot: Sendable {
         self.packetsByFunctionRaw = packetsByFunctionRaw
     }
 
+    public init(encodedPackets bytes: Data) throws {
+        var offset = 0
+        var packetsByFunctionRaw: [UInt8: BmapPacket] = [:]
+
+        while offset < bytes.count {
+            guard offset + 4 <= bytes.count else {
+                throw BossSettingsCodecError.invalidPayload("Settings snapshot length prefix was truncated")
+            }
+            let length = Int(bytes[offset])
+                | (Int(bytes[offset + 1]) << 8)
+                | (Int(bytes[offset + 2]) << 16)
+                | (Int(bytes[offset + 3]) << 24)
+            offset += 4
+
+            guard length >= BmapPacket.headerSize, offset + length <= bytes.count else {
+                throw BossSettingsCodecError.invalidPayload("Settings snapshot packet length was invalid")
+            }
+
+            let packetBytes = Data(bytes[offset..<(offset + length)])
+            let packet = try BmapCodec.decode(packetBytes)
+            packetsByFunctionRaw[packet.function.rawValue] = packet
+            offset += length
+        }
+
+        self.init(packetsByFunctionRaw: packetsByFunctionRaw)
+    }
+
     public func packet(functionRaw: UInt8) -> BmapPacket? {
         packetsByFunctionRaw[functionRaw]
     }

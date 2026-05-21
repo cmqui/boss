@@ -1,5 +1,4 @@
 import Foundation
-import libboss
 import libbossApple
 
 @main
@@ -23,6 +22,15 @@ struct BossctlCLI {
     private static func run(_ command: Command) async throws {
         switch command {
         case .bootstrap(let options):
+            let description = bootstrapAttemptDescription(for: options)
+            print("Bootstrapping \(description)...")
+            print("Scan timeout per attempt: \(options.timeoutSeconds)s")
+            if options.characteristicPreference == .automatic {
+                print("Characteristic preference: automatic (may try unsecure, then secure)")
+            } else {
+                print("Characteristic preference: \(options.characteristicPreference.rawValue)")
+            }
+            fflush(stdout)
             let device = try await BossAppleSession(connection: options.appleConnectionOptions()).bootstrap()
             printBootstrap(device)
 
@@ -356,5 +364,15 @@ struct BossctlCLI {
                 printFavoriteAudioModes(favorites, modes: modes)
             }
         }
+    }
+
+    private static func bootstrapAttemptDescription(for options: ConnectionOptions) -> String {
+        if let identifier = options.identifier {
+            return "device \(identifier.uuidString)"
+        }
+        if let nameContains = options.nameContains, !nameContains.isEmpty {
+            return "device matching \"\(nameContains)\""
+        }
+        return "nearby Bose device"
     }
 }

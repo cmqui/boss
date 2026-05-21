@@ -3,7 +3,7 @@ import libboss
 
 extension BossAppleController {
     static func verifyCurrentAudioMode(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         targetIndex: Int,
         timeoutPerAttempt: Duration,
         attempts: Int,

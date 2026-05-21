@@ -4,6 +4,11 @@ use crate::{
     BleReassemblyError, BleSegmentationError, BmapCodec, BmapPacket, Bytes, PacketDecodeError,
 };
 
+pub const BOSS_BLE_SERVICE_UUID: &str = "0000FEBE-0000-1000-8000-00805F9B34FB";
+pub const BOSS_BLE_SECURE_CHARACTERISTIC_UUID: &str = "C65B8F2F-AEE2-4C89-B758-BC4892D6F2D8";
+pub const BOSS_BLE_UNSECURE_CHARACTERISTIC_UUID: &str = "D417C028-9818-4354-99D1-2AC09D074591";
+pub const BOSS_SPP_UUID: &str = "00001101-0000-1000-8000-00805F9B34FB";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BossTransportKind {
     Ble,

@@ -4,8 +4,26 @@ import Foundation
 
 final class BossRustFfiRuntime: @unchecked Sendable {
     typealias BufferFreeFn = @convention(c) (BossBuffer) -> Void
+    typealias BufferListFreeFn = @convention(c) (BossBufferList) -> Void
     typealias ErrorFreeFn = @convention(c) (BossFfiError) -> Void
     typealias CopyBytesFn = @convention(c) (UnsafePointer<UInt8>?, Int) -> BossBuffer
+    typealias BleReassemblerCreateFn = @convention(c) () -> UnsafeMutableRawPointer?
+    typealias BleReassemblerFreeFn = @convention(c) (UnsafeMutableRawPointer?) -> Void
+    typealias BleSegmentPacketFn = @convention(c) (
+        UnsafePointer<UInt8>?,
+        Int,
+        Int,
+        UnsafeMutablePointer<BossBufferList>?,
+        UnsafeMutablePointer<BossFfiError>?
+    ) -> Bool
+    typealias BleReassemblerPushFn = @convention(c) (
+        UnsafeMutableRawPointer?,
+        UnsafePointer<UInt8>?,
+        Int,
+        UnsafeMutablePointer<BossBuffer>?,
+        UnsafeMutablePointer<Bool>?,
+        UnsafeMutablePointer<BossFfiError>?
+    ) -> Bool
     typealias SessionCreateFn = @convention(c) (BossFfiSessionCallbacks, UnsafeMutablePointer<BossFfiError>?) -> UnsafeMutableRawPointer?
     typealias SessionFreeFn = @convention(c) (UnsafeMutableRawPointer?) -> Void
     typealias BootstrapFn = @convention(c) (
@@ -96,6 +114,11 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         UnsafeMutablePointer<BossBuffer>?,
         UnsafeMutablePointer<BossFfiError>?
     ) -> Bool
+    typealias AudioModeCapabilitiesFn = @convention(c) (
+        UnsafeMutableRawPointer?,
+        UnsafeMutablePointer<BossFfiAudioModesCapabilities>?,
+        UnsafeMutablePointer<BossFfiError>?
+    ) -> Bool
     typealias AudioModeSettingsConfigFn = @convention(c) (
         UnsafeMutableRawPointer?,
         UnsafeMutablePointer<BossFfiAudioModeSettingsConfig>?,
@@ -156,6 +179,14 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         UnsafeMutablePointer<BossFfiStandbyTimerValue>?,
         UnsafeMutablePointer<BossFfiError>?
     ) -> Bool
+    typealias SetFavoriteAudioModeIndicesFn = @convention(c) (
+        UnsafeMutableRawPointer?,
+        Int32,
+        UnsafePointer<Int32>?,
+        Int,
+        UnsafeMutablePointer<BossBuffer>?,
+        UnsafeMutablePointer<BossFfiError>?
+    ) -> Bool
     typealias SetAudioModeFavoriteFn = @convention(c) (
         UnsafeMutableRawPointer?,
         Int32,
@@ -184,8 +215,13 @@ final class BossRustFfiRuntime: @unchecked Sendable {
 
     let handle: UnsafeMutableRawPointer?
     let bossBufferFree: BufferFreeFn
+    let bossBufferListFree: BufferListFreeFn
     let bossErrorFree: ErrorFreeFn
     let bossCopyBytes: CopyBytesFn
+    let bossBleReassemblerCreate: BleReassemblerCreateFn
+    let bossBleReassemblerFree: BleReassemblerFreeFn
+    let bossBleSegmentPacket: BleSegmentPacketFn
+    let bossBleReassemblerPush: BleReassemblerPushFn
     let bossSessionCreate: SessionCreateFn
     let bossSessionFree: SessionFreeFn
     let bossBootstrapSession: BootstrapFn
@@ -204,6 +240,7 @@ final class BossRustFfiRuntime: @unchecked Sendable {
     let bossSessionCurrentAudioMode: CurrentAudioModeFn
     let bossSessionSupportedAudioModePrompts: SupportedAudioModePromptsFn
     let bossSessionAudioModeConfigs: AudioModeConfigsFn
+    let bossSessionAudioModeCapabilities: AudioModeCapabilitiesFn
     let bossSessionAudioModeSettingsConfig: AudioModeSettingsConfigFn
     let bossSessionFirmwareVersion: FirmwareVersionFn
     let bossSessionStandbyTimer: StandbyTimerFn
@@ -215,6 +252,7 @@ final class BossRustFfiRuntime: @unchecked Sendable {
     let bossSessionVolumeControlStatus: VolumeControlStatusFn
     let bossSessionSetVolumeControl: SetVolumeControlFn
     let bossSessionSetStandbyTimer: SetStandbyTimerFn
+    let bossSessionSetFavoriteAudioModeIndices: SetFavoriteAudioModeIndicesFn
     let bossSessionSetAudioModeFavorite: SetAudioModeFavoriteFn
     let bossSessionSaveCustomAudioMode: SaveCustomAudioModeFn
     let bossSessionDeleteCustomAudioMode: DeleteCustomAudioModeFn
@@ -230,8 +268,13 @@ final class BossRustFfiRuntime: @unchecked Sendable {
 
         guard
             let bossBufferFree = load("boss_buffer_free", as: BufferFreeFn.self),
+            let bossBufferListFree = load("boss_buffer_list_free", as: BufferListFreeFn.self),
             let bossErrorFree = load("boss_error_free", as: ErrorFreeFn.self),
             let bossCopyBytes = load("boss_copy_bytes", as: CopyBytesFn.self),
+            let bossBleReassemblerCreate = load("boss_ble_reassembler_create", as: BleReassemblerCreateFn.self),
+            let bossBleReassemblerFree = load("boss_ble_reassembler_free", as: BleReassemblerFreeFn.self),
+            let bossBleSegmentPacket = load("boss_ble_segment_packet", as: BleSegmentPacketFn.self),
+            let bossBleReassemblerPush = load("boss_ble_reassembler_push", as: BleReassemblerPushFn.self),
             let bossSessionCreate = load("boss_session_create", as: SessionCreateFn.self),
             let bossSessionFree = load("boss_session_free", as: SessionFreeFn.self),
             let bossBootstrapSession = load("boss_bootstrap_session", as: BootstrapFn.self),
@@ -250,6 +293,7 @@ final class BossRustFfiRuntime: @unchecked Sendable {
             let bossSessionCurrentAudioMode = load("boss_session_current_audio_mode", as: CurrentAudioModeFn.self),
             let bossSessionSupportedAudioModePrompts = load("boss_session_supported_audio_mode_prompts", as: SupportedAudioModePromptsFn.self),
             let bossSessionAudioModeConfigs = load("boss_session_audio_mode_configs", as: AudioModeConfigsFn.self),
+            let bossSessionAudioModeCapabilities = load("boss_session_audio_mode_capabilities", as: AudioModeCapabilitiesFn.self),
             let bossSessionAudioModeSettingsConfig = load("boss_session_audio_mode_settings_config", as: AudioModeSettingsConfigFn.self),
             let bossSessionFirmwareVersion = load("boss_session_firmware_version", as: FirmwareVersionFn.self),
             let bossSessionStandbyTimer = load("boss_session_standby_timer", as: StandbyTimerFn.self),
@@ -261,6 +305,7 @@ final class BossRustFfiRuntime: @unchecked Sendable {
             let bossSessionVolumeControlStatus = load("boss_session_volume_control_status", as: VolumeControlStatusFn.self),
             let bossSessionSetVolumeControl = load("boss_session_set_volume_control", as: SetVolumeControlFn.self),
             let bossSessionSetStandbyTimer = load("boss_session_set_standby_timer", as: SetStandbyTimerFn.self),
+            let bossSessionSetFavoriteAudioModeIndices = load("boss_session_set_favorite_audio_mode_indices", as: SetFavoriteAudioModeIndicesFn.self),
             let bossSessionSetAudioModeFavorite = load("boss_session_set_audio_mode_favorite", as: SetAudioModeFavoriteFn.self),
             let bossSessionSaveCustomAudioMode = load("boss_session_save_custom_audio_mode", as: SaveCustomAudioModeFn.self),
             let bossSessionDeleteCustomAudioMode = load("boss_session_delete_custom_audio_mode", as: DeleteCustomAudioModeFn.self)
@@ -271,8 +316,13 @@ final class BossRustFfiRuntime: @unchecked Sendable {
 
         self.handle = handle
         self.bossBufferFree = bossBufferFree
+        self.bossBufferListFree = bossBufferListFree
         self.bossErrorFree = bossErrorFree
         self.bossCopyBytes = bossCopyBytes
+        self.bossBleReassemblerCreate = bossBleReassemblerCreate
+        self.bossBleReassemblerFree = bossBleReassemblerFree
+        self.bossBleSegmentPacket = bossBleSegmentPacket
+        self.bossBleReassemblerPush = bossBleReassemblerPush
         self.bossSessionCreate = bossSessionCreate
         self.bossSessionFree = bossSessionFree
         self.bossBootstrapSession = bossBootstrapSession
@@ -291,6 +341,7 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         self.bossSessionCurrentAudioMode = bossSessionCurrentAudioMode
         self.bossSessionSupportedAudioModePrompts = bossSessionSupportedAudioModePrompts
         self.bossSessionAudioModeConfigs = bossSessionAudioModeConfigs
+        self.bossSessionAudioModeCapabilities = bossSessionAudioModeCapabilities
         self.bossSessionAudioModeSettingsConfig = bossSessionAudioModeSettingsConfig
         self.bossSessionFirmwareVersion = bossSessionFirmwareVersion
         self.bossSessionStandbyTimer = bossSessionStandbyTimer
@@ -302,6 +353,7 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         self.bossSessionVolumeControlStatus = bossSessionVolumeControlStatus
         self.bossSessionSetVolumeControl = bossSessionSetVolumeControl
         self.bossSessionSetStandbyTimer = bossSessionSetStandbyTimer
+        self.bossSessionSetFavoriteAudioModeIndices = bossSessionSetFavoriteAudioModeIndices
         self.bossSessionSetAudioModeFavorite = bossSessionSetAudioModeFavorite
         self.bossSessionSaveCustomAudioMode = bossSessionSaveCustomAudioMode
         self.bossSessionDeleteCustomAudioMode = bossSessionDeleteCustomAudioMode
@@ -312,8 +364,21 @@ final class BossRustFfiRuntime: @unchecked Sendable {
     private init(linked: Void) {
         self.handle = nil
         self.bossBufferFree = boss_buffer_free
+        self.bossBufferListFree = boss_buffer_list_free
         self.bossErrorFree = boss_error_free
         self.bossCopyBytes = boss_copy_bytes
+        self.bossBleReassemblerCreate = {
+            UnsafeMutableRawPointer(boss_ble_reassembler_create())
+        }
+        self.bossBleReassemblerFree = { handle in
+            boss_ble_reassembler_free(handle.map(OpaquePointer.init))
+        }
+        self.bossBleSegmentPacket = { packetData, packetLen, mtu, outFrames, outError in
+            boss_ble_segment_packet(packetData, packetLen, mtu, outFrames, outError)
+        }
+        self.bossBleReassemblerPush = { handle, segmentData, segmentLen, outPacket, outHasPacket, outError in
+            boss_ble_reassembler_push(handle.map(OpaquePointer.init), segmentData, segmentLen, outPacket, outHasPacket, outError)
+        }
         self.bossSessionCreate = { callbacks, outError in
             UnsafeMutableRawPointer(boss_session_create(callbacks, outError))
         }
@@ -368,6 +433,9 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         self.bossSessionAudioModeConfigs = { handle, outConfigs, outError in
             boss_session_audio_mode_configs(handle.map(OpaquePointer.init), outConfigs, outError)
         }
+        self.bossSessionAudioModeCapabilities = { handle, outCapabilities, outError in
+            boss_session_audio_mode_capabilities(handle.map(OpaquePointer.init), outCapabilities, outError)
+        }
         self.bossSessionAudioModeSettingsConfig = { handle, outConfig, outError in
             boss_session_audio_mode_settings_config(handle.map(OpaquePointer.init), outConfig, outError)
         }
@@ -400,6 +468,16 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         }
         self.bossSessionSetStandbyTimer = { handle, minutes, outValue, outError in
             boss_session_set_standby_timer(handle.map(OpaquePointer.init), minutes, outValue, outError)
+        }
+        self.bossSessionSetFavoriteAudioModeIndices = { handle, numberOfModes, favoriteIndicesData, favoriteIndicesLen, outIndices, outError in
+            boss_session_set_favorite_audio_mode_indices(
+                handle.map(OpaquePointer.init),
+                numberOfModes,
+                favoriteIndicesData,
+                favoriteIndicesLen,
+                outIndices,
+                outError
+            )
         }
         self.bossSessionSetAudioModeFavorite = { handle, index, isFavorite, outIndices, outError in
             boss_session_set_audio_mode_favorite(handle.map(OpaquePointer.init), index, isFavorite, outIndices, outError)

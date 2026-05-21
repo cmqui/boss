@@ -1,7 +1,7 @@
 use futures::executor::block_on;
 use libboss_rs_core::{
-    BmapCodec, BmapFunctionBlock, BmapPacket, BossAudioModeSettingsConfig, BossAudioModesCodec,
-    BossSettingsCodec, BossVolumeControlValue,
+    BleSegmentReassembler, BleSegmentation, BmapCodec, BmapFunctionBlock, BmapPacket,
+    BossAudioModeSettingsConfig, BossAudioModesCodec, BossSettingsCodec, BossVolumeControlValue,
 };
 use libboss_rs_session::{
     BootstrapSession, BossAudioModeSettingsWriteResult, BossCurrentAudioModeWriteResult,
@@ -29,6 +29,15 @@ pub(crate) fn buffer_from_vec(mut owned: Vec<u8>) -> BossBuffer {
     };
     std::mem::forget(owned);
     buffer
+}
+
+fn buffer_list_from_vec(mut owned: Vec<BossBuffer>) -> BossBufferList {
+    let list = BossBufferList {
+        data: owned.as_mut_ptr(),
+        len: owned.len(),
+    };
+    std::mem::forget(owned);
+    list
 }
 
 pub(crate) fn buffer_from_string(message: impl Into<String>) -> BossBuffer {
@@ -70,6 +79,15 @@ pub(crate) fn invalid_argument_error(message: impl Into<String>) -> BossFfiError
     }
 }
 
+fn other_error(message: impl Into<String>) -> BossFfiError {
+    BossFfiError {
+        code: BossFfiErrorCode::None,
+        message: buffer_from_string(message),
+        has_bmap_error_code: false,
+        bmap_error_code: 0,
+    }
+}
+
 impl Default for BossFfiWriteDisposition {
     fn default() -> Self {
         Self::Unchanged
@@ -83,6 +101,19 @@ pub extern "C" fn boss_buffer_free(buffer: BossBuffer) {
     }
     unsafe {
         let _ = Vec::from_raw_parts(buffer.data, buffer.len, buffer.len);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn boss_buffer_list_free(list: BossBufferList) {
+    if list.data.is_null() || list.len == 0 {
+        return;
+    }
+    unsafe {
+        let buffers = Vec::from_raw_parts(list.data, list.len, list.len);
+        for buffer in buffers {
+            boss_buffer_free(buffer);
+        }
     }
 }
 
@@ -120,6 +151,112 @@ pub extern "C" fn boss_copy_bytes(data: *const u8, len: usize) -> BossBuffer {
     }
     let input = unsafe { std::slice::from_raw_parts(data, len) };
     buffer_from_vec(input.to_vec())
+}
+
+pub struct BossFfiBleReassemblerHandle {
+    reassembler: BleSegmentReassembler,
+}
+
+#[no_mangle]
+pub extern "C" fn boss_ble_reassembler_create() -> *mut BossFfiBleReassemblerHandle {
+    Box::into_raw(Box::new(BossFfiBleReassemblerHandle {
+        reassembler: BleSegmentReassembler::default(),
+    }))
+}
+
+#[no_mangle]
+pub extern "C" fn boss_ble_reassembler_free(handle: *mut BossFfiBleReassemblerHandle) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        drop(Box::from_raw(handle));
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn boss_ble_segment_packet(
+    packet_data: *const u8,
+    packet_len: usize,
+    mtu: usize,
+    out_frames: *mut BossBufferList,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if packet_data.is_null() {
+        write_error(out_error, invalid_argument_error("packet_data was null"));
+        return false;
+    }
+    if out_frames.is_null() {
+        write_error(out_error, invalid_argument_error("out_frames was null"));
+        return false;
+    }
+
+    let packet = unsafe { std::slice::from_raw_parts(packet_data, packet_len) };
+    match BleSegmentation::encode(packet, mtu) {
+        Ok(frames) => {
+            let buffers = frames.into_iter().map(buffer_from_vec).collect();
+            unsafe {
+                *out_frames = buffer_list_from_vec(buffers);
+            }
+            true
+        }
+        Err(error) => {
+            write_error(out_error, other_error(format!("{error:?}")));
+            false
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn boss_ble_reassembler_push(
+    handle: *mut BossFfiBleReassemblerHandle,
+    segment_data: *const u8,
+    segment_len: usize,
+    out_packet: *mut BossBuffer,
+    out_has_packet: *mut bool,
+    out_error: *mut BossFfiError,
+) -> bool {
+    let Some(handle) = (unsafe { handle.as_mut() }) else {
+        write_error(out_error, invalid_argument_error("reassembler handle was null"));
+        return false;
+    };
+    if segment_data.is_null() {
+        write_error(out_error, invalid_argument_error("segment_data was null"));
+        return false;
+    }
+    if out_packet.is_null() {
+        write_error(out_error, invalid_argument_error("out_packet was null"));
+        return false;
+    }
+    if out_has_packet.is_null() {
+        write_error(out_error, invalid_argument_error("out_has_packet was null"));
+        return false;
+    }
+
+    let segment = unsafe { std::slice::from_raw_parts(segment_data, segment_len) };
+    match handle.reassembler.push(segment) {
+        Ok(Some(packet)) => {
+            unsafe {
+                *out_packet = buffer_from_vec(packet);
+                *out_has_packet = true;
+            }
+            true
+        }
+        Ok(None) => {
+            unsafe {
+                *out_packet = BossBuffer {
+                    data: ptr::null_mut(),
+                    len: 0,
+                };
+                *out_has_packet = false;
+            }
+            true
+        }
+        Err(error) => {
+            write_error(out_error, other_error(format!("{error:?}")));
+            false
+        }
+    }
 }
 
 #[no_mangle]
@@ -773,6 +910,30 @@ pub extern "C" fn boss_session_audio_mode_configs(
 }
 
 #[no_mangle]
+pub extern "C" fn boss_session_audio_mode_capabilities(
+    handle: *mut BossFfiSessionHandle,
+    out_capabilities: *mut BossFfiAudioModesCapabilities,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_capabilities.is_null() {
+        write_error(
+            out_error,
+            invalid_argument_error("out_capabilities was null"),
+        );
+        return false;
+    }
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.audio_mode_capabilities(5_000))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_capabilities = ffi_audio_modes_capabilities_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn boss_session_audio_mode_settings_config(
     handle: *mut BossFfiSessionHandle,
     out_config: *mut BossFfiAudioModeSettingsConfig,
@@ -970,6 +1131,39 @@ pub extern "C" fn boss_session_set_standby_timer(
     };
     unsafe {
         *out_value = ffi_standby_timer_from_core(result);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_set_favorite_audio_mode_indices(
+    handle: *mut BossFfiSessionHandle,
+    number_of_modes: i32,
+    favorite_indices_data: *const i32,
+    favorite_indices_len: usize,
+    out_indices: *mut BossBuffer,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_indices.is_null() {
+        write_error(out_error, invalid_argument_error("out_indices was null"));
+        return false;
+    }
+    let favorite_indices = if favorite_indices_data.is_null() || favorite_indices_len == 0 {
+        &[]
+    } else {
+        unsafe { std::slice::from_raw_parts(favorite_indices_data, favorite_indices_len) }
+    };
+    let Some(result) = with_session(handle, out_error, |handle| {
+        block_on(handle.session.set_favorite_audio_mode_indices(
+            number_of_modes,
+            favorite_indices,
+            5_000,
+        ))
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_indices = buffer_from_i32_slice(&result);
     }
     true
 }

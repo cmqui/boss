@@ -274,6 +274,32 @@ final class LibbossTests: XCTestCase {
         XCTAssertEqual(try snapshot.autoPlayPause(), true)
     }
 
+    func testBossSettingsSnapshotDecodesEncodedPacketBuffer() throws {
+        let standbyPacket = BossSettingsCodec.settingsPacket(
+            functionRaw: BossSettingsCodec.standbyTimerFunctionRaw,
+            operatorValue: .status,
+            payload: Data([0x0F])
+        )
+        let autoAwarePacket = BossSettingsCodec.settingsPacket(
+            functionRaw: BossSettingsCodec.autoAwareFunctionRaw,
+            operatorValue: .status,
+            payload: Data([0x01])
+        )
+
+        var encoded = Data()
+        for packet in [standbyPacket, autoAwarePacket] {
+            let frame = try BmapCodec.encode(packet)
+            var length = UInt32(frame.count).littleEndian
+            withUnsafeBytes(of: &length) { encoded.append(contentsOf: $0) }
+            encoded.append(frame)
+        }
+
+        let snapshot = try BossSettingsSnapshot(encodedPackets: encoded)
+
+        XCTAssertEqual(try snapshot.standbyTimer()?.minutes, 15)
+        XCTAssertEqual(try snapshot.autoAware(), true)
+    }
+
     func testBossPacketSessionSurfacesGenericBmapResponseError() async throws {
         let errorPacket = BmapPacket(
             functionBlock: .audioModes,

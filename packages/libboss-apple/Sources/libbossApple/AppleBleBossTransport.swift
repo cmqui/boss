@@ -1,6 +1,5 @@
 @preconcurrency import CoreBluetooth
 import Foundation
-import libboss
 
 public struct AppleBossScanFilter: Sendable {
     public var peripheralIdentifier: UUID?
@@ -81,7 +80,7 @@ private actor SendGate {
     }
 }
 
-public final class AppleBleBossTransport: NSObject, BossBleTransport, @unchecked Sendable {
+public final class AppleBleBossTransport: NSObject, @unchecked Sendable {
     public let incomingFrames: AsyncThrowingStream<Data, Error>
 
     public var attMTU: Int {
@@ -285,7 +284,7 @@ public final class AppleBleBossTransport: NSObject, BossBleTransport, @unchecked
             }
         }
 
-        let serviceUUID = CBUUID(nsuuid: BoseUUIDs.service)
+        let serviceUUID = CBUUID(nsuuid: AppleBoseUUIDs.service)
         let connected = central.retrieveConnectedPeripherals(withServices: [serviceUUID])
         if let peripheral = connected.first(where: { candidate in
             !rejectedPeripheralIdentifiers.contains(candidate.identifier) &&
@@ -337,8 +336,8 @@ public final class AppleBleBossTransport: NSObject, BossBleTransport, @unchecked
     }
 
     private func selectWriteCharacteristic(from characteristics: [CBCharacteristic]) -> CBCharacteristic? {
-        let unsecure = CBUUID(nsuuid: BoseUUIDs.unsecureCharacteristic)
-        let secure = CBUUID(nsuuid: BoseUUIDs.secureCharacteristic)
+        let unsecure = CBUUID(nsuuid: AppleBoseUUIDs.unsecureCharacteristic)
+        let secure = CBUUID(nsuuid: AppleBoseUUIDs.secureCharacteristic)
         let orderedCandidates: [CBUUID]
         switch characteristicPreference {
         case .automatic, .unsecure:
@@ -409,7 +408,7 @@ extension AppleBleBossTransport: CBCentralManagerDelegate {
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         debug("connected peripheral \(peripheral.identifier.uuidString)")
-        peripheral.discoverServices([CBUUID(nsuuid: BoseUUIDs.service)])
+        peripheral.discoverServices([CBUUID(nsuuid: AppleBoseUUIDs.service)])
     }
 
     public func centralManager(
@@ -477,15 +476,15 @@ extension AppleBleBossTransport: CBPeripheralDelegate {
 
         let serviceUUIDs = peripheral.services?.map { $0.uuid.uuidString } ?? []
         debug("discovered services for \(peripheral.identifier.uuidString): \(serviceUUIDs)")
-        guard let service = peripheral.services?.first(where: { $0.uuid == CBUUID(nsuuid: BoseUUIDs.service) }) else {
+        guard let service = peripheral.services?.first(where: { $0.uuid == CBUUID(nsuuid: AppleBoseUUIDs.service) }) else {
             rejectCurrentPeripheralAndResumeScan()
             return
         }
 
         peripheral.discoverCharacteristics(
             [
-                CBUUID(nsuuid: BoseUUIDs.unsecureCharacteristic),
-                CBUUID(nsuuid: BoseUUIDs.secureCharacteristic),
+                CBUUID(nsuuid: AppleBoseUUIDs.unsecureCharacteristic),
+                CBUUID(nsuuid: AppleBoseUUIDs.secureCharacteristic),
             ],
             for: service
         )

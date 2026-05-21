@@ -3,6 +3,48 @@ import Dispatch
 import Foundation
 import libboss
 
+private final class BossRustBleReassembler: @unchecked Sendable {
+    private let runtime: BossRustFfiRuntime
+    private let handle: UnsafeMutableRawPointer
+
+    init?(runtime: BossRustFfiRuntime) {
+        guard let handle = runtime.bossBleReassemblerCreate() else {
+            return nil
+        }
+        self.runtime = runtime
+        self.handle = handle
+    }
+
+    deinit {
+        runtime.bossBleReassemblerFree(handle)
+    }
+
+    func push(_ frame: Data) throws -> Data? {
+        var packet = BossBuffer(data: nil, len: 0)
+        var hasPacket = false
+        var operationError = emptyRustTransportError()
+        let success = frame.withUnsafeBytes { bytes in
+            runtime.bossBleReassemblerPush(
+                handle,
+                bytes.bindMemory(to: UInt8.self).baseAddress,
+                bytes.count,
+                &packet,
+                &hasPacket,
+                &operationError
+            )
+        }
+        guard success else {
+            defer { runtime.bossErrorFree(operationError) }
+            throw rustTransportError(from: operationError)
+        }
+        guard hasPacket else {
+            return nil
+        }
+        defer { runtime.bossBufferFree(packet) }
+        return Data(bytes: packet.data!, count: packet.len)
+    }
+}
+
 private final class BossRustPacketQueue: @unchecked Sendable {
     enum Event {
         case packet(Data)
@@ -78,91 +120,6 @@ private final class BossRustFfiSendResultBox: @unchecked Sendable {
     }
 }
 
-final class BossRustPacketSessionBridge: BossRustPacketByteBridge, @unchecked Sendable {
-    private let runtime: BossRustFfiRuntime
-    private let packetSession: BossPacketSession
-    private let queue = BossRustPacketQueue()
-    private var consumeTask: Task<Void, Never>?
-
-    init(runtime: BossRustFfiRuntime, packetSession: BossPacketSession) {
-        self.runtime = runtime
-        self.packetSession = packetSession
-        let queue = self.queue
-        self.consumeTask = Task {
-            do {
-                for try await packet in packetSession.packetStream(matching: { _ in true }) {
-                    queue.pushPacket(try BmapCodec.encode(packet))
-                }
-                queue.pushStreamEnded()
-            } catch let error as BossLinkError where error == .unexpectedStreamTermination {
-                queue.pushUnexpectedStreamTermination()
-            } catch {
-                queue.pushOtherError()
-            }
-        }
-    }
-
-    deinit {
-        consumeTask?.cancel()
-    }
-
-    func send(packetBytes: UnsafePointer<UInt8>?, len: Int) -> BossFfiLinkStatus {
-        guard let packetBytes, len > 0 else {
-            return BOSS_FFI_LINK_STATUS_OTHER
-        }
-
-        let packetData = Data(bytes: packetBytes, count: len)
-        let packet: BmapPacket
-        do {
-            packet = try BmapCodec.decode(packetData)
-        } catch {
-            return BOSS_FFI_LINK_STATUS_OTHER
-        }
-
-        let semaphore = DispatchSemaphore(value: 0)
-        let resultBox = BossRustFfiSendResultBox()
-        Task {
-            do {
-                try await packetSession.send(packet: packet)
-                resultBox.set(BOSS_FFI_LINK_STATUS_OK)
-            } catch let error as BossLinkError where error == .unexpectedStreamTermination {
-                resultBox.set(BOSS_FFI_LINK_STATUS_UNEXPECTED_STREAM_TERMINATION)
-            } catch {
-                resultBox.set(BOSS_FFI_LINK_STATUS_OTHER)
-            }
-            semaphore.signal()
-        }
-        semaphore.wait()
-        return resultBox.get()
-    }
-
-    func nextPacket(timeoutMilliseconds: UInt64, outPacket: UnsafeMutablePointer<BossBuffer>?) -> BossFfiLinkStatus {
-        guard let outPacket else {
-            return BOSS_FFI_LINK_STATUS_OTHER
-        }
-
-        let timeout = Duration.milliseconds(Int64(timeoutMilliseconds))
-        guard let event = queue.nextPacketEvent(timeout: timeout) else {
-            return BOSS_FFI_LINK_STATUS_TIMED_OUT
-        }
-
-        switch event {
-        case .packet(let packetData):
-            let rustBuffer = packetData.withUnsafeBytes { bytes -> BossBuffer in
-                runtime.bossCopyBytes(bytes.bindMemory(to: UInt8.self).baseAddress, bytes.count)
-            }
-            outPacket.pointee = rustBuffer
-            return BOSS_FFI_LINK_STATUS_OK
-        case .streamEnded:
-            return BOSS_FFI_LINK_STATUS_STREAM_ENDED
-        case .unexpectedStreamTermination:
-            return BOSS_FFI_LINK_STATUS_UNEXPECTED_STREAM_TERMINATION
-        case .otherError:
-            return BOSS_FFI_LINK_STATUS_OTHER
-        }
-    }
-}
-
 final class BossRustBleTransportBridge: BossRustPacketByteBridge, @unchecked Sendable {
     private let runtime: BossRustFfiRuntime
     private let transport: AppleBleBossTransport
@@ -174,7 +131,10 @@ final class BossRustBleTransportBridge: BossRustPacketByteBridge, @unchecked Sen
         self.transport = transport
         let queue = self.queue
         self.consumeTask = Task {
-            var reassembler = BleSegmentReassembler()
+            guard let reassembler = BossRustBleReassembler(runtime: runtime) else {
+                queue.pushOtherError()
+                return
+            }
             do {
                 for try await frame in transport.incomingFrames {
                     if let packetData = try reassembler.push(frame) {
@@ -202,7 +162,7 @@ final class BossRustBleTransportBridge: BossRustPacketByteBridge, @unchecked Sen
         let packetData = Data(bytes: packetBytes, count: len)
         let frames: [Data]
         do {
-            frames = try BleSegmentation.encode(packetBytes: packetData, mtu: transport.attMTU)
+            frames = try segment(packetData, mtu: transport.attMTU)
         } catch {
             return BOSS_FFI_LINK_STATUS_OTHER
         }
@@ -250,6 +210,55 @@ final class BossRustBleTransportBridge: BossRustPacketByteBridge, @unchecked Sen
         case .otherError:
             return BOSS_FFI_LINK_STATUS_OTHER
         }
+    }
+
+    private func segment(_ packetData: Data, mtu: Int) throws -> [Data] {
+        var frames = BossBufferList(data: nil, len: 0)
+        var operationError = emptyRustTransportError()
+        let success = packetData.withUnsafeBytes { bytes in
+            runtime.bossBleSegmentPacket(
+                bytes.bindMemory(to: UInt8.self).baseAddress,
+                bytes.count,
+                mtu,
+                &frames,
+                &operationError
+            )
+        }
+        guard success else {
+            defer { runtime.bossErrorFree(operationError) }
+            throw rustTransportError(from: operationError)
+        }
+        defer { runtime.bossBufferListFree(frames) }
+        let buffers = UnsafeBufferPointer(start: frames.data, count: frames.len)
+        return buffers.map { buffer in
+            Data(bytes: buffer.data!, count: buffer.len)
+        }
+    }
+}
+
+private func emptyRustTransportError() -> BossFfiError {
+    BossFfiError(
+        code: BOSS_FFI_ERROR_NONE,
+        message: BossBuffer(data: nil, len: 0),
+        has_bmap_error_code: false,
+        bmap_error_code: 0
+    )
+}
+
+private func rustTransportError(from ffiError: BossFfiError) -> BossAppleControlError {
+    let message: String
+    if let data = ffiError.message.data, ffiError.message.len > 0 {
+        let bytes = UnsafeBufferPointer(start: data, count: ffiError.message.len)
+        message = String(decoding: bytes, as: UTF8.self)
+    } else {
+        message = ""
+    }
+
+    switch ffiError.code {
+    case BOSS_FFI_ERROR_INVALID_ARGUMENT, BOSS_FFI_ERROR_UNSUPPORTED_OPERATION:
+        return .unsupportedOperation(message.isEmpty ? "Rust transport FFI reported an unsupported operation" : message)
+    default:
+        return .unsupportedOperation(message.isEmpty ? "Rust transport FFI error code \(ffiError.code)" : message)
     }
 }
 

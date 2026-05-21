@@ -63,7 +63,7 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
     case customAudioModeSlotNotEditable(Int)
     case customAudioModeSlotNotFound(Int)
 
-    public var bmapErrorCode: BmapErrorCode? {
+    public var bmapErrorCode: BossAppleBmapErrorCode? {
         guard case .bmapErrorResponse(_, let payloadHex) = self else {
             return nil
         }
@@ -98,21 +98,21 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
         }
     }
 
-    private static func bmapErrorCode(from payloadHex: String) -> BmapErrorCode? {
+    private static func bmapErrorCode(from payloadHex: String) -> BossAppleBmapErrorCode? {
         bossBmapErrorCode(from: payloadHex)
     }
 }
 
 public enum BossAppleEqualizerWriteResult: Sendable, Equatable {
-    case unchanged(BossEqualizerSettings)
-    case updated(BossEqualizerSettings)
-    case verificationInconclusive(BossEqualizerSettings)
+    case unchanged(BossAppleEqualizerSettings)
+    case updated(BossAppleEqualizerSettings)
+    case verificationInconclusive(BossAppleEqualizerSettings)
 }
 
 public enum BossAppleAudioModeSettingsWriteResult: Sendable, Equatable {
-    case unchanged(BossAudioModeSettingsConfig)
-    case updated(BossAudioModeSettingsConfig)
-    case verificationInconclusive(BossAudioModeSettingsConfig)
+    case unchanged(BossAppleAudioModeSettingsConfig)
+    case updated(BossAppleAudioModeSettingsConfig)
+    case verificationInconclusive(BossAppleAudioModeSettingsConfig)
 }
 
 public enum BossAppleCurrentAudioModeWriteResult: Sendable, Equatable {
@@ -136,7 +136,7 @@ public enum BossAppleSettingUnavailableReason: Sendable, Equatable, CustomString
     case dataUnavailable
     case insecureTransport
     case unexpectedStreamTermination
-    case bmapError(BmapErrorCode?)
+    case bmapError(BossAppleBmapErrorCode?)
 
     public var description: String {
         switch self {
@@ -186,18 +186,18 @@ public struct BossAppleObservedSetting<Value: Sendable & Equatable>: Sendable, E
 }
 
 public struct BossAppleDeviceSettingsReport: Sendable, Equatable {
-    public let wearDetection: BossAppleObservedSetting<BossOnHeadDetectionValue>
+    public let wearDetection: BossAppleObservedSetting<BossAppleOnHeadDetectionValue>
     public let autoAwareEnabled: BossAppleObservedSetting<Bool>
     public let autoPlayPauseEnabled: BossAppleObservedSetting<Bool>
     public let autoAnswerEnabled: BossAppleObservedSetting<Bool>
-    public let volumeControl: BossAppleObservedSetting<BossVolumeControlStatus>
+    public let volumeControl: BossAppleObservedSetting<BossAppleVolumeControlStatus>
 
     public init(
-        wearDetection: BossAppleObservedSetting<BossOnHeadDetectionValue>,
+        wearDetection: BossAppleObservedSetting<BossAppleOnHeadDetectionValue>,
         autoAwareEnabled: BossAppleObservedSetting<Bool>,
         autoPlayPauseEnabled: BossAppleObservedSetting<Bool>,
         autoAnswerEnabled: BossAppleObservedSetting<Bool>,
-        volumeControl: BossAppleObservedSetting<BossVolumeControlStatus>
+        volumeControl: BossAppleObservedSetting<BossAppleVolumeControlStatus>
     ) {
         self.wearDetection = wearDetection
         self.autoAwareEnabled = autoAwareEnabled
@@ -206,8 +206,8 @@ public struct BossAppleDeviceSettingsReport: Sendable, Equatable {
         self.volumeControl = volumeControl
     }
 
-    public var settings: BossDeviceSettings {
-        BossDeviceSettings(
+    public var settings: BossAppleDeviceSettings {
+        BossAppleDeviceSettings(
             wearDetection: wearDetection.value,
             autoAwareEnabled: autoAwareEnabled.value,
             autoPlayPauseEnabled: autoPlayPauseEnabled.value,
@@ -225,26 +225,26 @@ public struct BossAppleController: Sendable {
     }
 
     public func withConnectedLink<T: Sendable>(
-        _ operation: @escaping @Sendable (BleBmapLink) async throws -> T
+        _ operation: @escaping @Sendable (BossAppleLink) async throws -> T
     ) async throws -> T {
         try await Self.withConnectedLink(connection, operation: operation)
     }
 
-    public func bootstrap() async throws -> BootstrappedDevice {
+    public func bootstrap() async throws -> BossAppleBootstrappedDevice {
         try await withRustPreferred(
             { try await $0.bootstrap() },
             fallback: { try await self.swiftFallbackBootstrap() }
         )
     }
 
-    public func settingsSnapshot() async throws -> BossSettingsSnapshot {
+    public func settingsSnapshot() async throws -> BossAppleSettingsSnapshot {
         try await withRustPreferred(
             { try await $0.settingsSnapshot() },
             fallback: { try await self.swiftFallbackSettingsSnapshot() }
         )
     }
 
-    public func deviceSettings() async throws -> BossDeviceSettings {
+    public func deviceSettings() async throws -> BossAppleDeviceSettings {
         try await deviceSettingsReport().settings
     }
 
@@ -255,14 +255,14 @@ public struct BossAppleController: Sendable {
         )
     }
 
-    public func standbyTimer() async throws -> BossStandbyTimerValue? {
+    public func standbyTimer() async throws -> BossAppleStandbyTimerValue? {
         try await withRustPreferred(
             { try await $0.standbyTimer() },
             fallback: { try await self.swiftFallbackStandbyTimer() }
         )
     }
 
-    public func setStandbyTimer(minutes: Int) async throws -> BossStandbyTimerValue {
+    public func setStandbyTimer(minutes: Int) async throws -> BossAppleStandbyTimerValue {
         try await withRustPreferred(
             { try await $0.setStandbyTimer(minutes: minutes) },
             fallback: { try await self.swiftFallbackSetStandbyTimer(minutes: minutes) }
@@ -283,39 +283,39 @@ public struct BossAppleController: Sendable {
         )
     }
 
-    public func onHeadDetection() async throws -> BossOnHeadDetectionValue? {
+    public func onHeadDetection() async throws -> BossAppleOnHeadDetectionValue? {
         try await withRustPreferred(
             { try await $0.onHeadDetection() },
             fallback: { try await self.swiftFallbackOnHeadDetection() }
         )
     }
 
-    public func wearDetection() async throws -> BossOnHeadDetectionValue? {
+    public func wearDetection() async throws -> BossAppleOnHeadDetectionValue? {
         try await onHeadDetection()
     }
 
-    public func setWearDetection(_ value: BossOnHeadDetectionValue) async throws -> BossOnHeadDetectionValue {
+    public func setWearDetection(_ value: BossAppleOnHeadDetectionValue) async throws -> BossAppleOnHeadDetectionValue {
         try await withRustPreferred(
             { try await $0.setWearDetection(value) },
             fallback: { try await self.swiftFallbackSetWearDetection(value) }
         )
     }
 
-    public func setWearDetection(_ patch: BossOnHeadDetectionPatch) async throws -> BossOnHeadDetectionValue {
+    public func setWearDetection(_ patch: BossAppleOnHeadDetectionPatch) async throws -> BossAppleOnHeadDetectionValue {
         try await withRustPreferred(
             { try await $0.setWearDetection(patch) },
             fallback: { try await self.swiftFallbackSetWearDetection(patch) }
         )
     }
 
-    public func updateWearDetectionRelatedSettings(_ patch: BossOnHeadDetectionPatch) async throws -> BossAppleDeviceSettingsReport {
+    public func updateWearDetectionRelatedSettings(_ patch: BossAppleOnHeadDetectionPatch) async throws -> BossAppleDeviceSettingsReport {
         try await withRustPreferred(
             { try await $0.updateWearDetectionRelatedSettings(patch) },
             fallback: { try await self.swiftFallbackUpdateWearDetectionRelatedSettings(patch) }
         )
     }
 
-    public func setWearDetectionEnabled(_ enabled: Bool) async throws -> BossOnHeadDetectionValue {
+    public func setWearDetectionEnabled(_ enabled: Bool) async throws -> BossAppleOnHeadDetectionValue {
         try await withRustPreferred(
             { try await $0.setWearDetectionEnabled(enabled) },
             fallback: { try await self.swiftFallbackSetWearDetectionEnabled(enabled) }
@@ -350,21 +350,21 @@ public struct BossAppleController: Sendable {
         )
     }
 
-    public func volumeControl() async throws -> BossVolumeControlStatus? {
+    public func volumeControl() async throws -> BossAppleVolumeControlStatus? {
         try await withRustPreferred(
             { try await $0.volumeControl() },
             fallback: { try await self.swiftFallbackVolumeControl() }
         )
     }
 
-    public func setVolumeControl(_ value: BossVolumeControlValue) async throws -> BossVolumeControlStatus {
+    public func setVolumeControl(_ value: BossAppleVolumeControlValue) async throws -> BossAppleVolumeControlStatus {
         try await withRustPreferred(
             { try await $0.setVolumeControl(value) },
             fallback: { try await self.swiftFallbackSetVolumeControl(value) }
         )
     }
 
-    public func equalizer() async throws -> BossEqualizerSettings? {
+    public func equalizer() async throws -> BossAppleEqualizerSettings? {
         try await withRustPreferred(
             { try await $0.equalizer() },
             fallback: { try await self.swiftFallbackEqualizer() }
@@ -372,7 +372,7 @@ public struct BossAppleController: Sendable {
     }
 
     public func setEqualizer(
-        _ update: BossEqualizerSettingsPatch
+        _ update: BossAppleEqualizerSettingsPatch
     ) async throws -> BossAppleEqualizerWriteResult {
         try await withRustPreferred(
             { try await $0.setEqualizer(update) },
@@ -381,42 +381,42 @@ public struct BossAppleController: Sendable {
     }
 
     public func setEqualizerBass(_ level: Int) async throws -> BossAppleEqualizerWriteResult {
-        try await setEqualizer(BossEqualizerSettingsPatch(bass: level))
+        try await setEqualizer(BossAppleEqualizerSettingsPatch(bass: level))
     }
 
     public func setEqualizerMid(_ level: Int) async throws -> BossAppleEqualizerWriteResult {
-        try await setEqualizer(BossEqualizerSettingsPatch(mid: level))
+        try await setEqualizer(BossAppleEqualizerSettingsPatch(mid: level))
     }
 
     public func setEqualizerTreble(_ level: Int) async throws -> BossAppleEqualizerWriteResult {
-        try await setEqualizer(BossEqualizerSettingsPatch(treble: level))
+        try await setEqualizer(BossAppleEqualizerSettingsPatch(treble: level))
     }
 
-    public func audioModes() async throws -> [BossAudioModeInfo] {
+    public func audioModes() async throws -> [BossAppleAudioModeInfo] {
         try await audioModeConfigs().map(\.info)
     }
 
-    public func audioModeConfigs() async throws -> [BossAudioModeConfig] {
+    public func audioModeConfigs() async throws -> [BossAppleAudioModeConfig] {
         try await withRustPreferred(
             { try await $0.audioModeConfigs() },
             fallback: { try await self.swiftFallbackAudioModeConfigs() }
         )
     }
 
-    public func displayableAudioModes() async throws -> [BossAudioModeInfo] {
+    public func displayableAudioModes() async throws -> [BossAppleAudioModeInfo] {
         try await audioModes().filter { mode in
             !(mode.userConfigurable && !mode.userConfigured && mode.name == "None")
         }
     }
 
-    public func audioModeCapabilities() async throws -> BossAudioModesCapabilities {
+    public func audioModeCapabilities() async throws -> BossAppleAudioModesCapabilities {
         try await withRustPreferred(
             { try await $0.audioModeCapabilities() },
             fallback: { try await self.swiftFallbackAudioModeCapabilities() }
         )
     }
 
-    public func supportedAudioModePrompts() async throws -> [BossAudioModePrompt] {
+    public func supportedAudioModePrompts() async throws -> [BossAppleAudioModePrompt] {
         try await withRustPreferred(
             { try await $0.supportedAudioModePrompts() },
             fallback: { try await self.swiftFallbackSupportedAudioModePrompts() }
@@ -472,10 +472,10 @@ public struct BossAppleController: Sendable {
 
     public func saveCustomAudioMode(
         name: String,
-        settings: BossAudioModeSettingsConfig,
-        prompt: BossAudioModePrompt = .none,
+        settings: BossAppleAudioModeSettingsConfig,
+        prompt: BossAppleAudioModePrompt = .none,
         slot requestedSlot: Int? = nil
-    ) async throws -> BossAudioModeConfig {
+    ) async throws -> BossAppleAudioModeConfig {
         try await withRustPreferred(
             {
                 try await $0.saveCustomAudioMode(
@@ -499,8 +499,8 @@ public struct BossAppleController: Sendable {
     public func renameCustomAudioMode(
         slot: Int,
         name: String,
-        prompt: BossAudioModePrompt? = nil
-    ) async throws -> BossAudioModeConfig {
+        prompt: BossAppleAudioModePrompt? = nil
+    ) async throws -> BossAppleAudioModeConfig {
         try await withRustPreferred(
             {
                 try await $0.renameCustomAudioMode(
@@ -516,9 +516,9 @@ public struct BossAppleController: Sendable {
     public func updateCustomAudioMode(
         slot: Int,
         name: String? = nil,
-        settings: BossAudioModeSettingsConfig? = nil,
-        prompt: BossAudioModePrompt? = nil
-    ) async throws -> BossAudioModeConfig {
+        settings: BossAppleAudioModeSettingsConfig? = nil,
+        prompt: BossAppleAudioModePrompt? = nil
+    ) async throws -> BossAppleAudioModeConfig {
         try await withRustPreferred(
             {
                 try await $0.updateCustomAudioMode(
@@ -539,7 +539,7 @@ public struct BossAppleController: Sendable {
         )
     }
 
-    public func deleteCustomAudioMode(slot: Int) async throws -> BossAudioModeConfig {
+    public func deleteCustomAudioMode(slot: Int) async throws -> BossAppleAudioModeConfig {
         try await withRustPreferred(
             { try await $0.deleteCustomAudioMode(slot: slot) },
             fallback: { try await self.swiftFallbackDeleteCustomAudioMode(slot: slot) }
@@ -570,7 +570,7 @@ public struct BossAppleController: Sendable {
         )
     }
 
-    public func audioModeSettings() async throws -> BossAudioModeSettingsConfig {
+    public func audioModeSettings() async throws -> BossAppleAudioModeSettingsConfig {
         try await withRustPreferred(
             { try await $0.audioModeSettings() },
             fallback: { try await self.swiftFallbackAudioModeSettings() }
@@ -578,7 +578,7 @@ public struct BossAppleController: Sendable {
     }
 
     public func setAudioModeSettings(
-        _ update: BossAudioModeSettingsConfigPatch
+        _ update: BossAppleAudioModeSettingsConfigPatch
     ) async throws -> BossAppleAudioModeSettingsWriteResult {
         try await withRustPreferred(
             { try await $0.setAudioModeSettings(update) },
@@ -587,19 +587,19 @@ public struct BossAppleController: Sendable {
     }
 
     public func setCNCLevel(_ level: Int) async throws -> BossAppleAudioModeSettingsWriteResult {
-        try await setAudioModeSettings(BossAudioModeSettingsConfigPatch(cncLevel: level))
+        try await setAudioModeSettings(BossAppleAudioModeSettingsConfigPatch(cncLevel: level))
     }
 
-    public func setSpatialAudioMode(_ mode: BossSpatialAudioMode) async throws -> BossAppleAudioModeSettingsWriteResult {
-        try await setAudioModeSettings(BossAudioModeSettingsConfigPatch(spatialAudioMode: mode))
+    public func setSpatialAudioMode(_ mode: BossAppleSpatialAudioMode) async throws -> BossAppleAudioModeSettingsWriteResult {
+        try await setAudioModeSettings(BossAppleAudioModeSettingsConfigPatch(spatialAudioMode: mode))
     }
 
     public func setWindBlockEnabled(_ enabled: Bool) async throws -> BossAppleAudioModeSettingsWriteResult {
-        try await setAudioModeSettings(BossAudioModeSettingsConfigPatch(windBlockEnabled: enabled))
+        try await setAudioModeSettings(BossAppleAudioModeSettingsConfigPatch(windBlockEnabled: enabled))
     }
 
     public func setANCEnabled(_ enabled: Bool) async throws -> BossAppleAudioModeSettingsWriteResult {
-        try await setAudioModeSettings(BossAudioModeSettingsConfigPatch(ancToggleEnabled: enabled))
+        try await setAudioModeSettings(BossAppleAudioModeSettingsConfigPatch(ancToggleEnabled: enabled))
     }
 
     private func withRustPreferred<T: Sendable>(
@@ -615,9 +615,9 @@ public struct BossAppleController: Sendable {
     func writeCustomAudioMode(
         slot: Int,
         name: String,
-        settings: BossAudioModeSettingsConfig,
-        prompt: BossAudioModePrompt
-    ) async throws -> BossAudioModeConfig {
+        settings: BossAppleAudioModeSettingsConfig,
+        prompt: BossAppleAudioModePrompt
+    ) async throws -> BossAppleAudioModeConfig {
         try await Self.withConnectedLinkRetrying(connection.securePreferred, shouldRetry: Self.retrySecureCharacteristicIfNeeded) { link in
             try await Self.sendAudioModeConfigSetGet(
                 modeIndex: slot,
@@ -634,7 +634,7 @@ public struct BossAppleController: Sendable {
 private extension BossAppleController {
     func swiftFallbackBootstrap() async throws -> BootstrappedDevice {
         try await withConnectedLink { link in
-            try await BootstrapSession(link: link).bootstrap()
+            try await BootstrapSession(link: link.asCoreLink()).bootstrap()
         }
     }
 

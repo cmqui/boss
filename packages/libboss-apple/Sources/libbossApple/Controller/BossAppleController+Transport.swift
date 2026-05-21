@@ -3,7 +3,7 @@ import libboss
 
 extension BossAppleController {
     static func supportedAudioModePrompts(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> [BossAudioModePrompt] {
         let response = try await sendAndAwaitSameFunction(
@@ -15,7 +15,7 @@ extension BossAppleController {
     }
 
     static func awaitSettingsSnapshot(
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BossSettingsSnapshot {
         try await link.send(packet: BossSettingsCodec.settingsPacket(
@@ -58,7 +58,7 @@ extension BossAppleController {
 
     static func withConnectedLink<T: Sendable>(
         _ options: BossAppleConnectionOptions,
-        operation: @escaping @Sendable (BleBmapLink) async throws -> T
+        operation: @escaping @Sendable (BossAppleLink) async throws -> T
     ) async throws -> T {
         try await withConnectedLinkRetrying(options, shouldRetry: { _, _ in false }, operation: operation)
     }
@@ -66,7 +66,7 @@ extension BossAppleController {
     static func withConnectedLinkRetrying<T: Sendable>(
         _ options: BossAppleConnectionOptions,
         shouldRetry: @escaping @Sendable (Error, AppleBossCharacteristicPreference) -> Bool,
-        operation: @escaping @Sendable (BleBmapLink) async throws -> T
+        operation: @escaping @Sendable (BossAppleLink) async throws -> T
     ) async throws -> T {
         let preferences: [AppleBossCharacteristicPreference] = options.characteristicPreference == .automatic
             ? [.unsecure, .secure]
@@ -90,7 +90,7 @@ extension BossAppleController {
 
     static func withConnectedLinkOnce<T: Sendable>(
         _ options: BossAppleConnectionOptions,
-        operation: @escaping @Sendable (BleBmapLink) async throws -> T
+        operation: @escaping @Sendable (BossAppleLink) async throws -> T
     ) async throws -> T {
         let transport = try await AppleBleBossTransport.connect(
             filter: options.scanFilter,
@@ -101,7 +101,7 @@ extension BossAppleController {
                 await transport.close()
             }
         }
-        let link = BleBmapLink(transport: transport)
+        let link = BossAppleLink(transport: transport)
         return try await operation(link)
     }
 
@@ -131,7 +131,7 @@ extension BossAppleController {
 
     static func sendAndAwaitSameFunction(
         packet: BmapPacket,
-        on link: BleBmapLink,
+        on link: BossAppleLink,
         timeout: Duration
     ) async throws -> BmapPacket {
         try await link.send(packet: packet)

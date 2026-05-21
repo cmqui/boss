@@ -1,5 +1,5 @@
 import AppKit
-import libboss
+import libbossApple
 import SwiftUI
 
 private func deferMain(_ action: @escaping @MainActor () -> Void) {

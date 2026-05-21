@@ -256,6 +256,14 @@ public actor BossSession {
         self.packetSession = packetSession
     }
 
+    public init(link: any BossLink) {
+        self.packetSession = BossPacketSession(link: link)
+    }
+
+    public nonisolated func invalidate() {
+        packetSession.invalidate()
+    }
+
     public nonisolated func packetStream(
         matching predicate: @escaping @Sendable (BmapPacket) -> Bool
     ) -> AsyncThrowingStream<BmapPacket, Error> {

@@ -1,5 +1,5 @@
 import AppKit
-import libboss
+import libbossApple
 import ServiceManagement
 import SwiftUI
 

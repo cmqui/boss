@@ -1,5 +1,5 @@
 import Foundation
-import libboss
+import libbossApple
 
 extension Data {
     init(hexString: String) throws {

@@ -1,5 +1,4 @@
 import Foundation
-import libboss
 import libbossApple
 
 struct SettingsCommand {

@@ -5,10 +5,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define LIBBOSS_RS_BLE_SERVICE_UUID "0000FEBE-0000-1000-8000-00805F9B34FB"
+#define LIBBOSS_RS_BLE_SECURE_CHARACTERISTIC_UUID "C65B8F2F-AEE2-4C89-B758-BC4892D6F2D8"
+#define LIBBOSS_RS_BLE_UNSECURE_CHARACTERISTIC_UUID "D417C028-9818-4354-99D1-2AC09D074591"
+#define LIBBOSS_RS_SPP_UUID "00001101-0000-1000-8000-00805F9B34FB"
+
 typedef struct BossBuffer {
     uint8_t *data;
     size_t len;
 } BossBuffer;
+
+typedef struct BossBufferList {
+    BossBuffer *data;
+    size_t len;
+} BossBufferList;
 
 typedef enum BossFfiLinkStatus {
     BOSS_FFI_LINK_STATUS_OK = 0,
@@ -58,6 +68,11 @@ typedef struct BossFfiSessionCallbacks {
     BossFfiLinkStatus (*next_packet_bytes)(void *context, uint64_t timeout_millis, BossBuffer *out_packet);
     void (*release_context)(void *context);
 } BossFfiSessionCallbacks;
+
+typedef struct BossFfiAudioModesCapabilities {
+    int32_t bose_modes;
+    int32_t user_modes;
+} BossFfiAudioModesCapabilities;
 
 typedef struct BossFfiAudioModeSettingsConfig {
     int32_t cnc_level;
@@ -222,11 +237,35 @@ typedef struct BossFfiError {
 
 typedef struct BossFfiSessionHandle BossFfiSessionHandle;
 typedef struct BossFfiUpdateStreamHandle BossFfiUpdateStreamHandle;
+typedef struct BossFfiBleReassemblerHandle BossFfiBleReassemblerHandle;
+
+const char *boss_ble_service_uuid(void);
+const char *boss_ble_secure_characteristic_uuid(void);
+const char *boss_ble_unsecure_characteristic_uuid(void);
+const char *boss_spp_uuid(void);
 
 void boss_buffer_free(BossBuffer buffer);
+void boss_buffer_list_free(BossBufferList list);
 void boss_error_free(BossFfiError error);
 bool boss_bmap_decode_frame_size(const uint8_t *frame_data, size_t frame_len, size_t *out_payload_len);
 BossBuffer boss_copy_bytes(const uint8_t *data, size_t len);
+BossFfiBleReassemblerHandle *boss_ble_reassembler_create(void);
+void boss_ble_reassembler_free(BossFfiBleReassemblerHandle *handle);
+bool boss_ble_segment_packet(
+    const uint8_t *packet_data,
+    size_t packet_len,
+    size_t mtu,
+    BossBufferList *out_frames,
+    BossFfiError *out_error
+);
+bool boss_ble_reassembler_push(
+    BossFfiBleReassemblerHandle *handle,
+    const uint8_t *segment_data,
+    size_t segment_len,
+    BossBuffer *out_packet,
+    bool *out_has_packet,
+    BossFfiError *out_error
+);
 
 BossFfiSessionHandle *boss_session_create(BossFfiSessionCallbacks callbacks, BossFfiError *out_error);
 void boss_session_free(BossFfiSessionHandle *handle);
@@ -333,6 +372,12 @@ bool boss_session_audio_mode_configs(
     BossFfiError *out_error
 );
 
+bool boss_session_audio_mode_capabilities(
+    BossFfiSessionHandle *handle,
+    BossFfiAudioModesCapabilities *out_capabilities,
+    BossFfiError *out_error
+);
+
 bool boss_session_audio_mode_settings_config(
     BossFfiSessionHandle *handle,
     BossFfiAudioModeSettingsConfig *out_config,
@@ -401,6 +446,15 @@ bool boss_session_set_standby_timer(
     BossFfiSessionHandle *handle,
     int32_t minutes,
     BossFfiStandbyTimerValue *out_value,
+    BossFfiError *out_error
+);
+
+bool boss_session_set_favorite_audio_mode_indices(
+    BossFfiSessionHandle *handle,
+    int32_t number_of_modes,
+    const int32_t *favorite_indices_data,
+    size_t favorite_indices_len,
+    BossBuffer *out_indices,
     BossFfiError *out_error
 );
 

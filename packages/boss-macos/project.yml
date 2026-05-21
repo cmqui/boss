@@ -3,8 +3,6 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
 packages:
-  libboss:
-    path: ../libboss
   libbossApple:
     path: ../libboss-apple
 settings:
@@ -35,8 +33,6 @@ targets:
       - path: BossXcode/Assets.xcassets
         buildPhase: resources
     dependencies:
-      - package: libboss
-        product: libboss
       - package: libbossApple
         product: libbossApple
 schemes:
