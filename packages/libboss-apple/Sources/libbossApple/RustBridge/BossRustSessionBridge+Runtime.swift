@@ -542,10 +542,35 @@ final class BossRustFfiRuntime: @unchecked Sendable {
             paths.append(explicit)
         }
 
+        let dylibName = "liblibboss_rs_ffi.dylib"
+        let profiles = ffiBuildProfiles()
+
+        if let embedded = Bundle.main.path(forResource: "liblibboss_rs_ffi", ofType: "dylib", inDirectory: "Frameworks") {
+            paths.append(embedded)
+        }
+        if let frameworksURL = Bundle.main.privateFrameworksURL {
+            paths.append(frameworksURL.appendingPathComponent(dylibName).path)
+        }
+        if let executableURL = Bundle.main.executableURL {
+            let frameworksURL = executableURL
+                .deletingLastPathComponent()
+                .appendingPathComponent("../Frameworks/\(dylibName)")
+            paths.append(frameworksURL.standardizedFileURL.path)
+        }
+
+        for profile in profiles {
+            for base in repositorySearchRoots() {
+                paths.append(base.appendingPathComponent("libboss-rs/target/\(profile)/\(dylibName)").path)
+                paths.append(base.appendingPathComponent("packages/libboss-rs/target/\(profile)/\(dylibName)").path)
+            }
+        }
+
         let cwd = FileManager.default.currentDirectoryPath
-        paths.append("\(cwd)/../libboss-rs/target/debug/liblibboss_rs_ffi.dylib")
-        paths.append("\(cwd)/packages/libboss-rs/target/debug/liblibboss_rs_ffi.dylib")
-        paths.append("\(cwd)/target/debug/liblibboss_rs_ffi.dylib")
+        for profile in profiles {
+            paths.append("\(cwd)/../libboss-rs/target/\(profile)/\(dylibName)")
+            paths.append("\(cwd)/packages/libboss-rs/target/\(profile)/\(dylibName)")
+            paths.append("\(cwd)/target/\(profile)/\(dylibName)")
+        }
 
         var deduped: [String] = []
         var seen = Set<String>()
@@ -553,6 +578,51 @@ final class BossRustFfiRuntime: @unchecked Sendable {
             deduped.append(path)
         }
         return deduped
+    }
+
+    private static func ffiBuildProfiles() -> [String] {
+        #if DEBUG
+        return ["debug", "release"]
+        #else
+        return ["release", "debug"]
+        #endif
+    }
+
+    private static func repositorySearchRoots() -> [URL] {
+        var roots: [URL] = []
+        var seen = Set<String>()
+
+        func appendAncestors(of url: URL?) {
+            guard var directory = url?.standardizedFileURL else { return }
+            for _ in 0..<12 {
+                let path = directory.path
+                guard seen.insert(path).inserted else { break }
+                roots.append(directory)
+                let parent = directory.deletingLastPathComponent()
+                if parent.path == directory.path {
+                    break
+                }
+                directory = parent
+            }
+        }
+
+        appendAncestors(of: Bundle.main.bundleURL)
+        appendAncestors(of: Bundle.main.executableURL?.deletingLastPathComponent())
+        appendAncestors(of: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true))
+
+        return roots
+    }
+}
+
+extension BossRustFfiRuntime {
+    func loadCodecSymbol<T>(_ symbol: String, as _: T.Type) -> T? {
+        guard let handle else {
+            return nil
+        }
+        guard let pointer = dlsym(handle, symbol) else {
+            return nil
+        }
+        return unsafeBitCast(pointer, to: T.self)
     }
 }
 

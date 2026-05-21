@@ -1,5 +1,4 @@
 import Foundation
-import libboss
 import libbossApple
 
 @main
@@ -32,7 +31,7 @@ struct BossBootstrapCLI {
     private static func bootstrap(
         filter: AppleBossScanFilter,
         options: Options
-    ) async throws -> BootstrappedDevice {
+    ) async throws -> BossAppleBootstrappedDevice {
         _ = filter
         let connection = BossAppleConnectionOptions(
             nameContains: options.nameContains,
@@ -120,7 +119,7 @@ private struct UsageError: LocalizedError {
     }
 }
 
-private extension FunctionBlockSet {
+private extension BossAppleFunctionBlockSet {
     var sortedNames: [String] {
         allBlocks()
             .map(\.displayName)
@@ -128,7 +127,7 @@ private extension FunctionBlockSet {
     }
 }
 
-private extension BmapFunctionBlock {
+private extension BossAppleBmapFunctionBlock {
     var displayName: String {
         switch self {
         case .productInfo: "productInfo"

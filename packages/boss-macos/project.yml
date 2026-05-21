@@ -35,6 +35,11 @@ targets:
     dependencies:
       - package: libbossApple
         product: libbossApple
+    postBuildScripts:
+      - name: Build libboss-rs FFI
+        script: |
+          /bin/bash "${SRCROOT}/scripts/build-libboss-rs-ffi.sh"
+        basedOnDependencyAnalysis: false
 schemes:
   Boss:
     build:

@@ -70,7 +70,7 @@ struct ArgumentParser {
         return try parseBool(value, flag: label)
     }
 
-    mutating func requiredVolumeControlValue(for flag: String) throws -> BossVolumeControlValue {
+    mutating func requiredVolumeControlValue(for flag: String) throws -> BossAppleVolumeControlValue {
         guard let value = try optionalValue(for: flag) else {
             throw UsageError("Missing value for \(flag)")
         }
@@ -106,12 +106,12 @@ struct ArgumentParser {
         }
     }
 
-    mutating func onHeadDetectionPatch() throws -> BossOnHeadDetectionPatch {
+    mutating func onHeadDetectionPatch() throws -> BossAppleOnHeadDetectionPatch {
         let isEnabled = try optionalBool(for: "--enabled")
         let isAutoPlayEnabled = try optionalBool(for: "--auto-play")
         let isAutoAnswerEnabled = try optionalBool(for: "--auto-answer")
         let isAutoTransparencyEnabled = try optionalBool(for: "--auto-transparency")
-        let patch = BossOnHeadDetectionPatch(
+        let patch = BossAppleOnHeadDetectionPatch(
             isEnabled: isEnabled,
             isAutoPlayEnabled: isAutoPlayEnabled,
             isAutoAnswerEnabled: isAutoAnswerEnabled,
@@ -196,85 +196,6 @@ struct ArgumentParser {
             throw UsageError("Invalid UUID for \(flag): \(value)")
         }
         return parsed
-    }
-
-    mutating func optionalHexData(for flag: String) throws -> Data? {
-        guard let value = try optionalValue(for: flag) else {
-            return nil
-        }
-        return try Data(hexString: value)
-    }
-
-    mutating func requiredUInt8(for flag: String) throws -> UInt8 {
-        guard let value = try optionalValue(for: flag) else {
-            throw UsageError("Missing value for \(flag)")
-        }
-        let raw = parseIntegerString(value)
-        guard (0...Int(UInt8.max)).contains(raw) else {
-            throw UsageError("Invalid byte for \(flag): \(value)")
-        }
-        return UInt8(raw)
-    }
-
-    mutating func requiredOperator(for flag: String) throws -> BmapOperator {
-        guard let value = try optionalValue(for: flag) else {
-            throw UsageError("Missing value for \(flag)")
-        }
-        return try parseOperator(value, flag: flag)
-    }
-
-    mutating func optionalOperator(for flag: String) throws -> BmapOperator? {
-        guard let value = try optionalValue(for: flag) else {
-            return nil
-        }
-        return try parseOperator(value, flag: flag)
-    }
-
-    private func parseOperator(_ value: String, flag: String) throws -> BmapOperator {
-        switch value {
-        case "set": return .set
-        case "get": return .get
-        case "setGet": return .setGet
-        case "status": return .status
-        case "error": return .error
-        case "start": return .start
-        case "result": return .result
-        case "processing": return .processing
-        default:
-            let parsed = parseIntegerString(value)
-            guard (0...Int(UInt8.max)).contains(parsed) else {
-                throw UsageError("Invalid operator for \(flag): \(value)")
-            }
-            return BmapOperator(rawValue: UInt8(parsed))
-        }
-    }
-
-    mutating func requiredUInt8Range(for flag: String) throws -> ClosedRange<UInt8> {
-        guard let value = try optionalValue(for: flag) else {
-            throw UsageError("Missing value for \(flag)")
-        }
-        let parts = value.split(separator: "-", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else {
-            throw UsageError("Invalid range for \(flag): \(value)")
-        }
-        let lower = parseIntegerString(parts[0])
-        let upper = parseIntegerString(parts[1])
-        guard (0...Int(UInt8.max)).contains(lower),
-              (0...Int(UInt8.max)).contains(upper),
-              lower <= upper else {
-            throw UsageError("Invalid range for \(flag): \(value)")
-        }
-        return UInt8(lower)...UInt8(upper)
-    }
-
-    mutating func optionalResponseMatchMode(for flag: String) throws -> ResponseMatchMode? {
-        guard let value = try optionalValue(for: flag) else {
-            return nil
-        }
-        guard let mode = ResponseMatchMode(rawValue: value) else {
-            throw UsageError("Invalid value for \(flag): \(value)")
-        }
-        return mode
     }
 
     mutating func optionalCharacteristicPreference(for flag: String) throws -> AppleBossCharacteristicPreference? {

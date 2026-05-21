@@ -169,29 +169,29 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func swiftFirmwareVersion(from ffi: BossFfiFirmwareVersionInfo) -> FirmwareVersionInfo {
+    static func swiftFirmwareVersion(from ffi: BossFfiFirmwareVersionInfo) -> BossAppleFirmwareVersionInfo {
         let version = withUnsafeBytes(of: ffi.version_bytes) { rawBuffer in
             String(decoding: rawBuffer.prefix(ffi.version_len), as: UTF8.self)
         }
-        return FirmwareVersionInfo(version: version, port: Int(ffi.port))
+        return BossAppleFirmwareVersionInfo(version: version, port: Int(ffi.port))
     }
 
-    static func swiftStandbyTimer(from ffi: BossFfiStandbyTimerValue) -> BossStandbyTimerValue {
-        BossStandbyTimerValue(
+    static func swiftStandbyTimer(from ffi: BossFfiStandbyTimerValue) -> BossAppleStandbyTimerValue {
+        BossAppleStandbyTimerValue(
             minutes: Int(ffi.minutes),
             supportsTwoByteMinutes: ffi.supports_two_byte_minutes
         )
     }
 
-    static func swiftSettingsSnapshot(from buffer: BossBuffer) throws -> BossSettingsSnapshot {
+    static func swiftSettingsSnapshot(from buffer: BossBuffer) throws -> BossAppleSettingsSnapshot {
         do {
-            return try BossSettingsSnapshot(encodedPackets: readData(buffer))
+            return try BossAppleSettingsSnapshot(encodedPackets: readData(buffer))
         } catch let error as BossSettingsCodecError {
             throw BossAppleControlError.unsupportedOperation(error.localizedDescription)
         }
     }
 
-    static func swiftBootstrappedDevice(from ffi: BossFfiBootstrappedDevice) -> BootstrappedDevice {
+    static func swiftBootstrappedDevice(from ffi: BossFfiBootstrappedDevice) -> BossAppleBootstrappedDevice {
         let bmapVersion = withUnsafeBytes(of: ffi.bmap_version_bytes) { rawBuffer in
             String(decoding: rawBuffer.prefix(ffi.bmap_version_len), as: UTF8.self)
         }
@@ -202,17 +202,17 @@ extension BossRustSessionBridge {
             Data(rawBuffer.prefix(ffi.function_blocks_len))
         }
         let product = ProductMap.product(for: ffi.product_id)
-        return BootstrappedDevice(
-            bmapVersion: BmapVersionInfo(version: bmapVersion),
+        return BossAppleBootstrappedDevice(
+            bmapVersion: BossAppleBmapVersionInfo(version: bmapVersion),
             productID: ffi.product_id,
             productName: productName,
-            productVariant: ProductIDVariant(
+            productVariant: BossAppleProductVariant(
                 productID: ffi.product_id,
                 variant: ffi.variant,
-                product: product,
+                product: product.map(BossAppleProductDefinition.init),
                 variantName: product?.variants[ffi.variant]
             ),
-            supportedFunctionBlocks: FunctionBlockSet(bytes: functionBlockBytes),
+            supportedFunctionBlocks: BossAppleFunctionBlockSet(bytes: functionBlockBytes),
             transportKind: ffi.transport_kind == 0 ? .ble : .stream,
             defaultDeviceID: Int(ffi.default_device_id),
             defaultPort: Int(ffi.default_port)
@@ -237,7 +237,7 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func swiftObservedOnHeadDetection(from ffi: BossFfiObservedOnHeadDetection) -> BossAppleObservedSetting<BossOnHeadDetectionValue> {
+    static func swiftObservedOnHeadDetection(from ffi: BossFfiObservedOnHeadDetection) -> BossAppleObservedSetting<BossAppleOnHeadDetectionValue> {
         BossAppleObservedSetting(
             value: ffi.has_value ? swiftOnHeadDetection(from: ffi.value) : nil,
             source: ffi.has_source ? swiftSettingSource(raw: ffi.source) : nil,
@@ -245,7 +245,7 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func swiftObservedVolumeControl(from ffi: BossFfiObservedVolumeControlStatus) -> BossAppleObservedSetting<BossVolumeControlStatus> {
+    static func swiftObservedVolumeControl(from ffi: BossFfiObservedVolumeControlStatus) -> BossAppleObservedSetting<BossAppleVolumeControlStatus> {
         BossAppleObservedSetting(
             value: ffi.has_value ? (try? swiftVolumeControlStatus(from: ffi.value)) : nil,
             source: ffi.has_source ? swiftSettingSource(raw: ffi.source) : nil,
@@ -308,7 +308,7 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func ffiOnHeadDetection(from value: BossOnHeadDetectionValue) -> BossFfiOnHeadDetectionValue {
+    static func ffiOnHeadDetection(from value: BossAppleOnHeadDetectionValue) -> BossFfiOnHeadDetectionValue {
         BossFfiOnHeadDetectionValue(
             is_enabled: value.isEnabled,
             has_auto_play_enabled: value.isAutoPlayEnabled != nil,
@@ -355,8 +355,8 @@ extension BossRustSessionBridge {
         return BossEqualizerSettings(ranges: ranges)
     }
 
-    static func swiftOnHeadDetection(from ffi: BossFfiOnHeadDetectionValue) -> BossOnHeadDetectionValue {
-        BossOnHeadDetectionValue(
+    static func swiftOnHeadDetection(from ffi: BossFfiOnHeadDetectionValue) -> BossAppleOnHeadDetectionValue {
+        BossAppleOnHeadDetectionValue(
             isEnabled: ffi.is_enabled,
             isAutoPlayEnabled: ffi.has_auto_play_enabled ? ffi.auto_play_enabled : nil,
             isAutoAnswerEnabled: ffi.has_auto_answer_enabled ? ffi.auto_answer_enabled : nil,
@@ -364,19 +364,19 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func swiftVolumeControlStatus(from ffi: BossFfiVolumeControlStatus) throws -> BossVolumeControlStatus {
-        guard let value = BossVolumeControlValue(rawValue: ffi.value) else {
+    static func swiftVolumeControlStatus(from ffi: BossFfiVolumeControlStatus) throws -> BossAppleVolumeControlStatus {
+        guard let value = BossAppleVolumeControlValue(rawValue: ffi.value) else {
             throw BossAppleControlError.unsupportedOperation(
                 "Rust FFI returned unknown volume control value \(ffi.value)"
             )
         }
-        let supportedValues: [BossVolumeControlValue]? = ffi.has_supported_values_mask ? [
+        let supportedValues: [BossAppleVolumeControlValue]? = ffi.has_supported_values_mask ? [
             (ffi.supported_values_mask & 0x08) == 0x08 ? .disabled : nil,
             (ffi.supported_values_mask & 0x01) == 0x01 ? .button : nil,
             (ffi.supported_values_mask & 0x02) == 0x02 ? .capTouch : nil,
             (ffi.supported_values_mask & 0x04) == 0x04 ? .imu : nil,
         ].compactMap { $0 } : nil
 
-        return BossVolumeControlStatus(value: value, supportedValues: supportedValues)
+        return BossAppleVolumeControlStatus(value: value, supportedValues: supportedValues)
     }
 }

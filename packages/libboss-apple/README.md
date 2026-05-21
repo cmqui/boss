@@ -20,10 +20,26 @@ Observed Bose QC Ultra 2 HP behavior on macOS:
 - bootstrap notifications arrive on the secure characteristic
 - `writeWithoutResponse` is the working write mode on real hardware
 
+## Rust FFI runtime
+
+Session APIs such as `bootstrap()` require `liblibboss_rs_ffi.dylib` (or static linking with `LIBBOSS_RS_STATIC_LINKED`).
+
+Build the dylib from the workspace:
+
+```bash
+cd packages/libboss-rs
+cargo build -p libboss-rs-ffi
+```
+
+At runtime, `BossRustSessionBridge` loads `target/debug/liblibboss_rs_ffi.dylib` from the app bundle `Frameworks/`, a repo-relative path, or `LIBBOSS_RS_FFI_DYLIB`.
+
+The `boss-macos` Xcode target runs `scripts/build-libboss-rs-ffi.sh` after each build to compile Rust and copy the dylib into `Boss.app/Contents/Frameworks`.
+
 ## Running
 
 ```bash
-cd packages/libboss-apple
+cd packages/libboss-rs && cargo build -p libboss-rs-ffi
+cd ../libboss-apple
 swift run boss-bootstrap --name Bose --timeout 20
 ```
 
@@ -99,8 +115,6 @@ Convenience wrappers are available for the common GUI controls:
 - `setWindBlockEnabled(_:)`
 - `setANCEnabled(_:)`
 - `setCurrentAudioMode(index:playVoicePrompt:)`
-
-`withConnectedLink(_:)` is also exposed as an escape hatch for app code that needs raw `BleBmapLink` access while new typed APIs are still being added.
 
 ## CLI
 

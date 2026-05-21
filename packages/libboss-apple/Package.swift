@@ -36,7 +36,6 @@ let package = Package(
             name: "boss-bootstrap",
             dependencies: [
                 "libbossApple",
-                .product(name: "libboss", package: "libboss"),
             ]
         ),
         .testTarget(

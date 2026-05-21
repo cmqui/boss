@@ -14,7 +14,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
     static let shared = BossRustFfiRuntime.shared.map(BossRustSessionBridge.init(runtime:))
 
     private func sessionCallbacks(for transport: AppleBleBossTransport) -> BossFfiSessionCallbacks {
-        let bridge = BossRustBleTransportBridge(runtime: runtime, transport: transport)
+        let bridge = transport.sharedRustPacketBridge(runtime: runtime)
         let retained = Unmanaged.passRetained(bridge)
         return BossFfiSessionCallbacks(
             context: retained.toOpaque(),
@@ -52,7 +52,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         return try operation(handle)
     }
 
-    func bootstrap(on transport: AppleBleBossTransport) async throws -> BootstrappedDevice {
+    func bootstrap(on transport: AppleBleBossTransport) async throws -> BossAppleBootstrappedDevice {
         BossRustLogger.log("using Rust bridge for bootstrap")
         var device = BossFfiBootstrappedDevice()
         var operationError = emptyError()
@@ -205,7 +205,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func standbyTimer(on transport: AppleBleBossTransport) async throws -> BossStandbyTimerValue {
+    func standbyTimer(on transport: AppleBleBossTransport) async throws -> BossAppleStandbyTimerValue {
         BossRustLogger.log("using Rust bridge for standbyTimer")
         return try withSessionHandle(on: transport) { handle in
             var value = BossFfiStandbyTimerValue()
@@ -219,7 +219,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func settingsSnapshot(on transport: AppleBleBossTransport) async throws -> BossSettingsSnapshot {
+    func settingsSnapshot(on transport: AppleBleBossTransport) async throws -> BossAppleSettingsSnapshot {
         BossRustLogger.log("using Rust bridge for settingsSnapshot")
         return try withSessionHandle(on: transport) { handle in
             var buffer = BossBuffer(data: nil, len: 0)
@@ -296,7 +296,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         on transport: AppleBleBossTransport,
         port: Int,
         deviceID: Int
-    ) async throws -> FirmwareVersionInfo {
+    ) async throws -> BossAppleFirmwareVersionInfo {
         BossRustLogger.log("using Rust bridge for firmwareVersion(port: \(port), deviceID: \(deviceID))")
         return try withSessionHandle(on: transport) { handle in
             var info = BossFfiFirmwareVersionInfo()
@@ -415,7 +415,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
     }
 
     private func deviceSettingsReport(handle: UnsafeMutableRawPointer?) throws -> BossAppleDeviceSettingsReport {
-        let wearDetection: BossAppleObservedSetting<BossOnHeadDetectionValue> = try directObservedSetting {
+        let wearDetection: BossAppleObservedSetting<BossAppleOnHeadDetectionValue> = try directObservedSetting {
             var value = BossFfiOnHeadDetectionValue()
             var operationError = emptyError()
             let success = runtime.bossSessionOnHeadDetection(handle, &value, &operationError)
@@ -479,7 +479,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
             }
         }
 
-        let volumeControl: BossAppleObservedSetting<BossVolumeControlStatus> = try directObservedSetting {
+        let volumeControl: BossAppleObservedSetting<BossAppleVolumeControlStatus> = try directObservedSetting {
             var status = BossFfiVolumeControlStatus()
             var operationError = emptyError()
             let success = runtime.bossSessionVolumeControlStatus(handle, &status, &operationError)
@@ -645,7 +645,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
     func setWearDetectionEnabled(
         on transport: AppleBleBossTransport,
         enabled: Bool
-    ) async throws -> BossOnHeadDetectionValue {
+    ) async throws -> BossAppleOnHeadDetectionValue {
         BossRustLogger.log("using Rust bridge for setWearDetectionEnabled(enabled: \(enabled))")
         return try withSessionHandle(on: transport) { handle in
             var current = BossFfiOnHeadDetectionValue()
@@ -670,8 +670,8 @@ final class BossRustSessionBridge: @unchecked Sendable {
 
     func setWearDetection(
         on transport: AppleBleBossTransport,
-        value: BossOnHeadDetectionValue
-    ) async throws -> BossOnHeadDetectionValue {
+        value: BossAppleOnHeadDetectionValue
+    ) async throws -> BossAppleOnHeadDetectionValue {
         BossRustLogger.log("using Rust bridge for setWearDetection")
         return try withSessionHandle(on: transport) { handle in
             var updated = BossFfiOnHeadDetectionValue()
@@ -692,8 +692,8 @@ final class BossRustSessionBridge: @unchecked Sendable {
 
     func setVolumeControl(
         on transport: AppleBleBossTransport,
-        value: BossVolumeControlValue
-    ) async throws -> BossVolumeControlStatus {
+        value: BossAppleVolumeControlValue
+    ) async throws -> BossAppleVolumeControlStatus {
         BossRustLogger.log("using Rust bridge for setVolumeControl(value: \(value.displayName))")
         return try withSessionHandle(on: transport) { handle in
             var status = BossFfiVolumeControlStatus()
@@ -710,7 +710,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
     func setStandbyTimer(
         on transport: AppleBleBossTransport,
         minutes: Int
-    ) async throws -> BossStandbyTimerValue {
+    ) async throws -> BossAppleStandbyTimerValue {
         BossRustLogger.log("using Rust bridge for setStandbyTimer(minutes: \(minutes))")
         return try withSessionHandle(on: transport) { handle in
             var value = BossFfiStandbyTimerValue()

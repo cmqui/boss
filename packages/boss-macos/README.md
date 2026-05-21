@@ -5,6 +5,16 @@ SwiftUI macOS control surface for Bose QC Ultra 2 HP.
 Run it from this package directory:
 
 ```sh
+cd ../libboss-rs && cargo build -p libboss-rs-ffi
+cd ../boss-macos && swift run Boss
+```
+
+The macOS app loads `liblibboss_rs_ffi.dylib` at runtime. The Xcode project runs `scripts/build-libboss-rs-ffi.sh` after each build and copies the dylib into `Boss.app/Contents/Frameworks`. Install [Rust](https://rustup.rs) so `cargo` is available (`~/.cargo/bin`); Xcode does not load your shell profile by default.
+
+If you run outside Xcode without embedding the dylib, point at a built copy explicitly:
+
+```sh
+export LIBBOSS_RS_FFI_DYLIB="$PWD/../libboss-rs/target/debug/liblibboss_rs_ffi.dylib"
 swift run Boss
 ```
 

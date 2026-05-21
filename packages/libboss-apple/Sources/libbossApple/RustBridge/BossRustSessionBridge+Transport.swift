@@ -150,8 +150,13 @@ final class BossRustBleTransportBridge: BossRustPacketByteBridge, @unchecked Sen
         }
     }
 
-    deinit {
+    func shutdown() {
         consumeTask?.cancel()
+        consumeTask = nil
+    }
+
+    deinit {
+        shutdown()
     }
 
     func send(packetBytes: UnsafePointer<UInt8>?, len: Int) -> BossFfiLinkStatus {

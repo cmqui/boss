@@ -110,8 +110,20 @@ public final class AppleBleBossTransport: NSObject, @unchecked Sendable {
     private var closeError: Error?
     private var rejectedPeripheralIdentifiers = Set<UUID>()
     private var shouldResumeScanningAfterDisconnect = false
+    private var rustPacketBridge: BossRustBleTransportBridge?
     private let debugLoggingEnabled = ProcessInfo.processInfo.environment["LIBBOSS_APPLE_DEBUG"] == "1"
     private let packetLoggingEnabled = ProcessInfo.processInfo.environment["LIBBOSS_APPLE_DEBUG_PACKETS"] == "1"
+
+    func sharedRustPacketBridge(runtime: BossRustFfiRuntime) -> BossRustBleTransportBridge {
+        stateQueue.sync {
+            if let rustPacketBridge {
+                return rustPacketBridge
+            }
+            let bridge = BossRustBleTransportBridge(runtime: runtime, transport: self)
+            rustPacketBridge = bridge
+            return bridge
+        }
+    }
 
     public static func connect(
         filter: AppleBossScanFilter = AppleBossScanFilter(),
@@ -176,6 +188,8 @@ public final class AppleBleBossTransport: NSObject, @unchecked Sendable {
             }
 
             self.debug("closing transport")
+            self.rustPacketBridge?.shutdown()
+            self.rustPacketBridge = nil
             self.isClosed = true
             self.timeoutTask?.cancel()
             self.timeoutTask = nil

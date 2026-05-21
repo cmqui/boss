@@ -1,5 +1,4 @@
 import Foundation
-import libboss
 
 extension BossAppleController {
     static func supportedAudioModePrompts(
@@ -7,53 +6,11 @@ extension BossAppleController {
         timeout: Duration
     ) async throws -> [BossAudioModePrompt] {
         let response = try await sendAndAwaitSameFunction(
-            packet: BossAudioModesCodec.namesSupportedGetPacket(),
+            packet: try namesSupportedGetPacket(),
             on: link,
             timeout: timeout
         )
-        return try BossAudioModesCodec.parseSupportedPrompts(from: response)
-    }
-
-    static func awaitSettingsSnapshot(
-        on link: BossAppleLink,
-        timeout: Duration
-    ) async throws -> BossSettingsSnapshot {
-        try await link.send(packet: BossSettingsCodec.settingsPacket(
-            functionRaw: BossSettingsCodec.settingsGetAllFunctionRaw,
-            operatorValue: .start
-        ))
-        return try await withThrowingTaskGroup(of: BossSettingsSnapshot.self) { group in
-            group.addTask {
-                var snapshot: [UInt8: BmapPacket] = [:]
-                for try await packet in link.packets {
-                    guard packet.functionBlock == .settings else {
-                        continue
-                    }
-                    let rawFunction = packet.function.rawValue
-                    if rawFunction == BossSettingsCodec.settingsGetAllFunctionRaw, packet.operator == .error {
-                        throw BossAppleControlError.bmapErrorResponse(
-                            context: "settings.SettingsGetAll",
-                            payloadHex: hexString(packet.payload)
-                        )
-                    }
-                    if rawFunction == BossSettingsCodec.settingsGetAllFunctionRaw, packet.operator == .result {
-                        return BossSettingsSnapshot(packetsByFunctionRaw: snapshot)
-                    }
-                    guard packet.operator == .status else {
-                        continue
-                    }
-                    snapshot[rawFunction] = packet
-                }
-                throw BossAppleControlError.responseStreamEnded
-            }
-            group.addTask {
-                try await Task.sleep(for: timeout)
-                throw BossAppleControlError.responseTimedOut(seconds: timeout.components.seconds)
-            }
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
-        }
+        return try parseSupportedPrompts(from: response)
     }
 
     static func withConnectedLink<T: Sendable>(

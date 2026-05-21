@@ -54,11 +54,8 @@ final class BossMacOSViewModel: ObservableObject {
 
     private var hasStartedInitialRefresh = false
     private var discoveryTask: Task<Void, Never>?
-    private var currentModeUpdateTask: Task<Void, Never>?
-    private var settingsUpdateTask: Task<Void, Never>?
-    private var equalizerUpdateTask: Task<Void, Never>?
-    private var deviceSettingsUpdateTask: Task<Void, Never>?
-    private var audioModeCatalogUpdateTask: Task<Void, Never>?
+    private var workspaceUpdateTask: Task<Void, Never>?
+    private static let audioModeCatalogPollInterval = 6
     private var session: BossAppleSession?
     private var selectedDeviceIdentifier: UUID?
     private var isManualDeviceSelection = false
@@ -535,8 +532,10 @@ final class BossMacOSViewModel: ObservableObject {
         run("Updating Volume Control") {
             let session = self.makeSession()
             do {
-                let updated = try await session.setVolumeControl(value)
-                self.volumeControlValue = updated.value
+                let updated = try await session.setVolumeControl(
+                    BossAppleVolumeControlValue(rawValue: value.rawValue) ?? .disabled
+                )
+                self.volumeControlValue = BossVolumeControlValue(rawValue: updated.value.rawValue) ?? .disabled
                 self.lastResultMessage = "Volume control updated"
             } catch {
                 self.volumeControlValue = previousValue
@@ -746,78 +745,50 @@ final class BossMacOSViewModel: ObservableObject {
 
     private func startBackgroundLoad(using session: BossAppleSession) {
         cancelBackgroundLoad()
-        currentModeUpdateTask = Task { [weak self] in
+        workspaceUpdateTask = Task { [weak self] in
             guard let self else {
                 return
             }
 
             do {
-                let updates = await session.currentAudioModeUpdateStream()
-                for try await currentAudioModeIndex in updates {
+                let updates = session.modeWorkspaceUpdates(interval: .seconds(5))
+                var pollCount = 0
+                for try await snapshot in updates {
                     guard !Task.isCancelled else {
                         break
                     }
+
                     await MainActor.run {
+                        guard self.appScreen == .workspace else {
+                            return
+                        }
+
+                        let modeChanged = self.currentAudioModeIndex != snapshot.currentAudioModeIndex
+                        self.currentAudioModeIndex = snapshot.currentAudioModeIndex
                         Self.log(self.debugSummary(
-                            "Current mode stream update",
+                            "Mode workspace poll update",
                             selectedModeIndex: self.selectedAudioModeIndex,
                             currentModeIndex: self.currentAudioModeIndex,
-                            incomingModeIndex: currentAudioModeIndex,
-                            draftSettings: self.settings
+                            liveSettings: snapshot.settings
                         ))
-                    }
-                    let shouldRefreshWorkspace = await MainActor.run {
-                        guard self.appScreen == .workspace else {
-                            return false
-                        }
-                        let modeChanged = self.currentAudioModeIndex != currentAudioModeIndex
-                        self.currentAudioModeIndex = currentAudioModeIndex
-                        return modeChanged
-                    }
 
-                    if shouldRefreshWorkspace {
-                        await MainActor.run {
-                            self.loadState = .loading("Refreshing mode state")
+                        if !self.hasDetachedSettingsDraft {
+                            self.applyDisplayedModeSettings(liveConfig: snapshot.settings)
                         }
-                        try await self.reloadModeWorkspace(using: session)
-                        await MainActor.run {
-                            self.loadState = .ready
+                        if !self.hasDetachedEqualizerDraft {
+                            self.applyEqualizerSnapshot(snapshot.equalizer)
+                        }
+                        self.applyDeviceSettings(snapshot.deviceSettings.settings)
+
+                        if modeChanged {
                             self.lastResultMessage = "Mode changed on device; controls refreshed"
                         }
                     }
-                }
-            } catch {
-                await MainActor.run {
-                    guard self.appScreen == .workspace, !self.isBusy else {
-                        return
-                    }
-                    self.lastResultMessage = "Live mode updates paused: \(Self.describe(error))"
-                }
-            }
-        }
 
-        settingsUpdateTask = Task { [weak self] in
-            guard let self else {
-                return
-            }
-
-            do {
-                let updates = await session.audioModeSettingsUpdateStream()
-                for try await config in updates {
-                    guard !Task.isCancelled else {
-                        break
-                    }
-                    await MainActor.run {
-                        guard self.appScreen == .workspace, !self.hasDetachedSettingsDraft else {
-                            return
-                        }
-                        Self.log(self.debugSummary(
-                            "Live settings stream update",
-                            selectedModeIndex: self.selectedAudioModeIndex,
-                            currentModeIndex: self.currentAudioModeIndex,
-                            liveSettings: config
-                        ))
-                        self.applyDisplayedModeSettings(liveConfig: config)
+                    pollCount += 1
+                    if pollCount >= Self.audioModeCatalogPollInterval {
+                        pollCount = 0
+                        try await self.refreshAudioModeCatalog(using: session)
                     }
                 }
             } catch {
@@ -825,115 +796,33 @@ final class BossMacOSViewModel: ObservableObject {
                     guard self.appScreen == .workspace, !self.isBusy else {
                         return
                     }
-                    self.lastResultMessage = "Live settings updates paused: \(Self.describe(error))"
-                }
-            }
-        }
-
-        equalizerUpdateTask = Task { [weak self] in
-            guard let self else {
-                return
-            }
-
-            do {
-                let updates = await session.equalizerUpdateStream()
-                for try await settings in updates {
-                    guard !Task.isCancelled else {
-                        break
-                    }
-                    await MainActor.run {
-                        guard self.appScreen == .workspace, !self.hasDetachedEqualizerDraft else {
-                            return
-                        }
-                        self.applyEqualizerSnapshot(settings)
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    guard self.appScreen == .workspace, !self.isBusy else {
-                        return
-                    }
-                    self.lastResultMessage = "Live EQ updates paused: \(Self.describe(error))"
-                }
-            }
-        }
-
-        deviceSettingsUpdateTask = Task { [weak self] in
-            guard let self else {
-                return
-            }
-
-            do {
-                let updates = await session.deviceSettingsUpdateStream()
-                for try await report in updates {
-                    guard !Task.isCancelled else {
-                        break
-                    }
-                    await MainActor.run {
-                        guard self.appScreen == .workspace else {
-                            return
-                        }
-                        self.applyDeviceSettings(report.settings)
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    guard self.appScreen == .workspace, !self.isBusy else {
-                        return
-                    }
-                    self.lastResultMessage = "Live device settings updates paused: \(Self.describe(error))"
-                }
-            }
-        }
-
-        audioModeCatalogUpdateTask = Task { [weak self] in
-            guard let self else {
-                return
-            }
-
-            do {
-                let updates = await session.audioModeCatalogUpdateStream()
-                for try await modes in updates {
-                    guard !Task.isCancelled else {
-                        break
-                    }
-                    await MainActor.run {
-                        guard self.appScreen == .workspace else {
-                            return
-                        }
-                        let selectedMode = self.selectedModeConfig
-                        Self.log(self.debugSummary(
-                            "Audio mode catalog stream update",
-                            selectedModeIndex: self.selectedAudioModeIndex,
-                            currentModeIndex: self.currentAudioModeIndex,
-                            mode: selectedMode,
-                            draftSettings: selectedMode?.settings
-                        ) + " catalogCount=\(modes.count)")
-                        self.applyAudioModes(modes)
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    guard self.appScreen == .workspace, !self.isBusy else {
-                        return
-                    }
-                    self.lastResultMessage = "Live audio mode updates paused: \(Self.describe(error))"
+                    self.lastResultMessage = "Live updates paused: \(Self.describe(error))"
                 }
             }
         }
     }
 
+    private func refreshAudioModeCatalog(using session: BossAppleSession) async throws {
+        let modes = try await session.audioModeConfigs()
+        await MainActor.run {
+            guard self.appScreen == .workspace else {
+                return
+            }
+            let selectedMode = self.selectedModeConfig
+            Self.log(self.debugSummary(
+                "Audio mode catalog poll update",
+                selectedModeIndex: self.selectedAudioModeIndex,
+                currentModeIndex: self.currentAudioModeIndex,
+                mode: selectedMode,
+                draftSettings: selectedMode?.settings
+            ) + " catalogCount=\(modes.count)")
+            self.applyAudioModes(modes)
+        }
+    }
+
     private func cancelBackgroundLoad() {
-        currentModeUpdateTask?.cancel()
-        currentModeUpdateTask = nil
-        settingsUpdateTask?.cancel()
-        settingsUpdateTask = nil
-        equalizerUpdateTask?.cancel()
-        equalizerUpdateTask = nil
-        deviceSettingsUpdateTask?.cancel()
-        deviceSettingsUpdateTask = nil
-        audioModeCatalogUpdateTask?.cancel()
-        audioModeCatalogUpdateTask = nil
+        workspaceUpdateTask?.cancel()
+        workspaceUpdateTask = nil
     }
 
     private func waitingMessage(for error: Error, description: String) -> String {
@@ -1005,12 +894,14 @@ final class BossMacOSViewModel: ObservableObject {
         hasDetachedEqualizerDraft = false
     }
 
-    private func applyDeviceSettings(_ deviceSettings: BossDeviceSettings) {
+    private func applyDeviceSettings(_ deviceSettings: BossAppleDeviceSettings) {
         wearDetectionEnabled = deviceSettings.wearDetection?.isEnabled
         autoAwareEnabled = deviceSettings.autoAwareEnabled
         autoPlayPauseEnabled = deviceSettings.autoPlayPauseEnabled ?? deviceSettings.wearDetection?.isAutoPlayEnabled
         autoAnswerEnabled = deviceSettings.autoAnswerEnabled ?? deviceSettings.wearDetection?.isAutoAnswerEnabled
-        volumeControlValue = deviceSettings.volumeControl?.value
+        volumeControlValue = deviceSettings.volumeControl.map {
+            BossVolumeControlValue(rawValue: $0.value.rawValue) ?? .disabled
+        }
     }
 
     private func applyAudioModes(_ modes: [BossAudioModeConfig]) {

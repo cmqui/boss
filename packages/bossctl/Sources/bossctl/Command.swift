@@ -3,10 +3,6 @@ import libbossApple
 
 enum Command {
     case bootstrap(ConnectionOptions)
-    case bmapSend(BmapSendOptions)
-    case bmapWatch(BmapWatchOptions)
-    case bmapTrace(BmapTraceOptions)
-    case bmapProbe(BmapProbeOptions)
     case settings(SettingsCommand)
     case audioMode(AudioModeCommand)
 
@@ -24,23 +20,6 @@ enum Command {
             return .settings(try SettingsCommand.parse(arguments: args))
         case "audio-mode":
             return .audioMode(try AudioModeCommand.parse(arguments: args))
-        case "bmap":
-            guard !args.isEmpty else {
-                throw UsageError(Command.usage)
-            }
-            let subcommand = args.removeFirst()
-            switch subcommand {
-            case "send":
-                return .bmapSend(try BmapSendOptions.parse(arguments: args))
-            case "watch":
-                return .bmapWatch(try BmapWatchOptions.parse(arguments: args))
-            case "trace":
-                return .bmapTrace(try BmapTraceOptions.parse(arguments: args))
-            case "probe":
-                return .bmapProbe(try BmapProbeOptions.parse(arguments: args))
-            default:
-                throw UsageError(Command.usage)
-            }
         case "--help", "-h", "help":
             throw UsageError(Command.usage, isHelp: true)
         default:
@@ -73,10 +52,6 @@ enum Command {
       bossctl audio-mode favorites [connection options]
       bossctl audio-mode favorite (--index <n> | --mode <name>) [connection options]
       bossctl audio-mode unfavorite (--index <n> | --mode <name>) [connection options]
-      bossctl bmap send --block <id> --function <id> --op <set|get|setGet|start|0x..> [--device-id <n>] [--port <n>] [--payload <hex>] [--match same|any] [--response-timeout <seconds>] [connection options]
-      bossctl bmap trace --block <id> --function <id> --op <set|get|setGet|start|0x..> [--device-id <n>] [--port <n>] [--payload <hex>] [--match same|any] [--listen <seconds>] [connection options]
-      bossctl bmap watch [--count <n>] [connection options]
-      bossctl bmap probe --block <id> --functions <start-end> [--op <get|start|0x..>] [--device-id <n>] [--port <n>] [--payload <hex>] [--response-timeout-ms <n>] [connection options]
 
     Connection options:
       --name <substring>

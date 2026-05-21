@@ -74,6 +74,15 @@ typedef struct BossFfiAudioModesCapabilities {
     int32_t user_modes;
 } BossFfiAudioModesCapabilities;
 
+typedef struct BossFfiBmapPacket {
+    uint8_t function_block_raw;
+    uint8_t function_raw;
+    uint8_t device_id;
+    uint8_t port;
+    uint8_t operator_raw;
+    BossBuffer payload;
+} BossFfiBmapPacket;
+
 typedef struct BossFfiCurrentAudioModeWriteResult {
     BossFfiWriteDisposition disposition;
     int32_t mode_index;
@@ -247,8 +256,41 @@ const char *boss_spp_uuid(void);
 void boss_buffer_free(BossBuffer buffer);
 void boss_buffer_list_free(BossBufferList list);
 void boss_error_free(BossFfiError error);
+void boss_packet_free(BossFfiBmapPacket packet);
+bool boss_packet_encode(BossFfiBmapPacket packet, BossBuffer *out_bytes, BossFfiError *out_error);
+bool boss_packet_decode(const uint8_t *packet_data, size_t packet_len, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
 bool boss_bmap_decode_frame_size(const uint8_t *frame_data, size_t frame_len, size_t *out_payload_len);
 BossBuffer boss_copy_bytes(const uint8_t *data, size_t len);
+bool boss_audio_modes_names_supported_get_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_current_mode_get_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_current_mode_start_packet(int32_t mode_index, bool play_voice_prompt, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_capabilities_get_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_favorites_get_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_settings_config_get_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_mode_config_start_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_settings_config_set_get_packet(BossFfiAudioModeSettingsConfig config, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_mode_config_set_get_packet(int32_t mode_index, uint8_t prompt_byte1, uint8_t prompt_byte2, const uint8_t *name_bytes, size_t name_len, BossFfiAudioModeSettingsConfig settings, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_favorites_set_get_packet(int32_t number_of_modes, const int32_t *favorite_mode_indices, size_t favorite_mode_indices_len, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_settings_get_all_start_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_settings_standby_timer_get_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_settings_standby_timer_set_get_packet(int32_t minutes, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_settings_on_head_detection_get_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_settings_on_head_detection_set_get_packet(BossFfiOnHeadDetectionValue value, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_settings_enabled_setting_get_packet(uint8_t function_raw, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_settings_enabled_setting_set_get_packet(uint8_t function_raw, bool enabled, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_settings_equalizer_get_packet(BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_settings_equalizer_set_get_packet(int32_t target_level, uint8_t band_raw, BossFfiBmapPacket *out_packet, BossFfiError *out_error);
+bool boss_audio_modes_parse_supported_prompts(const BossFfiBmapPacket *packet, BossBuffer *out_prompts, BossFfiError *out_error);
+bool boss_audio_modes_parse_current_mode(const BossFfiBmapPacket *packet, int32_t *out_mode_index, BossFfiError *out_error);
+bool boss_audio_modes_parse_capabilities(const BossFfiBmapPacket *packet, BossFfiAudioModesCapabilities *out_capabilities, BossFfiError *out_error);
+bool boss_audio_modes_parse_favorites(const BossFfiBmapPacket *packet, BossBuffer *out_favorites, BossFfiError *out_error);
+bool boss_audio_modes_parse_settings_config(const BossFfiBmapPacket *packet, BossFfiAudioModeSettingsConfig *out_config, BossFfiError *out_error);
+bool boss_audio_modes_parse_mode_config_detail(const BossFfiBmapPacket *packet, BossFfiAudioModeConfig *out_config, BossFfiError *out_error);
+bool boss_audio_modes_parse_volume_control_status(const BossFfiBmapPacket *packet, BossFfiVolumeControlStatus *out_status, BossFfiError *out_error);
+bool boss_settings_parse_equalizer(const BossFfiBmapPacket *packet, BossFfiEqualizerSettings *out_settings, BossFfiError *out_error);
+bool boss_settings_parse_standby_timer(const BossFfiBmapPacket *packet, BossFfiStandbyTimerValue *out_value, BossFfiError *out_error);
+bool boss_settings_parse_enabled_flag(const BossFfiBmapPacket *packet, bool *out_enabled, BossFfiError *out_error);
+bool boss_settings_parse_on_head_detection(const BossFfiBmapPacket *packet, BossFfiOnHeadDetectionValue *out_value, BossFfiError *out_error);
 BossFfiBleReassemblerHandle *boss_ble_reassembler_create(void);
 void boss_ble_reassembler_free(BossFfiBleReassemblerHandle *handle);
 bool boss_ble_segment_packet(

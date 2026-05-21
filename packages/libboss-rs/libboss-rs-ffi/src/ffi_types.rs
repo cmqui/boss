@@ -91,6 +91,32 @@ pub struct BossFfiAudioModesCapabilities {
 }
 
 #[repr(C)]
+pub struct BossFfiBmapPacket {
+    pub function_block_raw: u8,
+    pub function_raw: u8,
+    pub device_id: u8,
+    pub port: u8,
+    pub operator_raw: u8,
+    pub payload: BossBuffer,
+}
+
+impl Default for BossFfiBmapPacket {
+    fn default() -> Self {
+        Self {
+            function_block_raw: 0,
+            function_raw: 0,
+            device_id: 0,
+            port: 0,
+            operator_raw: 0,
+            payload: BossBuffer {
+                data: std::ptr::null_mut(),
+                len: 0,
+            },
+        }
+    }
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BossFfiAudioModeSettingsConfig {
     pub cnc_level: i32,

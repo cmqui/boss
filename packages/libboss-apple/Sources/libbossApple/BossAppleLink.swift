@@ -1,33 +1,26 @@
 import CBossRustFFI
 import Foundation
-import libboss
 
-public final class BossAppleLink: @unchecked Sendable {
-    public let transportKind: BossAppleTransportKind = .ble
-    public let packets: AsyncThrowingStream<BossAppleBmapPacket, Error>
+final class BossAppleLink: @unchecked Sendable {
+    let transportKind: BossAppleTransportKind = .ble
+    let packets: AsyncThrowingStream<BossAppleBmapPacket, Error>
 
     private let transport: AppleBleBossTransport
     private let consumeTask: Task<Void, Never>
 
-    public init(transport: AppleBleBossTransport) {
+    init(transport: AppleBleBossTransport) {
         self.transport = transport
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: BossAppleBmapPacket.self, throwing: Error.self)
         self.packets = stream
         self.consumeTask = Task {
             do {
-                if let runtime = BossRustFfiRuntime.shared,
-                   let reassembler = BossAppleRustBleReassembler(runtime: runtime) {
-                    for try await frame in transport.incomingFrames {
-                        if let packetData = try reassembler.push(frame) {
-                            continuation.yield(try BmapCodec.decode(packetData))
-                        }
-                    }
-                } else {
-                    var reassembler = BleSegmentReassembler()
-                    for try await frame in transport.incomingFrames {
-                        if let packetData = try reassembler.push(frame) {
-                            continuation.yield(try BmapCodec.decode(packetData))
-                        }
+                let runtime = try requireBossRustRuntime()
+                guard let reassembler = BossAppleRustBleReassembler(runtime: runtime) else {
+                    throw BossAppleControlError.unsupportedOperation("Rust BLE reassembler was unavailable")
+                }
+                for try await frame in transport.incomingFrames {
+                    if let packetData = try reassembler.push(frame) {
+                        continuation.yield(try BossRustCodecBridge.decode(packetData, runtime: runtime))
                     }
                 }
 
@@ -42,21 +35,17 @@ public final class BossAppleLink: @unchecked Sendable {
         }
     }
 
-    public func send(packet: BossAppleBmapPacket) async throws {
-        let packetData = try BmapCodec.encode(packet)
-        let frames: [Data]
-        if let runtime = BossRustFfiRuntime.shared {
-            frames = try BossAppleRustBleSegmentation.segment(packetData, mtu: transport.attMTU, runtime: runtime)
-        } else {
-            frames = try BleSegmentation.encode(packetBytes: packetData, mtu: transport.attMTU)
-        }
+    func send(packet: BossAppleBmapPacket) async throws {
+        let runtime = try requireBossRustRuntime()
+        let packetData = try BossRustCodecBridge.encode(packet, runtime: runtime)
+        let frames = try BossAppleRustBleSegmentation.segment(packetData, mtu: transport.attMTU, runtime: runtime)
 
         for frame in frames {
             try await transport.send(frame)
         }
     }
 
-    public func close() async {
+    func close() async {
         consumeTask.cancel()
         await transport.close()
     }
@@ -76,7 +65,7 @@ private final class BossAppleCoreLinkAdapter: BossLink, @unchecked Sendable {
 
     init(link: BossAppleLink) {
         self.link = link
-        self.transportKind = link.transportKind
+        self.transportKind = link.transportKind.core
         self.packets = link.packets
     }
 
@@ -187,4 +176,11 @@ private func bossAppleLinkError(from ffiError: BossFfiError) -> BossAppleControl
     default:
         return .unsupportedOperation(message.isEmpty ? "BossAppleLink FFI error code \(ffiError.code)" : message)
     }
+}
+
+private func requireBossRustRuntime() throws -> BossRustFfiRuntime {
+    guard let runtime = BossRustFfiRuntime.shared else {
+        throw BossAppleControlError.unsupportedOperation("Rust runtime is required for packet transport")
+    }
+    return runtime
 }

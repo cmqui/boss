@@ -17,11 +17,10 @@
 		6B50C788FF5564E514BAAEE8 /* BossMacOSViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B22153A6B061770A45D12FB /* BossMacOSViewModel.swift */; };
 		92725E85518487ADF2FB563E /* BossResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F397452A28A84E164534B6 /* BossResources.swift */; };
 		C03A0939C5244B0145077CE5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5D40D1B528161BC87CFE416D /* Assets.xcassets */; };
-		C1D1087CCF33ADEFB76D24B4 /* libbossApple in Frameworks */ = {isa = PBXBuildFile; productRef = 04EF58F22849C7E60400DE71 /* libbossApple */; };
 		C6BFEDB0497E0C8A40025531 /* DriftwoodSand.png in Resources */ = {isa = PBXBuildFile; fileRef = BA9068650716DCD5D108891B /* DriftwoodSand.png */; };
 		D919165A959CDE5B4541C018 /* WhiteSmoke.png in Resources */ = {isa = PBXBuildFile; fileRef = 2EC3955FE9D1E84754D7DCED /* WhiteSmoke.png */; };
 		DB8A94308C276DD03E277541 /* DesertGold.png in Resources */ = {isa = PBXBuildFile; fileRef = 31AA73B59A3B71B663D1932C /* DesertGold.png */; };
-		DEAFD8A822D2465BC02083A0 /* libboss in Frameworks */ = {isa = PBXBuildFile; productRef = 003CDF69F2A61F876B160E75 /* libboss */; };
+		DEAFD8A822D2465BC02083A0 /* libbossApple in Frameworks */ = {isa = PBXBuildFile; productRef = 04EF58F22849C7E60400DE71 /* libbossApple */; };
 		EC96C2C57B95444C0012E7DD /* BossMenuBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C3141B6998C4F928C6A50F /* BossMenuBar.swift */; };
 /* End PBXBuildFile section */
 
@@ -34,7 +33,6 @@
 		5D40D1B528161BC87CFE416D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		662C619660F4A4AE38356C8C /* MidnightViolet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = MidnightViolet.png; sourceTree = "<group>"; };
 		6805378F136D4E46A2849CB7 /* libboss-apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "libboss-apple"; path = "../libboss-apple"; sourceTree = SOURCE_ROOT; };
-		730DED07C45A35B95E2AC7AC /* libboss */ = {isa = PBXFileReference; lastKnownFileType = folder; name = libboss; path = ../libboss; sourceTree = SOURCE_ROOT; };
 		77F397452A28A84E164534B6 /* BossResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossResources.swift; sourceTree = "<group>"; };
 		84F21CC1E7A6D0316D418D1C /* HeadphonesMark.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = HeadphonesMark.png; sourceTree = "<group>"; };
 		8B22153A6B061770A45D12FB /* BossMacOSViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossMacOSViewModel.swift; sourceTree = "<group>"; };
@@ -50,8 +48,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DEAFD8A822D2465BC02083A0 /* libboss in Frameworks */,
-				C1D1087CCF33ADEFB76D24B4 /* libbossApple in Frameworks */,
+				DEAFD8A822D2465BC02083A0 /* libbossApple in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -139,7 +136,6 @@
 		FD599E9FABB1B75DA45A394B /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				730DED07C45A35B95E2AC7AC /* libboss */,
 				6805378F136D4E46A2849CB7 /* libboss-apple */,
 			);
 			name = Packages;
@@ -155,6 +151,7 @@
 				CDEB8DE37D8557CCED59236D /* Sources */,
 				CDC8659A71CE93F8A97B961D /* Resources */,
 				FD58CFE76875C6D11382A771 /* Frameworks */,
+				995729C630F3D648FC5A6107 /* Build libboss-rs FFI */,
 			);
 			buildRules = (
 			);
@@ -162,7 +159,6 @@
 			);
 			name = Boss;
 			packageProductDependencies = (
-				003CDF69F2A61F876B160E75 /* libboss */,
 				04EF58F22849C7E60400DE71 /* libbossApple */,
 			);
 			productName = Boss;
@@ -190,7 +186,6 @@
 			mainGroup = 708483B18F24FDC4F0ED474D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				D6CBDB4C12DADE77990715A1 /* XCLocalSwiftPackageReference "../libboss" */,
 				3B866AB1EF7C0B4D8130A380 /* XCLocalSwiftPackageReference "../libboss-apple" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -221,6 +216,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		995729C630F3D648FC5A6107 /* Build libboss-rs FFI */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build libboss-rs FFI";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/bash \"${SRCROOT}/scripts/build-libboss-rs-ffi.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		CDEB8DE37D8557CCED59236D /* Sources */ = {
@@ -431,17 +448,9 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../libboss-apple";
 		};
-		D6CBDB4C12DADE77990715A1 /* XCLocalSwiftPackageReference "../libboss" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../libboss;
-		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		003CDF69F2A61F876B160E75 /* libboss */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = libboss;
-		};
 		04EF58F22849C7E60400DE71 /* libbossApple */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = libbossApple;

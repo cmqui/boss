@@ -85,13 +85,13 @@ enum SettingsAction {
     case getAutoAware
     case setAutoAware(Bool)
     case getOnHeadDetection
-    case setOnHeadDetection(BossOnHeadDetectionPatch)
+    case setOnHeadDetection(BossAppleOnHeadDetectionPatch)
     case getAutoPlayPause
     case setAutoPlayPause(Bool)
     case getAutoAnswer
     case setAutoAnswer(Bool)
     case getVolumeControl
-    case setVolumeControl(BossVolumeControlValue)
+    case setVolumeControl(BossAppleVolumeControlValue)
     case getEqualizer
     case setEqualizer(BossEqualizerSettingsPatch)
 }

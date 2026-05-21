@@ -2,7 +2,7 @@ import Foundation
 import libbossApple
 
 extension BossctlCLI {
-    static func printWearDetectionFallbackPaths(for patch: BossOnHeadDetectionPatch) {
+    static func printWearDetectionFallbackPaths(for patch: BossAppleOnHeadDetectionPatch) {
         if patch.isAutoPlayEnabled != nil {
             print("Applied subordinate setting path: auto-play-pause (settings 0x18)")
         }
@@ -14,7 +14,7 @@ extension BossctlCLI {
         }
     }
 
-    static func printOnHeadDetection(_ value: BossOnHeadDetectionValue) {
+    static func printOnHeadDetection(_ value: BossAppleOnHeadDetectionValue) {
         print("On-head detection: \(value.isEnabled)")
         print("Auto-play: \(formatOptionalBool(value.isAutoPlayEnabled))")
         print("Auto-answer: \(formatOptionalBool(value.isAutoAnswerEnabled))")
@@ -179,7 +179,7 @@ extension BossctlCLI {
         return BmapErrorCode(rawValue: rawValue)
     }
 
-    static func printBootstrap(_ device: BootstrappedDevice) {
+    static func printBootstrap(_ device: BossAppleBootstrappedDevice) {
         print("Transport: \(device.transportKind.rawValue)")
         print("BMAP: \(device.bmapVersion.version)")
         print("Product: \(device.productName) (\(String(format: "0x%04X", device.productID)))")
@@ -187,14 +187,6 @@ extension BossctlCLI {
         print("Variant: \(variantLabel) (raw=\(String(format: "0x%02X", device.productVariant.variant)))")
         let blocks = device.supportedFunctionBlocks.allBlocks().map(\.displayName).joined(separator: ", ")
         print("Function blocks: \(blocks)")
-    }
-
-    static func describe(_ packet: BmapPacket) -> String {
-        let encoded = (try? BmapCodec.encode(packet).hexString) ?? "<encode-failed>"
-        return "packet block=\(packet.functionBlock.displayName)(0x\(String(format: "%02X", packet.functionBlock.rawValue))) " +
-            "function=\(packet.function.name)(0x\(String(format: "%02X", packet.function.rawValue))) " +
-            "op=\(packet.operator.displayName)(0x\(String(format: "%02X", packet.operator.rawValue))) " +
-            "deviceID=\(packet.deviceID) port=\(packet.port) frame=\(encoded)"
     }
 
     static func describe(_ config: BossAudioModeSettingsConfig) -> String {

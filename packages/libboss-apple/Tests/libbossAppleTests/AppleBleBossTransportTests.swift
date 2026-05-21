@@ -1,5 +1,4 @@
 import XCTest
-import libboss
 @testable import libbossApple
 
 final class AppleBleBossTransportTests: XCTestCase {
@@ -62,7 +61,7 @@ final class AppleBleBossTransportTests: XCTestCase {
     func testDeviceSettingsReportProjectsToPlainSettings() {
         let report = BossAppleDeviceSettingsReport(
             wearDetection: BossAppleObservedSetting(
-                value: BossOnHeadDetectionValue(
+                value: BossAppleOnHeadDetectionValue(
                     isEnabled: true,
                     isAutoPlayEnabled: true,
                     isAutoAnswerEnabled: false,
