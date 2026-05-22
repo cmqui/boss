@@ -1,6 +1,6 @@
 import AppKit
-import libbossApple
 import SwiftUI
+import libbossApple
 
 private func deferMain(_ action: @escaping @MainActor () -> Void) {
     Task { @MainActor in
@@ -137,7 +137,8 @@ struct ContentView: View {
                 SidebarDeviceHeader(viewModel: viewModel, palette: palette)
 
                 if hasSupportedDeviceSettings {
-                    SidebarCard(title: "Device Settings", systemImage: "switch.2", palette: palette) {
+                    SidebarCard(title: "Device Settings", systemImage: "switch.2", palette: palette)
+                    {
                         VStack(alignment: .leading, spacing: 14) {
                             if viewModel.wearDetectionEnabled != nil {
                                 SettingsToggleRow(
@@ -219,7 +220,9 @@ struct ContentView: View {
                                             }
                                         )
                                     ) {
-                                        ForEach(BossAppleVolumeControlValue.allCases, id: \.rawValue) { value in
+                                        ForEach(
+                                            BossAppleVolumeControlValue.allCases, id: \.rawValue
+                                        ) { value in
                                             Text(value.displayName).tag(value)
                                         }
                                     }
@@ -232,7 +235,10 @@ struct ContentView: View {
                     }
                 }
 
-                SidebarCard(title: "Connection", systemImage: "dot.radiowaves.left.and.right", palette: palette) {
+                SidebarCard(
+                    title: "Connection", systemImage: "dot.radiowaves.left.and.right",
+                    palette: palette
+                ) {
                     VStack(alignment: .leading, spacing: 12) {
                         Button {
                             viewModel.returnToDeviceSelection()
@@ -263,9 +269,9 @@ struct ContentView: View {
     private func detail(palette: DevicePalette) -> some View {
         return ScrollView {
             ModeSettingsPanel(viewModel: viewModel, palette: palette)
-            .padding(.horizontal, 22)
-            .padding(.vertical, 18)
-            .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 18)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -283,8 +289,10 @@ struct ContentView: View {
             }
             .foregroundStyle(.secondary)
         case .failed:
-            Label("Operation failed. Check console output.", systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.red)
+            Label(
+                "Operation failed. Check console output.", systemImage: "exclamationmark.triangle"
+            )
+            .foregroundStyle(.red)
         case .ready:
             Label("Connected", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
@@ -292,11 +300,9 @@ struct ContentView: View {
     }
 
     private var hasSupportedDeviceSettings: Bool {
-        viewModel.wearDetectionEnabled != nil ||
-            viewModel.autoAwareEnabled != nil ||
-            viewModel.autoPlayPauseEnabled != nil ||
-            viewModel.autoAnswerEnabled != nil ||
-            viewModel.volumeControlValue != nil
+        viewModel.wearDetectionEnabled != nil || viewModel.autoAwareEnabled != nil
+            || viewModel.autoPlayPauseEnabled != nil || viewModel.autoAnswerEnabled != nil
+            || viewModel.volumeControlValue != nil
     }
 }
 
@@ -308,7 +314,9 @@ private struct ModeSettingsPanel: View {
         guard let selectedAudioModeIndex = viewModel.resolvedSelectedAudioModeIndex else {
             return nil
         }
-        return viewModel.selectableAudioModes.first(where: { $0.modeIndex == selectedAudioModeIndex })
+        return viewModel.selectableAudioModes.first(where: {
+            $0.modeIndex == selectedAudioModeIndex
+        })
     }
 
     var body: some View {
@@ -328,11 +336,11 @@ private struct ModeSettingsPanel: View {
                 Spacer(minLength: 0)
 
                 HStack(spacing: 10) {
-                        if let selectedMode {
-                            Button {
-                                viewModel.setFavorite(!selectedMode.favorite, for: selectedMode)
-                            } label: {
-                                AdaptiveToolbarLabel(
+                    if let selectedMode {
+                        Button {
+                            viewModel.setFavorite(!selectedMode.favorite, for: selectedMode)
+                        } label: {
+                            AdaptiveToolbarLabel(
                                 title: selectedMode.favorite ? "Favorited" : "Favorite",
                                 systemImage: selectedMode.favorite ? "star.fill" : "star",
                                 iconColor: selectedMode.favorite ? .yellow : nil
@@ -340,23 +348,24 @@ private struct ModeSettingsPanel: View {
                         }
                         .disabled(viewModel.isBusy)
 
-                            if viewModel.canDelete(selectedMode) {
-                                Button(role: .destructive) {
-                                    viewModel.deleteCustomProfile(selectedMode)
-                                } label: {
-                                    AdaptiveToolbarLabel(title: "Delete", systemImage: "trash")
-                                }
-                                .disabled(viewModel.isBusy)
-                            }
-                        }
-
-                        if viewModel.canSaveCustomProfile {
-                            Button {
-                                viewModel.beginSavingCustomProfile()
+                        if viewModel.canDelete(selectedMode) {
+                            Button(role: .destructive) {
+                                viewModel.deleteCustomProfile(selectedMode)
                             } label: {
-                                AdaptiveToolbarLabel(title: "Save as Custom", systemImage: "square.and.arrow.down")
+                                AdaptiveToolbarLabel(title: "Delete", systemImage: "trash")
                             }
+                            .disabled(viewModel.isBusy)
                         }
+                    }
+
+                    if viewModel.canSaveCustomProfile {
+                        Button {
+                            viewModel.beginSavingCustomProfile()
+                        } label: {
+                            AdaptiveToolbarLabel(
+                                title: "Save as Custom", systemImage: "square.and.arrow.down")
+                        }
+                    }
 
                     if viewModel.canApplyModeSettings {
                         Button {
@@ -371,13 +380,18 @@ private struct ModeSettingsPanel: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(viewModel.hasDetachedSettingsDraft ? "Editing unsaved custom changes" : "Select a built-in or saved custom mode.")
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                viewModel.hasDetachedSettingsDraft
+                    ? "Editing unsaved custom changes" : "Select a built-in or saved custom mode."
+            )
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             if let selectedMode {
                 HStack(spacing: 10) {
-                    Badge(text: selectedMode.userConfigurable ? "Custom" : "Built-In", tint: palette.accent)
+                    Badge(
+                        text: selectedMode.userConfigurable ? "Custom" : "Built-In",
+                        tint: palette.accent)
                     if selectedMode.favorite {
                         Badge(text: "Favorite", tint: .yellow)
                     }
@@ -400,8 +414,11 @@ private struct ModeSettingsPanel: View {
                         Text("This device forces CNC to 10 while Wind Block is enabled.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .opacity(viewModel.isCNCForcedToDisplayMaximumByCurrentConstraint ? 1 : 0)
-                            .accessibilityHidden(!viewModel.isCNCForcedToDisplayMaximumByCurrentConstraint)
+                            .opacity(
+                                viewModel.isCNCForcedToDisplayMaximumByCurrentConstraint ? 1 : 0
+                            )
+                            .accessibilityHidden(
+                                !viewModel.isCNCForcedToDisplayMaximumByCurrentConstraint)
                     }
                 }
 
@@ -620,8 +637,8 @@ private struct SidebarDeviceHeader: View {
                 BossHeadphonesMark(
                     size: 52,
                     deviceName: viewModel.deviceName,
-                    variantName: viewModel.deviceVariantName
-                )
+                    variantName: viewModel.deviceVariantName,
+                ).rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text(viewModel.deviceName)
@@ -655,8 +672,10 @@ private struct SidebarDeviceHeader: View {
             }
             .foregroundStyle(palette.secondaryText)
         case .failed:
-            Label("Operation failed. Check console output.", systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.red)
+            Label(
+                "Operation failed. Check console output.", systemImage: "exclamationmark.triangle"
+            )
+            .foregroundStyle(.red)
         case .ready:
             Label("Connected", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
@@ -670,15 +689,17 @@ private struct BossHeadphonesMark: View {
     var variantName: String? = nil
 
     var body: some View {
-        let image = if let deviceName,
-                       let deviceImage = BossDeviceImageResource(
-                           productName: deviceName,
-                           variantName: variantName
-                       )?.nsImage() {
-            deviceImage
-        } else {
-            BossImageResource.headphonesMark.nsImage()
-        }
+        let image =
+            if let deviceName,
+                let deviceImage = BossDeviceImageResource(
+                    productName: deviceName,
+                    variantName: variantName
+                )?.nsImage()
+            {
+                deviceImage
+            } else {
+                BossImageResource.headphonesMark.nsImage()
+            }
 
         if let image {
             Image(nsImage: image)
@@ -901,7 +922,9 @@ private struct SaveCustomProfileSheet: View {
                     viewModel.confirmSavingCustomProfile()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(viewModel.pendingProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(
+                    viewModel.pendingProfileName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        .isEmpty)
             }
         }
         .padding(24)

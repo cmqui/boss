@@ -60,6 +60,8 @@ struct BossApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private static let mainWindowTitle = "Boss"
+    private static var presentationTransitionID = 0
     private(set) var launchedAtLogin = false
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -88,30 +90,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     static func activateApp() {
+        presentationTransitionID &+= 1
         NSApplication.shared.setActivationPolicy(.regular)
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first {
-            window.delegate = NSApp.delegate as? AppDelegate
-            window.makeKeyAndOrderFront(nil)
-        }
+        NSRunningApplication.current.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+        restoreMainWindow()
     }
 
     static func openMainWindow() {
+        presentationTransitionID &+= 1
+        let transitionID = presentationTransitionID
         NSApplication.shared.unhide(nil)
         NSApplication.shared.setActivationPolicy(.regular)
-        NSApplication.shared.activate(ignoringOtherApps: true)
         DispatchQueue.main.async {
-            if let window = NSApp.windows.first {
-                window.delegate = NSApp.delegate as? AppDelegate
-                window.makeKeyAndOrderFront(nil)
+            guard transitionID == presentationTransitionID else {
+                return
             }
+            NSRunningApplication.current.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            restoreMainWindow()
         }
     }
 
     static func transitionToMenuBarOnly() {
-        NSApp.windows.forEach { $0.orderOut(nil) }
+        presentationTransitionID &+= 1
+        let transitionID = presentationTransitionID
+        NSApp.windows.forEach { window in
+            window.orderOut(nil)
+        }
+        DispatchQueue.main.async {
+            guard transitionID == presentationTransitionID else {
+                return
+            }
+            completeMenuBarTransition()
+        }
+    }
+
+    private static func completeMenuBarTransition() {
         NSApplication.shared.setActivationPolicy(.accessory)
+        _ = NSRunningApplication.current.hide()
         NSApplication.shared.hide(nil)
+    }
+
+    private static func restoreMainWindow() {
+        guard let window = NSApp.windows.first(where: { $0.title == mainWindowTitle }) ?? NSApp.windows.first else {
+            return
+        }
+
+        window.delegate = NSApp.delegate as? AppDelegate
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.orderFrontRegardless()
+        window.makeKeyAndOrderFront(nil)
+        window.makeMain()
     }
 
     private static func detectLoginItemLaunch() -> Bool {
@@ -133,10 +163,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        if sender.title == "Boss" {
+        if sender.title == Self.mainWindowTitle {
             AppDelegate.transitionToMenuBarOnly()
             return false
         }
+        return true
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !flag else {
+            return false
+        }
+        Self.activateApp()
         return true
     }
 }
