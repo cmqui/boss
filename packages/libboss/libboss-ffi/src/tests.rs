@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::ffi::c_void;
 use std::sync::Mutex;
 
 use libboss_core::{BmapFunction, BmapFunctionBlock, BmapOperator};

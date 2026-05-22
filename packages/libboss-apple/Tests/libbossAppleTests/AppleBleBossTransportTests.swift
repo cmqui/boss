@@ -81,4 +81,43 @@ final class AppleBleBossTransportTests: XCTestCase {
         XCTAssertEqual(report.settings.autoAnswerEnabled, false)
         XCTAssertNil(report.settings.volumeControl)
     }
+
+    func testDeviceSettingsAvailabilityReflectsFallbackFields() {
+        let settings = BossAppleDeviceSettings(
+            wearDetection: BossAppleOnHeadDetectionValue(
+                isEnabled: true,
+                isAutoPlayEnabled: true,
+                isAutoAnswerEnabled: false,
+                isAutoTransparencyEnabled: nil
+            ),
+            autoAwareEnabled: nil,
+            autoPlayPauseEnabled: nil,
+            autoAnswerEnabled: nil,
+            volumeControl: nil
+        )
+
+        XCTAssertEqual(
+            settings.availability,
+            BossAppleDeviceSettingsAvailability(
+                wearDetection: true,
+                autoAware: false,
+                autoPlayPause: true,
+                autoAnswer: true,
+                volumeControl: false
+            )
+        )
+        XCTAssertTrue(settings.availability.hasAnySupport)
+    }
+
+    func testDeviceSettingsAvailabilityCanBeFullyUnavailable() {
+        let settings = BossAppleDeviceSettings(
+            wearDetection: nil,
+            autoAwareEnabled: nil,
+            autoPlayPauseEnabled: nil,
+            autoAnswerEnabled: nil,
+            volumeControl: nil
+        )
+
+        XCTAssertFalse(settings.availability.hasAnySupport)
+    }
 }

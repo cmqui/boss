@@ -986,6 +986,44 @@ public struct BossAppleDeviceSettings: Equatable, Sendable {
     }
 }
 
+public struct BossAppleDeviceSettingsAvailability: Equatable, Sendable {
+    public let wearDetection: Bool
+    public let autoAware: Bool
+    public let autoPlayPause: Bool
+    public let autoAnswer: Bool
+    public let volumeControl: Bool
+
+    public init(
+        wearDetection: Bool,
+        autoAware: Bool,
+        autoPlayPause: Bool,
+        autoAnswer: Bool,
+        volumeControl: Bool
+    ) {
+        self.wearDetection = wearDetection
+        self.autoAware = autoAware
+        self.autoPlayPause = autoPlayPause
+        self.autoAnswer = autoAnswer
+        self.volumeControl = volumeControl
+    }
+
+    public var hasAnySupport: Bool {
+        wearDetection || autoAware || autoPlayPause || autoAnswer || volumeControl
+    }
+}
+
+public extension BossAppleDeviceSettings {
+    var availability: BossAppleDeviceSettingsAvailability {
+        BossAppleDeviceSettingsAvailability(
+            wearDetection: wearDetection != nil,
+            autoAware: autoAwareEnabled != nil,
+            autoPlayPause: autoPlayPauseEnabled != nil || wearDetection?.isAutoPlayEnabled != nil,
+            autoAnswer: autoAnswerEnabled != nil || wearDetection?.isAutoAnswerEnabled != nil,
+            volumeControl: volumeControl != nil
+        )
+    }
+}
+
 public struct BossAppleSettingsSnapshot: Sendable {
     private let packetsByFunctionRaw: [UInt8: BossAppleBmapPacket]
 

@@ -16,6 +16,13 @@ Build the FFI dylib:
 cargo build -p libboss-ffi
 ```
 
+Build a specific FFI artifact with the shared helper:
+
+```sh
+./scripts/build-ffi-artifact.sh --profile debug --crate-type cdylib
+./scripts/build-ffi-artifact.sh --profile release --target aarch64-apple-ios --crate-type staticlib
+```
+
 Run tests:
 
 ```sh

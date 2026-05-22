@@ -9,10 +9,17 @@
 **/.swiftpm/
 DerivedData/
 .derived-data/
+
+# Xcode / XcodeGen (regenerate: packages/*/scripts/generate-xcodeproj.sh from project.yml)
+**/*.xcodeproj/
+**/*.xcworkspace/
 *.xcuserdatad/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcarchive
+*.ipa
+*.dSYM.zip
 dist/
 target/
 **/target/

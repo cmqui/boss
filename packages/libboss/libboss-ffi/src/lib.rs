@@ -8,7 +8,6 @@ use libboss_session::{
     BossEqualizerWriteResult, BossLink, BossSession, BossSessionError, PacketSession,
     SessionConfiguration,
 };
-use std::ffi::c_void;
 use std::ptr;
 
 mod conversions;

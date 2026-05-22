@@ -31,6 +31,16 @@ public final class AppleBossDeviceDiscovery: NSObject, @unchecked Sendable {
         return try await discovery.run()
     }
 
+    public static func discoverDevices(
+        connection: BossAppleConnectionOptions
+    ) async throws -> [BossAppleDiscoveredDevice] {
+        let discovery = AppleBossDeviceDiscovery(
+            nameContains: connection.nameContains,
+            scanTimeout: connection.scanTimeout
+        )
+        return try await discovery.run()
+    }
+
     private init(nameContains: String?, scanTimeout: Duration) {
         self.nameContains = nameContains
         self.scanTimeout = scanTimeout

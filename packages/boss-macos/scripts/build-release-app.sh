@@ -64,7 +64,7 @@ cat > "${CONTENTS_DIR}/Info.plist" <<'EOF'
     <key>CFBundleIconFile</key>
     <string>Boss</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.local.boss</string>
+    <string>com.cmqui.boss.macos</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>

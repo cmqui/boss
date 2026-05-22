@@ -5,37 +5,10 @@ set -euo pipefail
 # dylib into the app bundle for runtime-loaded builds.
 # SRCROOT is packages/boss-macos when run from the Boss Xcode target.
 
-if [[ -f "${HOME}/.cargo/env" ]]; then
-  # shellcheck disable=SC1090
-  source "${HOME}/.cargo/env"
-fi
-export PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}"
-
-resolve_cargo() {
-  if [[ -n "${CARGO:-}" && -x "${CARGO}" ]]; then
-    printf '%s\n' "${CARGO}"
-    return 0
-  fi
-  local candidate
-  for candidate in cargo "${HOME}/.cargo/bin/cargo" /opt/homebrew/bin/cargo /usr/local/bin/cargo; do
-    if command -v "${candidate}" >/dev/null 2>&1; then
-      command -v "${candidate}"
-      return 0
-    fi
-  done
-  return 1
-}
-
-CARGO_BIN="$(resolve_cargo || true)"
-if [[ -z "${CARGO_BIN}" ]]; then
-  echo "[build-libboss-ffi] cargo not found in PATH (Xcode builds use a minimal environment)." >&2
-  echo "[build-libboss-ffi] Install Rust from https://rustup.rs or set CARGO to the cargo binary path." >&2
-  exit 1
-fi
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LIBBOSS_DIR="${PACKAGE_DIR}/../libboss"
+BUILD_SCRIPT="${LIBBOSS_DIR}/scripts/build-ffi-artifact.sh"
 
 PROFILE=debug
 if [[ "${CONFIGURATION:-Debug}" == Release* ]]; then
@@ -63,16 +36,19 @@ case "${LINKAGE}" in
     ;;
 esac
 
-echo "[build-libboss-ffi] Building libboss-ffi (${PROFILE}, ${LINKAGE})"
-cd "${LIBBOSS_DIR}"
-if [[ "${PROFILE}" == "release" ]]; then
-  "${CARGO_BIN}" build -p libboss-ffi --release
-else
-  "${CARGO_BIN}" build -p libboss-ffi
+if [[ ! -x "${BUILD_SCRIPT}" ]]; then
+  echo "[build-libboss-ffi] Expected helper at ${BUILD_SCRIPT}" >&2
+  exit 1
 fi
 
 DYLIB="${LIBBOSS_DIR}/target/${PROFILE}/liblibboss_ffi.dylib"
 STATICLIB="${LIBBOSS_DIR}/target/${PROFILE}/liblibboss_ffi.a"
+
+if [[ "${LINKAGE}" == "dynamic" ]]; then
+  "${BUILD_SCRIPT}" --profile "${PROFILE}" --crate-type cdylib
+else
+  "${BUILD_SCRIPT}" --profile "${PROFILE}" --crate-type staticlib
+fi
 
 if [[ "${LINKAGE}" == "dynamic" && ! -f "${DYLIB}" ]]; then
   echo "[build-libboss-ffi] Expected dylib at ${DYLIB}" >&2

@@ -1,0 +1,69 @@
+name: BossiOS
+options:
+  createIntermediateGroups: true
+  groupSortPosition: top
+configs:
+  Debug: debug
+  Release: release
+packages:
+  bossAppleApp:
+    path: ../boss-apple-app
+  libbossApple:
+    path: ../libboss-apple
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    PRODUCT_NAME: Boss
+    PRODUCT_BUNDLE_IDENTIFIER: com.cmqui.boss.ios
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+    MARKETING_VERSION: 1.0
+    CURRENT_PROJECT_VERSION: 1
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_CFBundleDisplayName: Boss
+    INFOPLIST_KEY_CFBundleName: Boss
+    INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: Boss uses Bluetooth to discover and connect to your Bose headphones so it can read and change device settings.
+    INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription: Boss uses Bluetooth to discover and connect to your Bose headphones so it can read and change device settings.
+    INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
+    INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone:
+      - UIInterfaceOrientationPortrait
+      - UIInterfaceOrientationLandscapeLeft
+      - UIInterfaceOrientationLandscapeRight
+    INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad:
+      - UIInterfaceOrientationPortrait
+      - UIInterfaceOrientationPortraitUpsideDown
+      - UIInterfaceOrientationLandscapeLeft
+      - UIInterfaceOrientationLandscapeRight
+    TARGETED_DEVICE_FAMILY: 1,2
+targets:
+  BossiOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    settings:
+      base:
+        OTHER_LDFLAGS: $(inherited) -Wl,-force_load,$(SRCROOT)/../libboss/target/apple-static/current/liblibboss_ffi.a
+    sources:
+      - path: Sources/BossiOS
+        excludes:
+          - logo-apple.icon/**
+      - path: Sources/BossiOS/Resources
+        buildPhase: resources
+      - path: Assets/AppIcon.icon
+        buildPhase: resources
+    dependencies:
+      - package: bossAppleApp
+        product: bossAppleApp
+      - package: libbossApple
+        product: libbossApple
+    preBuildScripts:
+      - name: Build libboss FFI
+        script: |
+          /bin/bash "${SRCROOT}/scripts/build-libboss-ffi.sh"
+        outputFiles:
+          - $(SRCROOT)/../libboss/target/apple-static/current/liblibboss_ffi.a
+        basedOnDependencyAnalysis: false
+schemes:
+  BossiOS:
+    build:
+      targets:
+        BossiOS: all
