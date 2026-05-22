@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 #[cfg(test)]
 use async_trait::async_trait;
 #[cfg(test)]
-use libboss_rs_core::{BmapPacket, BossTransportKind};
+use libboss_core::{BmapPacket, BossTransportKind};
 
 #[cfg(test)]
 use crate::{BossLink, BossLinkError};

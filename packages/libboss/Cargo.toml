@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "libboss-rs-core",
-    "libboss-rs-session",
-    "libboss-rs-ffi",
+    "libboss-core",
+    "libboss-session",
+    "libboss-ffi",
 ]
 resolver = "2"
 

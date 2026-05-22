@@ -73,7 +73,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWindow.didBecomeMainNotification,
             object: nil
         )
-        Self.applyAppIcon()
         if launchedAtLogin {
             DispatchQueue.main.async {
                 Self.transitionToMenuBarOnly()
@@ -107,13 +106,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 window.makeKeyAndOrderFront(nil)
             }
         }
-    }
-
-    static func applyAppIcon() {
-        guard let image = BossImageResource.bossLogo.nsImage() else {
-            return
-        }
-        NSApplication.shared.applicationIconImage = image
     }
 
     static func transitionToMenuBarOnly() {

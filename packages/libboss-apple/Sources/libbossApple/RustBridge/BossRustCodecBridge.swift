@@ -339,13 +339,13 @@ enum BossRustCodecBridge {
 
     private static func swiftPacket(from ffi: BossFfiBmapPacket) -> BossAppleBmapPacket {
         let payload = BossRustSessionBridge.readData(ffi.payload)
-        let block = BmapFunctionBlock(rawValue: ffi.function_block_raw)
-        return BmapPacket(
+        let block = BossAppleBmapFunctionBlock(rawValue: ffi.function_block_raw)
+        return BossAppleBmapPacket(
             functionBlock: block,
-            function: BmapFunction(block: block, rawValue: ffi.function_raw),
+            function: BossAppleBmapFunction(block: block, rawValue: ffi.function_raw),
             deviceID: Int(ffi.device_id),
             port: Int(ffi.port),
-            operator: BmapOperator(rawValue: ffi.operator_raw),
+            operator: BossAppleBmapOperator(rawValue: ffi.operator_raw),
             payload: payload
         )
     }
@@ -365,7 +365,7 @@ enum BossRustCodecBridge {
             return .responseTimedOut(seconds: 5)
         case BOSS_FFI_ERROR_BMAP_ERROR_RESPONSE:
             let payloadHex = ffiError.has_bmap_error_code ? String(format: "%02X", ffiError.bmap_error_code) : ""
-            return .bmapErrorResponse(context: "libboss-rs", payloadHex: payloadHex)
+            return .bmapErrorResponse(context: "libboss", payloadHex: payloadHex)
         case BOSS_FFI_ERROR_NO_FREE_CUSTOM_AUDIO_MODE_SLOT:
             return .noFreeCustomAudioModeSlot
         default:

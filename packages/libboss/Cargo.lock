@@ -102,26 +102,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "libboss-rs-core"
+name = "libboss-core"
 version = "0.1.0"
 
 [[package]]
-name = "libboss-rs-ffi"
+name = "libboss-ffi"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "futures",
- "libboss-rs-core",
- "libboss-rs-session",
+ "libboss-core",
+ "libboss-session",
 ]
 
 [[package]]
-name = "libboss-rs-session"
+name = "libboss-session"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "futures",
- "libboss-rs-core",
+ "libboss-core",
 ]
 
 [[package]]

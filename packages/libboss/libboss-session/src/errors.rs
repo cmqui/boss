@@ -1,4 +1,4 @@
-use libboss_rs_core::{
+use libboss_core::{
     BmapErrorCode, BossAudioModesCodecError, BossSettingsCodecError, ProductInfoParseError,
     UnexpectedOperatorError,
 };

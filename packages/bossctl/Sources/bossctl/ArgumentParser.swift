@@ -123,7 +123,7 @@ struct ArgumentParser {
         return patch
     }
 
-    mutating func audioModeSettingsConfigUpdate() throws -> BossAudioModeSettingsConfigPatch {
+    mutating func audioModeSettingsConfigUpdate() throws -> BossAppleAudioModeSettingsConfigPatch {
         let cncLevel = try optionalInt(for: "--cnc")
         if let cncLevel, !(0...10).contains(cncLevel) {
             throw UsageError("Invalid CNC level for --cnc: \(cncLevel)")
@@ -132,7 +132,7 @@ struct ArgumentParser {
         let spatialAudioMode = try optionalSpatialAudioMode(for: "--spatial")
         let windBlockEnabled = try optionalBool(for: "--wind-block")
         let ancToggleEnabled = try optionalBool(for: "--anc-toggle")
-        let patch = BossAudioModeSettingsConfigPatch(
+        let patch = BossAppleAudioModeSettingsConfigPatch(
             cncLevel: cncLevel,
             autoCNCEnabled: autoCNCEnabled,
             spatialAudioMode: spatialAudioMode,
@@ -145,11 +145,11 @@ struct ArgumentParser {
         return patch
     }
 
-    mutating func equalizerSettingsPatch() throws -> BossEqualizerSettingsPatch {
+    mutating func equalizerSettingsPatch() throws -> BossAppleEqualizerSettingsPatch {
         let bass = try optionalInt(for: "--bass")
         let mid = try optionalInt(for: "--mid")
         let treble = try optionalInt(for: "--treble")
-        let patch = BossEqualizerSettingsPatch(
+        let patch = BossAppleEqualizerSettingsPatch(
             bass: bass,
             mid: mid,
             treble: treble
@@ -160,14 +160,14 @@ struct ArgumentParser {
         return patch
     }
 
-    mutating func optionalSpatialAudioMode(for flag: String) throws -> BossSpatialAudioMode? {
+    mutating func optionalSpatialAudioMode(for flag: String) throws -> BossAppleSpatialAudioMode? {
         guard let value = try optionalValue(for: flag) else {
             return nil
         }
         return try parseSpatialAudioMode(value, label: flag)
     }
 
-    mutating func requiredSpatialAudioMode() throws -> BossSpatialAudioMode {
+    mutating func requiredSpatialAudioMode() throws -> BossAppleSpatialAudioMode {
         guard !arguments.isEmpty else {
             throw UsageError("Missing spatial audio mode")
         }
@@ -175,7 +175,7 @@ struct ArgumentParser {
         return try parseSpatialAudioMode(value, label: "spatial")
     }
 
-    private func parseSpatialAudioMode(_ value: String, label: String) throws -> BossSpatialAudioMode {
+    private func parseSpatialAudioMode(_ value: String, label: String) throws -> BossAppleSpatialAudioMode {
         switch value.lowercased() {
         case "off":
             return .off

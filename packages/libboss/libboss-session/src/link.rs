@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use libboss_rs_core::{BmapPacket, BossTransportKind};
+use libboss_core::{BmapPacket, BossTransportKind};
 
 use crate::BossLinkError;
 

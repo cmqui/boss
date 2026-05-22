@@ -1,14 +1,14 @@
-#ifndef LIBBOSS_RS_H
-#define LIBBOSS_RS_H
+#ifndef LIBBOSS_H
+#define LIBBOSS_H
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#define LIBBOSS_RS_BLE_SERVICE_UUID "0000FEBE-0000-1000-8000-00805F9B34FB"
-#define LIBBOSS_RS_BLE_SECURE_CHARACTERISTIC_UUID "C65B8F2F-AEE2-4C89-B758-BC4892D6F2D8"
-#define LIBBOSS_RS_BLE_UNSECURE_CHARACTERISTIC_UUID "D417C028-9818-4354-99D1-2AC09D074591"
-#define LIBBOSS_RS_SPP_UUID "00001101-0000-1000-8000-00805F9B34FB"
+#define LIBBOSS_BLE_SERVICE_UUID "0000FEBE-0000-1000-8000-00805F9B34FB"
+#define LIBBOSS_BLE_SECURE_CHARACTERISTIC_UUID "C65B8F2F-AEE2-4C89-B758-BC4892D6F2D8"
+#define LIBBOSS_BLE_UNSECURE_CHARACTERISTIC_UUID "D417C028-9818-4354-99D1-2AC09D074591"
+#define LIBBOSS_SPP_UUID "00001101-0000-1000-8000-00805F9B34FB"
 
 typedef struct BossBuffer {
     uint8_t *data;
@@ -83,6 +83,12 @@ typedef struct BossFfiBmapPacket {
     BossBuffer payload;
 } BossFfiBmapPacket;
 
+typedef struct BossFfiCurrentAudioModeWriteResult {
+    BossFfiWriteDisposition disposition;
+    int32_t mode_index;
+    int32_t target_index;
+} BossFfiCurrentAudioModeWriteResult;
+
 typedef struct BossFfiAudioModeSettingsConfig {
     int32_t cnc_level;
     bool auto_cnc_enabled;
@@ -103,34 +109,6 @@ typedef struct BossFfiAudioModeSettingsConfigPatch {
     bool has_anc_toggle_enabled;
     bool anc_toggle_enabled;
 } BossFfiAudioModeSettingsConfigPatch;
-
-typedef struct BossFfiEqualizerPatch {
-    bool has_bass;
-    int32_t bass;
-    bool has_mid;
-    int32_t mid;
-    bool has_treble;
-    int32_t treble;
-} BossFfiEqualizerPatch;
-
-typedef struct BossFfiEqualizerRange {
-    bool available;
-    int32_t current_level;
-    int32_t min_level;
-    int32_t max_level;
-} BossFfiEqualizerRange;
-
-typedef struct BossFfiEqualizerSettings {
-    BossFfiEqualizerRange bass;
-    BossFfiEqualizerRange mid;
-    BossFfiEqualizerRange treble;
-} BossFfiEqualizerSettings;
-
-typedef struct BossFfiCurrentAudioModeWriteResult {
-    BossFfiWriteDisposition disposition;
-    int32_t mode_index;
-    int32_t target_index;
-} BossFfiCurrentAudioModeWriteResult;
 
 typedef struct BossFfiAudioModeSettingsWriteResult {
     BossFfiWriteDisposition disposition;
@@ -155,6 +133,28 @@ typedef struct BossFfiAudioModePrompt {
     size_t name_len;
     uint8_t name_bytes[32];
 } BossFfiAudioModePrompt;
+
+typedef struct BossFfiEqualizerPatch {
+    bool has_bass;
+    int32_t bass;
+    bool has_mid;
+    int32_t mid;
+    bool has_treble;
+    int32_t treble;
+} BossFfiEqualizerPatch;
+
+typedef struct BossFfiEqualizerRange {
+    bool available;
+    int32_t current_level;
+    int32_t min_level;
+    int32_t max_level;
+} BossFfiEqualizerRange;
+
+typedef struct BossFfiEqualizerSettings {
+    BossFfiEqualizerRange bass;
+    BossFfiEqualizerRange mid;
+    BossFfiEqualizerRange treble;
+} BossFfiEqualizerSettings;
 
 typedef struct BossFfiEqualizerWriteResult {
     BossFfiWriteDisposition disposition;

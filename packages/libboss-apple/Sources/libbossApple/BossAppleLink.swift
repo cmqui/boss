@@ -27,7 +27,7 @@ final class BossAppleLink: @unchecked Sendable {
                 if Task.isCancelled {
                     continuation.finish()
                 } else {
-                    continuation.finish(throwing: BossLinkError.unexpectedStreamTermination)
+                    continuation.finish(throwing: BossAppleLinkError.unexpectedStreamTermination)
                 }
             } catch {
                 continuation.finish(throwing: error)
@@ -48,33 +48,6 @@ final class BossAppleLink: @unchecked Sendable {
     func close() async {
         consumeTask.cancel()
         await transport.close()
-    }
-}
-
-extension BossAppleLink {
-    func asCoreLink() -> any BossLink {
-        BossAppleCoreLinkAdapter(link: self)
-    }
-}
-
-private final class BossAppleCoreLinkAdapter: BossLink, @unchecked Sendable {
-    let transportKind: BossTransportKind
-    let packets: AsyncThrowingStream<BmapPacket, Error>
-
-    private let link: BossAppleLink
-
-    init(link: BossAppleLink) {
-        self.link = link
-        self.transportKind = link.transportKind.core
-        self.packets = link.packets
-    }
-
-    func send(packet: BmapPacket) async throws {
-        try await link.send(packet: packet)
-    }
-
-    func close() async {
-        await link.close()
     }
 }
 

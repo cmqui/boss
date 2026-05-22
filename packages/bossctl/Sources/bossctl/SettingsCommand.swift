@@ -93,5 +93,5 @@ enum SettingsAction {
     case getVolumeControl
     case setVolumeControl(BossAppleVolumeControlValue)
     case getEqualizer
-    case setEqualizer(BossEqualizerSettingsPatch)
+    case setEqualizer(BossAppleEqualizerSettingsPatch)
 }

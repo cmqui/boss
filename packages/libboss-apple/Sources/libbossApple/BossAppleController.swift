@@ -1,11 +1,10 @@
 import Foundation
-import libboss
 
-func bossBmapErrorCode(from payloadHex: String) -> BmapErrorCode? {
+func bossBmapErrorCode(from payloadHex: String) -> BossAppleBmapErrorCode? {
     guard payloadHex.count == 2, let rawValue = UInt8(payloadHex, radix: 16) else {
         return nil
     }
-    return BmapErrorCode(rawValue: rawValue)
+    return BossAppleBmapErrorCode(rawValue: rawValue)
 }
 
 public struct BossAppleConnectionOptions: Sendable, Equatable {

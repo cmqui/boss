@@ -1,5 +1,4 @@
 import Foundation
-import libboss
 
 public struct BossAppleModeWorkspaceSnapshot: Sendable, Equatable {
     public let currentAudioModeIndex: Int
@@ -293,14 +292,14 @@ public actor BossAppleSession {
         }
     }
 
-    private func readSupportedAudioModePrompts() async throws -> [BossAudioModePrompt] {
+    private func readSupportedAudioModePrompts() async throws -> [BossAppleAudioModePrompt] {
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.supportedAudioModePrompts(on: transport)
         }
     }
 
-    private func readAudioModeConfigs() async throws -> [BossAudioModeConfig] {
+    private func readAudioModeConfigs() async throws -> [BossAppleAudioModeConfig] {
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.audioModeConfigs(on: transport)
@@ -441,15 +440,15 @@ public actor BossAppleSession {
     }
 
     public func setAutoAware(_ enabled: Bool) async throws -> Bool {
-        try await setEnabledSetting(functionRaw: BossSettingsCodec.autoAwareFunctionRaw, enabled: enabled)
+        try await setEnabledSetting(functionRaw: BossAppleSettingsProtocol.autoAwareFunctionRaw, enabled: enabled)
     }
 
     public func setAutoPlayPause(_ enabled: Bool) async throws -> Bool {
-        try await setEnabledSetting(functionRaw: BossSettingsCodec.autoPlayPauseFunctionRaw, enabled: enabled)
+        try await setEnabledSetting(functionRaw: BossAppleSettingsProtocol.autoPlayPauseFunctionRaw, enabled: enabled)
     }
 
     public func setAutoAnswer(_ enabled: Bool) async throws -> Bool {
-        try await setEnabledSetting(functionRaw: BossSettingsCodec.autoAnswerFunctionRaw, enabled: enabled)
+        try await setEnabledSetting(functionRaw: BossAppleSettingsProtocol.autoAnswerFunctionRaw, enabled: enabled)
     }
 
     public func setVolumeControl(_ value: BossAppleVolumeControlValue) async throws -> BossAppleVolumeControlStatus {
@@ -550,9 +549,9 @@ public actor BossAppleSession {
     private func writeCustomAudioMode(
         slot: Int,
         name: String,
-        settings: BossAudioModeSettingsConfig,
-        prompt: BossAudioModePrompt
-    ) async throws -> BossAudioModeConfig {
+        settings: BossAppleAudioModeSettingsConfig,
+        prompt: BossAppleAudioModePrompt
+    ) async throws -> BossAppleAudioModeConfig {
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
             try await rustBridge.saveCustomAudioMode(
@@ -572,14 +571,14 @@ public actor BossAppleSession {
         }
     }
 
-    private func readAudioModeSettingsConfig() async throws -> BossAudioModeSettingsConfig {
+    private func readAudioModeSettingsConfig() async throws -> BossAppleAudioModeSettingsConfig {
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.audioModeSettingsConfig(on: transport)
         }
     }
 
-    private func readEqualizerSettingsIfAvailable() async throws -> BossEqualizerSettings? {
+    private func readEqualizerSettingsIfAvailable() async throws -> BossAppleEqualizerSettings? {
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.equalizerSettingsIfAvailable(on: transport)
@@ -876,7 +875,7 @@ public actor BossAppleSession {
                 return false
             }
         }
-        if let error = error as? BossLinkError, error == .unexpectedStreamTermination {
+        if let error = error as? BossAppleLinkError, error == .unexpectedStreamTermination {
             return true
         }
         return false
@@ -909,7 +908,7 @@ public actor BossAppleSession {
             }
         }
 
-        if let error = error as? BossLinkError, error == .unexpectedStreamTermination {
+        if let error = error as? BossAppleLinkError, error == .unexpectedStreamTermination {
             return true
         }
 
@@ -932,121 +931,4 @@ public actor BossAppleSession {
             )
         }
     }
-}
-
-private extension BossAppleSession {
-    nonisolated func wrap(_ workspace: BossWorkspaceSnapshot) -> BossAppleWorkspaceSnapshot {
-        BossAppleWorkspaceSnapshot(
-            bootstrappedDevice: BossAppleBootstrappedDevice(workspace.bootstrappedDevice),
-            modeWorkspace: wrap(workspace.modeWorkspace),
-            audioModes: workspace.audioModes
-        )
-    }
-
-    nonisolated func wrap(_ workspace: BossModeWorkspaceSnapshot) -> BossAppleModeWorkspaceSnapshot {
-        BossAppleModeWorkspaceSnapshot(
-            currentAudioModeIndex: workspace.currentAudioModeIndex,
-            settings: workspace.settings,
-            equalizer: workspace.equalizer,
-            deviceSettings: wrap(workspace.deviceSettings)
-        )
-    }
-
-    nonisolated func wrap(_ report: BossDeviceSettingsReport) -> BossAppleDeviceSettingsReport {
-        BossAppleDeviceSettingsReport(
-            wearDetection: BossAppleObservedSetting(
-                value: report.wearDetection.value.map(BossAppleOnHeadDetectionValue.init),
-                source: report.wearDetection.source.map(wrap),
-                unavailableReason: report.wearDetection.unavailableReason.map(wrap)
-            ),
-            autoAwareEnabled: wrap(report.autoAwareEnabled),
-            autoPlayPauseEnabled: wrap(report.autoPlayPauseEnabled),
-            autoAnswerEnabled: wrap(report.autoAnswerEnabled),
-            volumeControl: BossAppleObservedSetting(
-                value: report.volumeControl.value.map(BossAppleVolumeControlStatus.init),
-                source: report.volumeControl.source.map(wrap),
-                unavailableReason: report.volumeControl.unavailableReason.map(wrap)
-            )
-        )
-    }
-
-    nonisolated func wrap<Value>(_ setting: BossObservedSetting<Value>) -> BossAppleObservedSetting<Value> {
-        BossAppleObservedSetting(
-            value: setting.value,
-            source: setting.source.map(wrap),
-            unavailableReason: setting.unavailableReason.map(wrap)
-        )
-    }
-
-    nonisolated func wrap(_ source: BossSettingSource) -> BossAppleSettingSource {
-        switch source {
-        case .snapshot:
-            return .snapshot
-        case .compositeSnapshot:
-            return .compositeSnapshot
-        case .directGet:
-            return .directGet
-        }
-    }
-
-    nonisolated func wrap(_ reason: BossSettingUnavailableReason) -> BossAppleSettingUnavailableReason {
-        switch reason {
-        case .missingFromSnapshot:
-            return .missingFromSnapshot
-        case .timedOut:
-            return .timedOut
-        case .responseStreamEnded:
-            return .responseStreamEnded
-        case .functionUnsupported:
-            return .functionUnsupported
-        case .operatorUnsupported:
-            return .operatorUnsupported
-        case .dataUnavailable:
-            return .dataUnavailable
-        case .insecureTransport:
-            return .insecureTransport
-        case .unexpectedStreamTermination:
-            return .unexpectedStreamTermination
-        case .bmapError(let code):
-            return .bmapError(code)
-        }
-    }
-
-    nonisolated func wrap(_ result: BossCurrentAudioModeWriteResult) -> BossAppleCurrentAudioModeWriteResult {
-        switch result {
-        case .unchanged(let value):
-            return .unchanged(value)
-        case .updated(let value):
-            return .updated(value)
-        case .verificationInconclusive(let targetIndex):
-            return .verificationInconclusive(targetIndex: targetIndex)
-        }
-    }
-
-    nonisolated func wrap(_ result: BossAudioModeSettingsWriteResult) -> BossAppleAudioModeSettingsWriteResult {
-        switch result {
-        case .unchanged(let value):
-            return .unchanged(value)
-        case .updated(let value):
-            return .updated(value)
-        case .verificationInconclusive(let value):
-            return .verificationInconclusive(value)
-        }
-    }
-
-    nonisolated func wrap(_ result: BossEqualizerWriteResult) -> BossAppleEqualizerWriteResult {
-        switch result {
-        case .unchanged(let value):
-            return .unchanged(value)
-        case .updated(let value):
-            return .updated(value)
-        case .verificationInconclusive(let value):
-            return .verificationInconclusive(value)
-        }
-    }
-
-    func timeoutError(for timeout: Duration) -> BossAppleControlError {
-        .responseTimedOut(seconds: timeout.components.seconds)
-    }
-
 }

@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use libboss_rs_core::{
+use libboss_core::{
     BmapFunctionBlock, BmapPacket, BossAudioModeConfig, BossAudioModePrompt,
     BossAudioModeSettingsConfig, BossAudioModeSettingsConfigPatch, BossAudioModesCapabilities,
     BossAudioModesCodec, BossEqualizerBand, BossEqualizerSettings, BossEqualizerSettingsPatch,
@@ -360,7 +360,7 @@ impl<L: BossLink> BossSession<L> {
             .await
         {
             Ok(response) => {
-                if response.operator == libboss_rs_core::BmapOperator::Result {
+                if response.operator == libboss_core::BmapOperator::Result {
                     if let Some(response_mode_index) = response.payload.first() {
                         return Ok(BossCurrentAudioModeWriteResult::Updated(
                             *response_mode_index as i32,
@@ -456,7 +456,7 @@ impl<L: BossLink> BossSession<L> {
                         if range.current_level != *requested_level {
                             changed = true;
                         }
-                        libboss_rs_core::BossEqualizerRangeLevel {
+                        libboss_core::BossEqualizerRangeLevel {
                             band: range.band,
                             current_level: *requested_level,
                             min_level: range.min_level,
@@ -510,7 +510,7 @@ impl<L: BossLink> BossSession<L> {
         packet: &BmapPacket,
     ) -> Result<Option<Vec<BossAudioModeConfig>>, BossSessionError> {
         if packet.function_block != BmapFunctionBlock::AudioModes
-            || packet.operator != libboss_rs_core::BmapOperator::Status
+            || packet.operator != libboss_core::BmapOperator::Status
         {
             return Ok(None);
         }
@@ -549,7 +549,7 @@ impl<L: BossLink> BossSession<L> {
         packet: &BmapPacket,
     ) -> Result<Option<BossDeviceSettingsReport>, BossSessionError> {
         if packet.function_block != BmapFunctionBlock::Settings
-            || packet.operator != libboss_rs_core::BmapOperator::Status
+            || packet.operator != libboss_core::BmapOperator::Status
         {
             return Ok(None);
         }
@@ -641,17 +641,17 @@ impl<L: BossLink> BossSession<L> {
                 Some(crate::BossSettingUnavailableReason::ResponseStreamEnded)
             }
             BossSessionError::BmapErrorResponse(response) => match response.code() {
-                Some(libboss_rs_core::BmapErrorCode::FblockNotSupp)
-                | Some(libboss_rs_core::BmapErrorCode::FuncNotSupp) => {
+                Some(libboss_core::BmapErrorCode::FblockNotSupp)
+                | Some(libboss_core::BmapErrorCode::FuncNotSupp) => {
                     Some(crate::BossSettingUnavailableReason::FunctionUnsupported)
                 }
-                Some(libboss_rs_core::BmapErrorCode::OpNotSupp) => {
+                Some(libboss_core::BmapErrorCode::OpNotSupp) => {
                     Some(crate::BossSettingUnavailableReason::OperatorUnsupported)
                 }
-                Some(libboss_rs_core::BmapErrorCode::DataUnavailable) => {
+                Some(libboss_core::BmapErrorCode::DataUnavailable) => {
                     Some(crate::BossSettingUnavailableReason::DataUnavailable)
                 }
-                Some(libboss_rs_core::BmapErrorCode::InsecureTransport) => {
+                Some(libboss_core::BmapErrorCode::InsecureTransport) => {
                     Some(crate::BossSettingUnavailableReason::InsecureTransport)
                 }
                 code => Some(crate::BossSettingUnavailableReason::BmapError(code)),
@@ -783,9 +783,9 @@ impl<L: BossLink> BossSession<L> {
             BossSessionError::SettingsConfigNotObserved { .. } => true,
             BossSessionError::BmapErrorResponse(_) => matches!(
                 error.bmap_error_code(),
-                Some(libboss_rs_core::BmapErrorCode::InsecureTransport)
-                    | Some(libboss_rs_core::BmapErrorCode::Timeout)
-                    | Some(libboss_rs_core::BmapErrorCode::Busy)
+                Some(libboss_core::BmapErrorCode::InsecureTransport)
+                    | Some(libboss_core::BmapErrorCode::Timeout)
+                    | Some(libboss_core::BmapErrorCode::Busy)
             ),
             _ => false,
         }
@@ -799,9 +799,9 @@ impl<L: BossLink> BossSession<L> {
             BossSessionError::EqualizerNotObserved { .. } => true,
             BossSessionError::BmapErrorResponse(_) => matches!(
                 error.bmap_error_code(),
-                Some(libboss_rs_core::BmapErrorCode::InsecureTransport)
-                    | Some(libboss_rs_core::BmapErrorCode::Timeout)
-                    | Some(libboss_rs_core::BmapErrorCode::Busy)
+                Some(libboss_core::BmapErrorCode::InsecureTransport)
+                    | Some(libboss_core::BmapErrorCode::Timeout)
+                    | Some(libboss_core::BmapErrorCode::Busy)
             ),
             _ => false,
         }

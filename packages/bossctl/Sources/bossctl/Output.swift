@@ -76,7 +76,7 @@ extension BossctlCLI {
         }
     }
 
-    static func printEqualizer(_ settings: BossEqualizerSettings) {
+    static func printEqualizer(_ settings: BossAppleEqualizerSettings) {
         for band in settings.ranges {
             print("\(band.band.displayName.capitalized): \(band.currentLevel) [range \(band.minLevel)...\(band.maxLevel)]")
         }
@@ -84,7 +84,7 @@ extension BossctlCLI {
 
     static func printEqualizerWriteResult(_ result: BossAppleEqualizerWriteResult) {
         let prefix: String
-        let settings: BossEqualizerSettings
+        let settings: BossAppleEqualizerSettings
         switch result {
         case .unchanged(let unchanged):
             prefix = "Equalizer unchanged:"
@@ -100,7 +100,7 @@ extension BossctlCLI {
         printEqualizer(settings)
     }
 
-    static func printAudioModeSettingsConfig(_ config: BossAudioModeSettingsConfig) {
+    static func printAudioModeSettingsConfig(_ config: BossAppleAudioModeSettingsConfig) {
         print("CNC level: \(config.cncLevel) (0=max ANC, 10=most ambient)")
         print("Auto CNC: \(config.autoCNCEnabled)")
         print("Spatial audio: \(config.spatialAudioMode.displayName)")
@@ -108,7 +108,7 @@ extension BossctlCLI {
         print("ANC toggle: \(config.ancToggleEnabled)")
     }
 
-    static func printFavoriteAudioModes(_ favorites: [Int], modes: [BossAudioModeInfo]) {
+    static func printFavoriteAudioModes(_ favorites: [Int], modes: [BossAppleAudioModeInfo]) {
         guard !favorites.isEmpty else {
             print("Favorite audio modes: none")
             return
@@ -129,7 +129,7 @@ extension BossctlCLI {
         output: AudioModeSettingsOutput
     ) {
         let state: AudioModeSettingsWriteState
-        let config: BossAudioModeSettingsConfig
+        let config: BossAppleAudioModeSettingsConfig
         switch result {
         case .unchanged(let unchangedConfig):
             state = .unchanged
@@ -172,11 +172,11 @@ extension BossctlCLI {
         return value ? "enabled" : "disabled"
     }
 
-    static func bmapErrorCode(from payloadHex: String) -> BmapErrorCode? {
+    static func bmapErrorCode(from payloadHex: String) -> BossAppleBmapErrorCode? {
         guard payloadHex.count == 2, let rawValue = UInt8(payloadHex, radix: 16) else {
             return nil
         }
-        return BmapErrorCode(rawValue: rawValue)
+        return BossAppleBmapErrorCode(rawValue: rawValue)
     }
 
     static func printBootstrap(_ device: BossAppleBootstrappedDevice) {
@@ -189,7 +189,7 @@ extension BossctlCLI {
         print("Function blocks: \(blocks)")
     }
 
-    static func describe(_ config: BossAudioModeSettingsConfig) -> String {
+    static func describe(_ config: BossAppleAudioModeSettingsConfig) -> String {
         "cnc=\(config.cncLevel),autoCNC=\(config.autoCNCEnabled),spatial=\(config.spatialAudioMode.displayName),wind=\(config.windBlockEnabled),anc=\(config.ancToggleEnabled)"
     }
 

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use futures::executor::block_on;
-    use libboss_rs_core::{
+    use libboss_core::{
         BmapErrorCode, BmapFunction, BmapFunctionBlock, BmapOperator, BmapPacket,
         BossAudioModeConfig, BossAudioModePrompt, BossAudioModeSettingsConfig,
         BossAudioModeSettingsConfigPatch, BossAudioModesCodec, BossEqualizerBand,
@@ -177,7 +177,7 @@ mod tests {
                 .contains(BmapFunctionBlock::Settings));
             assert_eq!(
                 device.transport_kind,
-                libboss_rs_core::BossTransportKind::Stream
+                libboss_core::BossTransportKind::Stream
             );
             assert_eq!(link.sent_packets().len(), 3);
         });

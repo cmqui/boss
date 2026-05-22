@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use libboss_rs_core::*;
+use libboss_core::*;
 
 #[test]
 fn packet_codec_encodes_and_decodes() {

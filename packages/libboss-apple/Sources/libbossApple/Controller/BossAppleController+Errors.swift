@@ -1,5 +1,4 @@
 import Foundation
-import libboss
 
 extension BossAppleController {
     static func verifyCurrentAudioMode(
@@ -77,7 +76,7 @@ extension BossAppleController {
                 return false
             }
         }
-        if let error = error as? BossLinkError, error == .unexpectedStreamTermination {
+        if let error = error as? BossAppleLinkError, error == .unexpectedStreamTermination {
             return true
         }
         return false
@@ -186,7 +185,7 @@ extension BossAppleController {
                 return nil
             }
         }
-        if let error = error as? BossLinkError, error == .unexpectedStreamTermination {
+        if let error = error as? BossAppleLinkError, error == .unexpectedStreamTermination {
             return .unexpectedStreamTermination
         }
         return nil
@@ -196,77 +195,14 @@ extension BossAppleController {
         unavailableSettingReason(error) != nil
     }
 
-    static func bmapErrorCode(from payloadHex: String) -> BmapErrorCode? {
+    static func bmapErrorCode(from payloadHex: String) -> BossAppleBmapErrorCode? {
         bossBmapErrorCode(from: payloadHex)
     }
 
-    static func wrap(_ reason: BossAppleSettingUnavailableReason) -> BossSettingUnavailableReason {
-        switch reason {
-        case .missingFromSnapshot:
-            return .missingFromSnapshot
-        case .timedOut:
-            return .timedOut
-        case .responseStreamEnded:
-            return .responseStreamEnded
-        case .functionUnsupported:
-            return .functionUnsupported
-        case .operatorUnsupported:
-            return .operatorUnsupported
-        case .dataUnavailable:
-            return .dataUnavailable
-        case .insecureTransport:
-            return .insecureTransport
-        case .unexpectedStreamTermination:
-            return .unexpectedStreamTermination
-        case .bmapError(let code):
-            return .bmapError(code)
-        }
-    }
-
-    static func wrap(_ reason: BossSettingUnavailableReason) -> BossAppleSettingUnavailableReason {
-        switch reason {
-        case .missingFromSnapshot:
-            return .missingFromSnapshot
-        case .timedOut:
-            return .timedOut
-        case .responseStreamEnded:
-            return .responseStreamEnded
-        case .functionUnsupported:
-            return .functionUnsupported
-        case .operatorUnsupported:
-            return .operatorUnsupported
-        case .dataUnavailable:
-            return .dataUnavailable
-        case .insecureTransport:
-            return .insecureTransport
-        case .unexpectedStreamTermination:
-            return .unexpectedStreamTermination
-        case .bmapError(let code):
-            return .bmapError(code)
-        }
-    }
-
-    static func wrap<Value>(_ observed: BossObservedSetting<Value>) -> BossAppleObservedSetting<Value> {
-        BossAppleObservedSetting(
-            value: observed.value,
-            source: observed.source.map {
-                switch $0 {
-                case .snapshot:
-                    return .snapshot
-                case .compositeSnapshot:
-                    return .compositeSnapshot
-                case .directGet:
-                    return .directGet
-                }
-            },
-            unavailableReason: observed.unavailableReason.map(wrap)
-        )
-    }
-
     static func validatedEqualizerRequests(
-        _ update: BossEqualizerSettingsPatch,
-        current: BossEqualizerSettings
-    ) throws -> [(BossEqualizerBand, Int)] {
+        _ update: BossAppleEqualizerSettingsPatch,
+        current: BossAppleEqualizerSettings
+    ) throws -> [(BossAppleEqualizerBand, Int)] {
         try update.requestedLevels.map { band, level in
             guard let range = current.range(for: band) else {
                 throw BossAppleControlError.unsupportedOperation(
@@ -282,19 +218,19 @@ extension BossAppleController {
         }
     }
 
-    static func describe(_ update: BossEqualizerSettingsPatch) -> String {
+    static func describe(_ update: BossAppleEqualizerSettingsPatch) -> String {
         update.requestedLevels
             .map { "\($0.0.displayName)=\($0.1)" }
             .joined(separator: ",")
     }
 
-    static func describe(_ settings: BossEqualizerSettings) -> String {
+    static func describe(_ settings: BossAppleEqualizerSettings) -> String {
         settings.ranges
             .map { "\($0.band.displayName)=\($0.currentLevel)[\($0.minLevel)...\($0.maxLevel)]" }
             .joined(separator: ",")
     }
 
-    static func describe(_ config: BossAudioModeSettingsConfig) -> String {
+    static func describe(_ config: BossAppleAudioModeSettingsConfig) -> String {
         "cnc=\(config.cncLevel),autoCNC=\(config.autoCNCEnabled),spatial=\(config.spatialAudioMode.displayName),wind=\(config.windBlockEnabled),anc=\(config.ancToggleEnabled)"
     }
 

@@ -360,7 +360,7 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         self.ownsHandle = ownsHandle
     }
 
-    #if os(macOS) && DEBUG && LIBBOSS_RS_STATIC_LINKED
+    #if LIBBOSS_STATIC_LINKED
     private init(linked: Void) {
         self.handle = nil
         self.bossBufferFree = boss_buffer_free
@@ -510,13 +510,13 @@ final class BossRustFfiRuntime: @unchecked Sendable {
     }
 
     static let shared: BossRustFfiRuntime? = {
-        #if os(macOS) && DEBUG && LIBBOSS_RS_STATIC_LINKED
-        BossRustLogger.log("using directly linked libboss-rs ffi symbols")
+        #if LIBBOSS_STATIC_LINKED
+        BossRustLogger.log("using directly linked libboss ffi symbols")
         return BossRustFfiRuntime(linked: ())
         #else
         if let processHandle = dlopen(nil, RTLD_NOW | RTLD_LOCAL) {
             if let runtime = BossRustFfiRuntime(processHandle, ownsHandle: false) {
-                BossRustLogger.log("using linked libboss-rs ffi symbols from current process")
+                BossRustLogger.log("using linked libboss ffi symbols from current process")
                 return runtime
             }
         }
@@ -526,26 +526,28 @@ final class BossRustFfiRuntime: @unchecked Sendable {
                 continue
             }
             if let runtime = BossRustFfiRuntime(loaded, ownsHandle: true) {
-                BossRustLogger.log("loaded libboss-rs ffi from \(candidate)")
+                BossRustLogger.log("loaded libboss ffi from \(candidate)")
                 return runtime
             }
             dlclose(loaded)
         }
-        BossRustLogger.log("libboss-rs ffi not loaded; falling back to Swift libboss implementation")
+        BossRustLogger.log("libboss ffi not loaded; no supported runtime is available")
         return nil
         #endif
     }()
 
     private static func candidateLibraryPaths() -> [String] {
         var paths: [String] = []
-        if let explicit = ProcessInfo.processInfo.environment["LIBBOSS_RS_FFI_DYLIB"], !explicit.isEmpty {
+        if let explicit = ProcessInfo.processInfo.environment["LIBBOSS_FFI_DYLIB"], !explicit.isEmpty {
             paths.append(explicit)
+        } else if let legacyExplicit = ProcessInfo.processInfo.environment["LIBBOSS_RS_FFI_DYLIB"], !legacyExplicit.isEmpty {
+            paths.append(legacyExplicit)
         }
 
-        let dylibName = "liblibboss_rs_ffi.dylib"
+        let dylibName = "liblibboss_ffi.dylib"
         let profiles = ffiBuildProfiles()
 
-        if let embedded = Bundle.main.path(forResource: "liblibboss_rs_ffi", ofType: "dylib", inDirectory: "Frameworks") {
+        if let embedded = Bundle.main.path(forResource: "liblibboss_ffi", ofType: "dylib", inDirectory: "Frameworks") {
             paths.append(embedded)
         }
         if let frameworksURL = Bundle.main.privateFrameworksURL {
@@ -560,15 +562,15 @@ final class BossRustFfiRuntime: @unchecked Sendable {
 
         for profile in profiles {
             for base in repositorySearchRoots() {
-                paths.append(base.appendingPathComponent("libboss-rs/target/\(profile)/\(dylibName)").path)
-                paths.append(base.appendingPathComponent("packages/libboss-rs/target/\(profile)/\(dylibName)").path)
+                paths.append(base.appendingPathComponent("libboss/target/\(profile)/\(dylibName)").path)
+                paths.append(base.appendingPathComponent("packages/libboss/target/\(profile)/\(dylibName)").path)
             }
         }
 
         let cwd = FileManager.default.currentDirectoryPath
         for profile in profiles {
-            paths.append("\(cwd)/../libboss-rs/target/\(profile)/\(dylibName)")
-            paths.append("\(cwd)/packages/libboss-rs/target/\(profile)/\(dylibName)")
+            paths.append("\(cwd)/../libboss/target/\(profile)/\(dylibName)")
+            paths.append("\(cwd)/packages/libboss/target/\(profile)/\(dylibName)")
             paths.append("\(cwd)/target/\(profile)/\(dylibName)")
         }
 
@@ -616,6 +618,11 @@ final class BossRustFfiRuntime: @unchecked Sendable {
 
 extension BossRustFfiRuntime {
     func loadCodecSymbol<T>(_ symbol: String, as _: T.Type) -> T? {
+        #if LIBBOSS_STATIC_LINKED
+        if let symbol = Self.directlyLinkedCodecSymbol(symbol, as: T.self) {
+            return symbol
+        }
+        #endif
         guard let handle else {
             return nil
         }
@@ -624,11 +631,186 @@ extension BossRustFfiRuntime {
         }
         return unsafeBitCast(pointer, to: T.self)
     }
+
+    #if LIBBOSS_STATIC_LINKED
+    private static func directlyLinkedCodecSymbol<T>(_ symbol: String, as _: T.Type) -> T? {
+        switch symbol {
+        case "boss_packet_free":
+            return unsafeBitCast(
+                boss_packet_free as BossRustCodecBridge.PacketFreeFn,
+                to: T.self
+            )
+        case "boss_packet_encode":
+            return unsafeBitCast(
+                boss_packet_encode as BossRustCodecBridge.PacketEncodeFn,
+                to: T.self
+            )
+        case "boss_packet_decode":
+            return unsafeBitCast(
+                boss_packet_decode as BossRustCodecBridge.PacketDecodeFn,
+                to: T.self
+            )
+        case "boss_audio_modes_names_supported_get_packet":
+            return unsafeBitCast(
+                boss_audio_modes_names_supported_get_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_current_mode_get_packet":
+            return unsafeBitCast(
+                boss_audio_modes_current_mode_get_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_current_mode_start_packet":
+            return unsafeBitCast(
+                boss_audio_modes_current_mode_start_packet as BossRustCodecBridge.CurrentModeStartPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_capabilities_get_packet":
+            return unsafeBitCast(
+                boss_audio_modes_capabilities_get_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_favorites_get_packet":
+            return unsafeBitCast(
+                boss_audio_modes_favorites_get_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_settings_config_get_packet":
+            return unsafeBitCast(
+                boss_audio_modes_settings_config_get_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_mode_config_start_packet":
+            return unsafeBitCast(
+                boss_audio_modes_mode_config_start_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_settings_config_set_get_packet":
+            return unsafeBitCast(
+                boss_audio_modes_settings_config_set_get_packet as BossRustCodecBridge.SettingsConfigSetGetPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_mode_config_set_get_packet":
+            return unsafeBitCast(
+                boss_audio_modes_mode_config_set_get_packet as BossRustCodecBridge.ModeConfigSetGetPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_favorites_set_get_packet":
+            return unsafeBitCast(
+                boss_audio_modes_favorites_set_get_packet as BossRustCodecBridge.FavoritesSetGetPacketFn,
+                to: T.self
+            )
+        case "boss_settings_get_all_start_packet":
+            return unsafeBitCast(
+                boss_settings_get_all_start_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_settings_standby_timer_get_packet":
+            return unsafeBitCast(
+                boss_settings_standby_timer_get_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_settings_standby_timer_set_get_packet":
+            return unsafeBitCast(
+                boss_settings_standby_timer_set_get_packet as BossRustCodecBridge.StandbyTimerSetGetPacketFn,
+                to: T.self
+            )
+        case "boss_settings_on_head_detection_get_packet":
+            return unsafeBitCast(
+                boss_settings_on_head_detection_get_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_settings_on_head_detection_set_get_packet":
+            return unsafeBitCast(
+                boss_settings_on_head_detection_set_get_packet as BossRustCodecBridge.OnHeadDetectionSetGetPacketFn,
+                to: T.self
+            )
+        case "boss_settings_enabled_setting_get_packet":
+            return unsafeBitCast(
+                boss_settings_enabled_setting_get_packet as BossRustCodecBridge.EnabledSettingPacketFn,
+                to: T.self
+            )
+        case "boss_settings_enabled_setting_set_get_packet":
+            return unsafeBitCast(
+                boss_settings_enabled_setting_set_get_packet as BossRustCodecBridge.EnabledSettingSetPacketFn,
+                to: T.self
+            )
+        case "boss_settings_equalizer_get_packet":
+            return unsafeBitCast(
+                boss_settings_equalizer_get_packet as BossRustCodecBridge.BuildPacketFn,
+                to: T.self
+            )
+        case "boss_settings_equalizer_set_get_packet":
+            return unsafeBitCast(
+                boss_settings_equalizer_set_get_packet as BossRustCodecBridge.EqualizerSetGetPacketFn,
+                to: T.self
+            )
+        case "boss_audio_modes_parse_supported_prompts":
+            return unsafeBitCast(
+                boss_audio_modes_parse_supported_prompts as BossRustCodecBridge.ParsePromptsFn,
+                to: T.self
+            )
+        case "boss_audio_modes_parse_current_mode":
+            return unsafeBitCast(
+                boss_audio_modes_parse_current_mode as BossRustCodecBridge.ParseCurrentModeFn,
+                to: T.self
+            )
+        case "boss_audio_modes_parse_capabilities":
+            return unsafeBitCast(
+                boss_audio_modes_parse_capabilities as BossRustCodecBridge.ParseCapabilitiesFn,
+                to: T.self
+            )
+        case "boss_audio_modes_parse_favorites":
+            return unsafeBitCast(
+                boss_audio_modes_parse_favorites as BossRustCodecBridge.ParseFavoritesFn,
+                to: T.self
+            )
+        case "boss_audio_modes_parse_settings_config":
+            return unsafeBitCast(
+                boss_audio_modes_parse_settings_config as BossRustCodecBridge.ParseConfigFn,
+                to: T.self
+            )
+        case "boss_audio_modes_parse_mode_config_detail":
+            return unsafeBitCast(
+                boss_audio_modes_parse_mode_config_detail as BossRustCodecBridge.ParseModeConfigFn,
+                to: T.self
+            )
+        case "boss_audio_modes_parse_volume_control_status":
+            return unsafeBitCast(
+                boss_audio_modes_parse_volume_control_status as BossRustCodecBridge.ParseVolumeControlStatusFn,
+                to: T.self
+            )
+        case "boss_settings_parse_equalizer":
+            return unsafeBitCast(
+                boss_settings_parse_equalizer as BossRustCodecBridge.ParseEqualizerFn,
+                to: T.self
+            )
+        case "boss_settings_parse_standby_timer":
+            return unsafeBitCast(
+                boss_settings_parse_standby_timer as BossRustCodecBridge.ParseStandbyTimerFn,
+                to: T.self
+            )
+        case "boss_settings_parse_enabled_flag":
+            return unsafeBitCast(
+                boss_settings_parse_enabled_flag as BossRustCodecBridge.ParseEnabledFlagFn,
+                to: T.self
+            )
+        case "boss_settings_parse_on_head_detection":
+            return unsafeBitCast(
+                boss_settings_parse_on_head_detection as BossRustCodecBridge.ParseOnHeadDetectionFn,
+                to: T.self
+            )
+        default:
+            return nil
+        }
+    }
+    #endif
 }
 
 enum BossRustLogger {
     static var isEnabled: Bool {
-        let value = ProcessInfo.processInfo.environment["LIBBOSS_RS_FFI_LOG"]?.lowercased()
+        let value = ProcessInfo.processInfo.environment["LIBBOSS_FFI_LOG"]?.lowercased()
+            ?? ProcessInfo.processInfo.environment["LIBBOSS_RS_FFI_LOG"]?.lowercased()
         return value == "1" || value == "true" || value == "yes"
     }
 
@@ -636,6 +818,6 @@ enum BossRustLogger {
         guard isEnabled else {
             return
         }
-        fputs("[libboss-rs] \(message)\n", stderr)
+        fputs("[libboss] \(message)\n", stderr)
     }
 }

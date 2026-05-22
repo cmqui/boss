@@ -1,6 +1,5 @@
 import CBossRustFFI
 import Foundation
-import libboss
 
 extension BossRustSessionBridge {
     func map(error ffiError: BossFfiError) -> BossAppleControlError {
@@ -14,7 +13,7 @@ extension BossRustSessionBridge {
             return .responseTimedOut(seconds: 5)
         case BOSS_FFI_ERROR_BMAP_ERROR_RESPONSE:
             let payloadHex = ffiError.has_bmap_error_code ? String(format: "%02X", ffiError.bmap_error_code) : ""
-            return .bmapErrorResponse(context: "libboss-rs", payloadHex: payloadHex)
+            return .bmapErrorResponse(context: "libboss", payloadHex: payloadHex)
         case BOSS_FFI_ERROR_NO_FREE_CUSTOM_AUDIO_MODE_SLOT:
             return .noFreeCustomAudioModeSlot
         case BOSS_FFI_ERROR_CUSTOM_AUDIO_MODE_SLOT_NOT_EDITABLE:
@@ -100,7 +99,7 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func ffiConfig(from config: BossAudioModeSettingsConfig) -> BossFfiAudioModeSettingsConfig {
+    static func ffiConfig(from config: BossAppleAudioModeSettingsConfig) -> BossFfiAudioModeSettingsConfig {
         BossFfiAudioModeSettingsConfig(
             cnc_level: Int32(config.cncLevel),
             auto_cnc_enabled: config.autoCNCEnabled,
@@ -110,14 +109,14 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func ffiPatch(from patch: BossAudioModeSettingsConfigPatch) -> BossFfiAudioModeSettingsConfigPatch {
+    static func ffiPatch(from patch: BossAppleAudioModeSettingsConfigPatch) -> BossFfiAudioModeSettingsConfigPatch {
         BossFfiAudioModeSettingsConfigPatch(
             has_cnc_level: patch.cncLevel != nil,
             cnc_level: Int32(patch.cncLevel ?? 0),
             has_auto_cnc_enabled: patch.autoCNCEnabled != nil,
             auto_cnc_enabled: patch.autoCNCEnabled ?? false,
             has_spatial_audio_mode: patch.spatialAudioMode != nil,
-            spatial_audio_mode: patch.spatialAudioMode?.rawValue ?? BossSpatialAudioMode.off.rawValue,
+            spatial_audio_mode: patch.spatialAudioMode?.rawValue ?? BossAppleSpatialAudioMode.off.rawValue,
             has_wind_block_enabled: patch.windBlockEnabled != nil,
             wind_block_enabled: patch.windBlockEnabled ?? false,
             has_anc_toggle_enabled: patch.ancToggleEnabled != nil,
@@ -125,13 +124,13 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func swiftConfig(from ffi: BossFfiAudioModeSettingsConfig) throws -> BossAudioModeSettingsConfig {
-        guard let spatialAudioMode = BossSpatialAudioMode(rawValue: ffi.spatial_audio_mode) else {
+    static func swiftConfig(from ffi: BossFfiAudioModeSettingsConfig) throws -> BossAppleAudioModeSettingsConfig {
+        guard let spatialAudioMode = BossAppleSpatialAudioMode(rawValue: ffi.spatial_audio_mode) else {
             throw BossAppleControlError.unsupportedOperation(
                 "Rust FFI returned unknown spatial audio mode \(ffi.spatial_audio_mode)"
             )
         }
-        return BossAudioModeSettingsConfig(
+        return BossAppleAudioModeSettingsConfig(
             cncLevel: Int(ffi.cnc_level),
             autoCNCEnabled: ffi.auto_cnc_enabled,
             spatialAudioMode: spatialAudioMode,
@@ -140,20 +139,20 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func swiftAudioModePrompt(from ffi: BossFfiAudioModePrompt) -> BossAudioModePrompt {
+    static func swiftAudioModePrompt(from ffi: BossFfiAudioModePrompt) -> BossAppleAudioModePrompt {
         let name = withUnsafeBytes(of: ffi.name_bytes) { rawBuffer in
             String(decoding: rawBuffer.prefix(ffi.name_len), as: UTF8.self)
         }
-        return BossAudioModePrompt(byte1: ffi.byte1, byte2: ffi.byte2, name: name)
+        return BossAppleAudioModePrompt(byte1: ffi.byte1, byte2: ffi.byte2, name: name)
     }
 
-    static func swiftAudioModeConfig(from ffi: BossFfiAudioModeConfig) throws -> BossAudioModeConfig {
+    static func swiftAudioModeConfig(from ffi: BossFfiAudioModeConfig) throws -> BossAppleAudioModeConfig {
         let name = withUnsafeBytes(of: ffi.name_bytes) { rawBuffer in
             String(decoding: rawBuffer.prefix(ffi.name_len), as: UTF8.self)
         }
-        return BossAudioModeConfig(
+        return BossAppleAudioModeConfig(
             modeIndex: Int(ffi.mode_index),
-            prompt: BossAudioModePrompt.known(byte1: ffi.prompt_byte1, byte2: ffi.prompt_byte2),
+            prompt: BossAppleAudioModePrompt.known(byte1: ffi.prompt_byte1, byte2: ffi.prompt_byte2),
             name: name,
             favorite: ffi.favorite,
             userConfigurable: ffi.user_configurable,
@@ -162,8 +161,8 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func swiftAudioModeCapabilities(from ffi: BossFfiAudioModesCapabilities) -> BossAudioModesCapabilities {
-        BossAudioModesCapabilities(
+    static func swiftAudioModeCapabilities(from ffi: BossFfiAudioModesCapabilities) -> BossAppleAudioModesCapabilities {
+        BossAppleAudioModesCapabilities(
             boseModes: Int(ffi.bose_modes),
             userModes: Int(ffi.user_modes)
         )
@@ -186,7 +185,9 @@ extension BossRustSessionBridge {
     static func swiftSettingsSnapshot(from buffer: BossBuffer) throws -> BossAppleSettingsSnapshot {
         do {
             return try BossAppleSettingsSnapshot(encodedPackets: readData(buffer))
-        } catch let error as BossSettingsCodecError {
+        } catch let error as BossAppleControlError {
+            throw error
+        } catch {
             throw BossAppleControlError.unsupportedOperation(error.localizedDescription)
         }
     }
@@ -201,7 +202,7 @@ extension BossRustSessionBridge {
         let functionBlockBytes = withUnsafeBytes(of: ffi.function_blocks_bytes) { rawBuffer in
             Data(rawBuffer.prefix(ffi.function_blocks_len))
         }
-        let product = ProductMap.product(for: ffi.product_id)
+        let product = BossAppleProductCatalog.product(for: ffi.product_id)
         return BossAppleBootstrappedDevice(
             bmapVersion: BossAppleBmapVersionInfo(version: bmapVersion),
             productID: ffi.product_id,
@@ -209,7 +210,7 @@ extension BossRustSessionBridge {
             productVariant: BossAppleProductVariant(
                 productID: ffi.product_id,
                 variant: ffi.variant,
-                product: product.map(BossAppleProductDefinition.init),
+                product: product,
                 variantName: product?.variants[ffi.variant]
             ),
             supportedFunctionBlocks: BossAppleFunctionBlockSet(bytes: functionBlockBytes),
@@ -277,7 +278,7 @@ extension BossRustSessionBridge {
         }
     }
 
-    static func ffiEqualizerPatch(from patch: BossEqualizerSettingsPatch) -> BossFfiEqualizerPatch {
+    static func ffiEqualizerPatch(from patch: BossAppleEqualizerSettingsPatch) -> BossFfiEqualizerPatch {
         BossFfiEqualizerPatch(
             has_bass: patch.bass != nil,
             bass: Int32(patch.bass ?? 0),
@@ -288,7 +289,7 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func ffiEqualizerRange(from range: BossEqualizerRangeLevel?) -> BossFfiEqualizerRange {
+    static func ffiEqualizerRange(from range: BossAppleEqualizerRangeLevel?) -> BossFfiEqualizerRange {
         guard let range else {
             return BossFfiEqualizerRange(available: false, current_level: 0, min_level: 0, max_level: 0)
         }
@@ -300,7 +301,7 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func ffiEqualizerSettings(from settings: BossEqualizerSettings) -> BossFfiEqualizerSettings {
+    static func ffiEqualizerSettings(from settings: BossAppleEqualizerSettings) -> BossFfiEqualizerSettings {
         BossFfiEqualizerSettings(
             bass: ffiEqualizerRange(from: settings.range(for: .bass)),
             mid: ffiEqualizerRange(from: settings.range(for: .mid)),
@@ -320,11 +321,11 @@ extension BossRustSessionBridge {
         )
     }
 
-    static func swiftEqualizerSettings(from ffi: BossFfiEqualizerSettings) -> BossEqualizerSettings {
-        var ranges: [BossEqualizerRangeLevel] = []
+    static func swiftEqualizerSettings(from ffi: BossFfiEqualizerSettings) -> BossAppleEqualizerSettings {
+        var ranges: [BossAppleEqualizerRangeLevel] = []
         if ffi.bass.available {
             ranges.append(
-                BossEqualizerRangeLevel(
+                BossAppleEqualizerRangeLevel(
                     band: .bass,
                     currentLevel: Int(ffi.bass.current_level),
                     minLevel: Int(ffi.bass.min_level),
@@ -334,7 +335,7 @@ extension BossRustSessionBridge {
         }
         if ffi.mid.available {
             ranges.append(
-                BossEqualizerRangeLevel(
+                BossAppleEqualizerRangeLevel(
                     band: .mid,
                     currentLevel: Int(ffi.mid.current_level),
                     minLevel: Int(ffi.mid.min_level),
@@ -344,7 +345,7 @@ extension BossRustSessionBridge {
         }
         if ffi.treble.available {
             ranges.append(
-                BossEqualizerRangeLevel(
+                BossAppleEqualizerRangeLevel(
                     band: .treble,
                     currentLevel: Int(ffi.treble.current_level),
                     minLevel: Int(ffi.treble.min_level),
@@ -352,7 +353,7 @@ extension BossRustSessionBridge {
                 )
             )
         }
-        return BossEqualizerSettings(ranges: ranges)
+        return BossAppleEqualizerSettings(ranges: ranges)
     }
 
     static func swiftOnHeadDetection(from ffi: BossFfiOnHeadDetectionValue) -> BossAppleOnHeadDetectionValue {

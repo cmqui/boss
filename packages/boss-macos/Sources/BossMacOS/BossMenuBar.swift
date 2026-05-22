@@ -123,7 +123,7 @@ struct BossMenuBarView: View {
                             set: { viewModel.setVolumeControl($0) }
                         )
                     ) {
-                        ForEach(BossVolumeControlValue.allCases, id: \.rawValue) { value in
+                        ForEach(BossAppleVolumeControlValue.allCases, id: \.rawValue) { value in
                             Text(value.displayName).tag(value)
                         }
                     }
@@ -160,7 +160,7 @@ struct BossMenuBarView: View {
     }
 
     @ViewBuilder
-    private func audioModeRow(for mode: BossAudioModeConfig) -> some View {
+    private func audioModeRow(for mode: BossAppleAudioModeConfig) -> some View {
         HStack(spacing: 8) {
             if viewModel.displayedCurrentAudioModeIndex == mode.modeIndex {
                 Image(systemName: "checkmark")

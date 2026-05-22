@@ -219,7 +219,7 @@ struct ContentView: View {
                                             }
                                         )
                                     ) {
-                                        ForEach(BossVolumeControlValue.allCases, id: \.rawValue) { value in
+                                        ForEach(BossAppleVolumeControlValue.allCases, id: \.rawValue) { value in
                                             Text(value.displayName).tag(value)
                                         }
                                     }
@@ -304,7 +304,7 @@ private struct ModeSettingsPanel: View {
     @ObservedObject var viewModel: BossMacOSViewModel
     let palette: DevicePalette
 
-    private var selectedMode: BossAudioModeConfig? {
+    private var selectedMode: BossAppleAudioModeConfig? {
         guard let selectedAudioModeIndex = viewModel.resolvedSelectedAudioModeIndex else {
             return nil
         }
@@ -409,7 +409,7 @@ private struct ModeSettingsPanel: View {
                     Text("Spatial Audio")
                         .foregroundStyle(.secondary)
                     Picker("", selection: spatialAudioBinding) {
-                        ForEach(BossSpatialAudioMode.allCases, id: \.rawValue) { mode in
+                        ForEach(BossAppleSpatialAudioMode.allCases, id: \.rawValue) { mode in
                             Text(mode.displayName.capitalized).tag(mode)
                         }
                     }
@@ -493,7 +493,7 @@ private struct ModeSettingsPanel: View {
         )
     }
 
-    private var spatialAudioBinding: Binding<BossSpatialAudioMode> {
+    private var spatialAudioBinding: Binding<BossAppleSpatialAudioMode> {
         Binding(
             get: { viewModel.spatialAudioMode },
             set: { newValue in
@@ -579,7 +579,7 @@ private struct EqualizerControlGroup: View {
 
 private struct EqualizerBandSliderRow: View {
     let title: String
-    let range: BossEqualizerRangeLevel
+    let range: BossAppleEqualizerRangeLevel
     let value: Binding<Double>
 
     var body: some View {

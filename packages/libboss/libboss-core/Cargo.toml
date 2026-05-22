@@ -1,10 +1,10 @@
 [package]
-name = "libboss-rs-core"
+name = "libboss-core"
 edition.workspace = true
 license.workspace = true
 version.workspace = true
 
 [lib]
-name = "libboss_rs_core"
+name = "libboss_core"
 path = "src/lib.rs"
 

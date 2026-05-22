@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "libboss",
+    name: "libboss-OLD",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),

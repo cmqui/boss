@@ -54,7 +54,7 @@ struct AudioModeCommand {
             return AudioModeCommand(
                 connection: connection,
                 action: .setSettingsConfig(
-                    BossAudioModeSettingsConfigPatch(cncLevel: level),
+                    BossAppleAudioModeSettingsConfigPatch(cncLevel: level),
                     output: .field(.cncLevel)
                 )
             )
@@ -65,7 +65,7 @@ struct AudioModeCommand {
             return AudioModeCommand(
                 connection: connection,
                 action: .setSettingsConfig(
-                    BossAudioModeSettingsConfigPatch(spatialAudioMode: mode),
+                    BossAppleAudioModeSettingsConfigPatch(spatialAudioMode: mode),
                     output: .field(.spatialAudio)
                 )
             )
@@ -76,7 +76,7 @@ struct AudioModeCommand {
             return AudioModeCommand(
                 connection: connection,
                 action: .setSettingsConfig(
-                    BossAudioModeSettingsConfigPatch(windBlockEnabled: enabled),
+                    BossAppleAudioModeSettingsConfigPatch(windBlockEnabled: enabled),
                     output: .field(.windBlock)
                 )
             )
@@ -87,7 +87,7 @@ struct AudioModeCommand {
             return AudioModeCommand(
                 connection: connection,
                 action: .setSettingsConfig(
-                    BossAudioModeSettingsConfigPatch(ancToggleEnabled: enabled),
+                    BossAppleAudioModeSettingsConfigPatch(ancToggleEnabled: enabled),
                     output: .field(.ancToggle)
                 )
             )
@@ -115,7 +115,7 @@ enum AudioModeAction {
     case getCurrent
     case setCurrent(selection: AudioModeSelection, playVoicePrompt: Bool)
     case getSettingsConfig
-    case setSettingsConfig(BossAudioModeSettingsConfigPatch, output: AudioModeSettingsOutput)
+    case setSettingsConfig(BossAppleAudioModeSettingsConfigPatch, output: AudioModeSettingsOutput)
     case getFavorites
     case setFavorite(selection: AudioModeSelection, isFavorite: Bool)
 }
@@ -151,7 +151,7 @@ enum AudioModeSettingsField {
         }
     }
 
-    func value(from config: BossAudioModeSettingsConfig) -> String {
+    func value(from config: BossAppleAudioModeSettingsConfig) -> String {
         switch self {
         case .cncLevel:
             return "\(config.cncLevel) (0=max ANC, 10=most ambient)"

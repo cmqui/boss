@@ -1,4 +1,4 @@
-use libboss_rs_core::{product_for_id, ProductInfoCommands, ProductInfoParser};
+use libboss_core::{product_for_id, ProductInfoCommands, ProductInfoParser};
 
 use crate::{
     BootstrapSessionError, BootstrapTimeoutError, BootstrappedDevice, BossLink, BossSessionError,

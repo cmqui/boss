@@ -1,11 +1,11 @@
-use libboss_rs_core::{
+use libboss_core::{
     BmapFunction, BmapPacket, BossAudioModeConfig, BossAudioModePrompt,
     BossAudioModeSettingsConfig, BossAudioModeSettingsConfigPatch, BossAudioModesCapabilities,
-    BossEqualizerBand, BossEqualizerSettings, BossEqualizerSettingsPatch,
-    BossOnHeadDetectionValue, BossStandbyTimerValue, BossTransportKind,
-    BossVolumeControlStatus, BossVolumeControlValue, FirmwareVersionInfo,
+    BossEqualizerBand, BossEqualizerSettings, BossEqualizerSettingsPatch, BossOnHeadDetectionValue,
+    BossStandbyTimerValue, BossTransportKind, BossVolumeControlStatus, BossVolumeControlValue,
+    FirmwareVersionInfo,
 };
-use libboss_rs_session::{
+use libboss_session::{
     BootstrapSessionError, BootstrappedDevice, BossDeviceSettingsReport, BossLinkError,
     BossObservedSetting, BossSessionError, BossSettingSource, BossSettingUnavailableReason,
 };
@@ -14,10 +14,9 @@ use crate::{
     buffer_from_string, buffer_from_vec, BossFfiAudioModeConfig, BossFfiAudioModePrompt,
     BossFfiAudioModeSettingsConfig, BossFfiAudioModeSettingsConfigPatch,
     BossFfiAudioModesCapabilities, BossFfiBmapPacket, BossFfiBootstrappedDevice,
-    BossFfiDeviceSettingsReport,
-    BossFfiEqualizerPatch, BossFfiEqualizerRange, BossFfiEqualizerSettings, BossFfiError,
-    BossFfiErrorCode, BossFfiFirmwareVersionInfo, BossFfiObservedBool,
-    BossFfiObservedOnHeadDetection, BossFfiObservedVolumeControlStatus,
+    BossFfiDeviceSettingsReport, BossFfiEqualizerPatch, BossFfiEqualizerRange,
+    BossFfiEqualizerSettings, BossFfiError, BossFfiErrorCode, BossFfiFirmwareVersionInfo,
+    BossFfiObservedBool, BossFfiObservedOnHeadDetection, BossFfiObservedVolumeControlStatus,
     BossFfiOnHeadDetectionValue, BossFfiStandbyTimerValue, BossFfiVolumeControlStatus,
 };
 
@@ -97,8 +96,8 @@ pub(crate) fn core_config_from_ffi(
     BossAudioModeSettingsConfig {
         cnc_level: config.cnc_level,
         auto_cnc_enabled: config.auto_cnc_enabled,
-        spatial_audio_mode: libboss_rs_core::BossSpatialAudioMode::from_raw(config.spatial_audio_mode)
-            .unwrap_or(libboss_rs_core::BossSpatialAudioMode::Off),
+        spatial_audio_mode: libboss_core::BossSpatialAudioMode::from_raw(config.spatial_audio_mode)
+            .unwrap_or(libboss_core::BossSpatialAudioMode::Off),
         wind_block_enabled: config.wind_block_enabled,
         anc_toggle_enabled: config.anc_toggle_enabled,
     }
@@ -159,13 +158,13 @@ pub(crate) fn core_packet_from_ffi(packet: &BossFfiBmapPacket) -> BmapPacket {
     } else {
         unsafe { std::slice::from_raw_parts(packet.payload.data, packet.payload.len) }.to_vec()
     };
-    let block = libboss_rs_core::BmapFunctionBlock::from_raw(packet.function_block_raw);
+    let block = libboss_core::BmapFunctionBlock::from_raw(packet.function_block_raw);
     BmapPacket::new(
         block,
         BmapFunction::from_raw(block, packet.function_raw),
         i32::from(packet.device_id),
         i32::from(packet.port),
-        libboss_rs_core::BmapOperator::from_raw(packet.operator_raw),
+        libboss_core::BmapOperator::from_raw(packet.operator_raw),
         payload,
     )
 }
@@ -189,7 +188,7 @@ pub(crate) fn core_patch_from_ffi(
         auto_cnc_enabled: patch.has_auto_cnc_enabled.then_some(patch.auto_cnc_enabled),
         spatial_audio_mode: patch
             .has_spatial_audio_mode
-            .then(|| libboss_rs_core::BossSpatialAudioMode::from_raw(patch.spatial_audio_mode))
+            .then(|| libboss_core::BossSpatialAudioMode::from_raw(patch.spatial_audio_mode))
             .flatten(),
         wind_block_enabled: patch
             .has_wind_block_enabled

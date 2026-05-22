@@ -1,7 +1,6 @@
 import CBossRustFFI
 import Dispatch
 import Foundation
-import libboss
 
 private final class BossRustBleReassembler: @unchecked Sendable {
     private let runtime: BossRustFfiRuntime
@@ -142,7 +141,7 @@ final class BossRustBleTransportBridge: BossRustPacketByteBridge, @unchecked Sen
                     }
                 }
                 queue.pushStreamEnded()
-            } catch let error as BossLinkError where error == .unexpectedStreamTermination {
+            } catch let error as BossAppleLinkError where error == .unexpectedStreamTermination {
                 queue.pushUnexpectedStreamTermination()
             } catch {
                 queue.pushOtherError()
@@ -180,7 +179,7 @@ final class BossRustBleTransportBridge: BossRustPacketByteBridge, @unchecked Sen
                     try await transport.send(frame)
                 }
                 resultBox.set(BOSS_FFI_LINK_STATUS_OK)
-            } catch let error as BossLinkError where error == .unexpectedStreamTermination {
+            } catch let error as BossAppleLinkError where error == .unexpectedStreamTermination {
                 resultBox.set(BOSS_FFI_LINK_STATUS_UNEXPECTED_STREAM_TERMINATION)
             } catch {
                 resultBox.set(BOSS_FFI_LINK_STATUS_OTHER)

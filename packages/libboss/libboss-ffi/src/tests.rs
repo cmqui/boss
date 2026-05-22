@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
-use libboss_rs_core::{BmapFunction, BmapFunctionBlock, BmapOperator};
+use libboss_core::{BmapFunction, BmapFunctionBlock, BmapOperator};
 
 use crate::*;
 
@@ -53,10 +53,13 @@ fn read_i32_buffer(buffer: &BossBuffer) -> Vec<i32> {
     let byte_count = buffer.len;
     assert_eq!(byte_count % std::mem::size_of::<i32>(), 0);
     unsafe {
-        std::slice::from_raw_parts(buffer.data as *const i32, byte_count / std::mem::size_of::<i32>())
-            .iter()
-            .map(|value| i32::from_le(*value))
-            .collect()
+        std::slice::from_raw_parts(
+            buffer.data as *const i32,
+            byte_count / std::mem::size_of::<i32>(),
+        )
+        .iter()
+        .map(|value| i32::from_le(*value))
+        .collect()
     }
 }
 
@@ -75,7 +78,7 @@ fn ffi_session_set_current_audio_mode_returns_updated_result() {
                 BmapFunctionBlock::AudioModes,
                 BmapFunction::Unknown {
                     block: BmapFunctionBlock::AudioModes,
-                    raw_value: libboss_rs_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
+                    raw_value: libboss_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
                 },
                 0,
                 0,
@@ -86,7 +89,7 @@ fn ffi_session_set_current_audio_mode_returns_updated_result() {
                 BmapFunctionBlock::AudioModes,
                 BmapFunction::Unknown {
                     block: BmapFunctionBlock::AudioModes,
-                    raw_value: libboss_rs_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
+                    raw_value: libboss_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
                 },
                 0,
                 0,
@@ -128,7 +131,7 @@ fn ffi_session_audio_mode_capabilities_returns_counts() {
             BmapFunctionBlock::AudioModes,
             BmapFunction::Unknown {
                 block: BmapFunctionBlock::AudioModes,
-                raw_value: libboss_rs_core::BossAudioModesCodec::CAPABILITIES_FUNCTION_RAW,
+                raw_value: libboss_core::BossAudioModesCodec::CAPABILITIES_FUNCTION_RAW,
             },
             0,
             0,
@@ -167,7 +170,7 @@ fn ffi_session_set_favorite_audio_mode_indices_returns_updated_values() {
             BmapFunctionBlock::AudioModes,
             BmapFunction::Unknown {
                 block: BmapFunctionBlock::AudioModes,
-                raw_value: libboss_rs_core::BossAudioModesCodec::FAVORITES_FUNCTION_RAW,
+                raw_value: libboss_core::BossAudioModesCodec::FAVORITES_FUNCTION_RAW,
             },
             0,
             0,
@@ -223,10 +226,7 @@ fn ffi_ble_segment_packet_returns_expected_frames() {
     ));
 
     let frame_slice = unsafe { std::slice::from_raw_parts(frames.data, frames.len) };
-    let decoded: Vec<Vec<u8>> = frame_slice
-        .iter()
-        .map(read_bytes)
-        .collect();
+    let decoded: Vec<Vec<u8>> = frame_slice.iter().map(read_bytes).collect();
     assert_eq!(decoded, vec![vec![0x10, 1, 2, 3], vec![0x11, 4, 5, 6]]);
 
     boss_buffer_list_free(frames);

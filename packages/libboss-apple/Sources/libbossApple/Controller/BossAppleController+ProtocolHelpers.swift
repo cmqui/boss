@@ -4,14 +4,14 @@ extension BossAppleController {
     static func awaitAudioModeConfigs(
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> [BossAudioModeConfig] {
+    ) async throws -> [BossAppleAudioModeConfig] {
         try await link.send(packet: try modeConfigStartPacket())
-        return try await withThrowingTaskGroup(of: [BossAudioModeConfig].self) { group in
+        return try await withThrowingTaskGroup(of: [BossAppleAudioModeConfig].self) { group in
             group.addTask {
-                var modesByIndex: [Int: BossAudioModeConfig] = [:]
+                var modesByIndex: [Int: BossAppleAudioModeConfig] = [:]
                 for try await packet in link.packets {
                     guard packet.functionBlock == .audioModes,
-                          packet.function.rawValue == BossAudioModesCodec.modeConfigFunctionRaw else {
+                          packet.function.rawValue == BossAppleAudioModesProtocol.modeConfigFunctionRaw else {
                         continue
                     }
                     if packet.operator == .error {
@@ -41,7 +41,7 @@ extension BossAppleController {
         }
     }
 
-    static func firstFreeCustomAudioModeSlot(in configs: [BossAudioModeConfig]) -> Int? {
+    static func firstFreeCustomAudioModeSlot(in configs: [BossAppleAudioModeConfig]) -> Int? {
         configs
             .filter { $0.userConfigurable && !$0.userConfigured }
             .sorted { $0.modeIndex < $1.modeIndex }
@@ -83,7 +83,7 @@ extension BossAppleController {
     static func requiredEqualizer(
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> BossEqualizerSettings {
+    ) async throws -> BossAppleEqualizerSettings {
         let response = try await sendAndAwaitSameFunction(
             packet: try equalizerGetPacket(),
             on: link,
@@ -95,7 +95,7 @@ extension BossAppleController {
     static func requiredAudioModeSettingsConfig(
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> BossAudioModeSettingsConfig {
+    ) async throws -> BossAppleAudioModeSettingsConfig {
         let response = try await sendAndAwaitSameFunction(
             packet: try settingsConfigGetPacket(),
             on: link,
@@ -119,7 +119,7 @@ extension BossAppleController {
     static func requiredAudioModeCapabilities(
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> BossAudioModesCapabilities {
+    ) async throws -> BossAppleAudioModesCapabilities {
         let response = try await sendAndAwaitSameFunction(
             packet: try capabilitiesGetPacket(),
             on: link,
@@ -132,7 +132,7 @@ extension BossAppleController {
         connection: BossAppleConnectionOptions,
         attempts: Int = 3,
         retryDelay: Duration = .milliseconds(750)
-    ) async throws -> BossEqualizerSettings {
+    ) async throws -> BossAppleEqualizerSettings {
         var lastError: Error = BossAppleControlError.responseTimedOut(seconds: 5)
         for attempt in 0..<attempts {
             do {
@@ -154,7 +154,7 @@ extension BossAppleController {
         connection: BossAppleConnectionOptions,
         attempts: Int = 3,
         retryDelay: Duration = .milliseconds(750)
-    ) async throws -> BossAudioModeSettingsConfig {
+    ) async throws -> BossAppleAudioModeSettingsConfig {
         var lastError: Error = BossAppleControlError.responseTimedOut(seconds: 5)
         for attempt in 0..<attempts {
             do {
@@ -177,7 +177,7 @@ extension BossAppleController {
         attempts: Int,
         timeoutPerAttempt: Duration,
         retryDelay: Duration
-    ) async throws -> BossAudioModeSettingsConfig {
+    ) async throws -> BossAppleAudioModeSettingsConfig {
         var lastError: Error = BossAppleControlError.responseTimedOut(seconds: timeoutPerAttempt.components.seconds)
         for attempt in 0..<attempts {
             do {
@@ -194,7 +194,7 @@ extension BossAppleController {
     }
 
     static func setEqualizerWithVerification(
-        _ update: BossEqualizerSettingsPatch,
+        _ update: BossAppleEqualizerSettingsPatch,
         connection: BossAppleConnectionOptions
     ) async throws -> BossAppleEqualizerWriteResult {
         let current = try await readEqualizerAfterReconnect(connection: connection)
@@ -203,10 +203,10 @@ extension BossAppleController {
         }
 
         let requested = try validatedEqualizerRequests(update, current: current)
-        let target = BossEqualizerSettings(
+        let target = BossAppleEqualizerSettings(
             ranges: current.ranges.map { range in
                 if let requestedLevel = requested.first(where: { $0.0 == range.band })?.1 {
-                    return BossEqualizerRangeLevel(
+                    return BossAppleEqualizerRangeLevel(
                         band: range.band,
                         currentLevel: requestedLevel,
                         minLevel: range.minLevel,
@@ -261,7 +261,7 @@ extension BossAppleController {
     }
 
     static func setAudioModeSettingsConfigWithVerification(
-        _ update: BossAudioModeSettingsConfigPatch,
+        _ update: BossAppleAudioModeSettingsConfigPatch,
         connection: BossAppleConnectionOptions
     ) async throws -> BossAppleAudioModeSettingsWriteResult {
         let current = try await readAudioModeSettingsConfigAfterReconnect(connection: connection)
@@ -309,11 +309,11 @@ extension BossAppleController {
     }
 
     static func sendEqualizerSetGets(
-        _ requests: [(BossEqualizerBand, Int)],
+        _ requests: [(BossAppleEqualizerBand, Int)],
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> BossEqualizerSettings {
-        var lastSettings: BossEqualizerSettings?
+    ) async throws -> BossAppleEqualizerSettings {
+        var lastSettings: BossAppleEqualizerSettings?
         for (band, level) in requests {
             lastSettings = try await sendEqualizerSetGet(
                 targetLevel: level,
@@ -330,20 +330,20 @@ extension BossAppleController {
 
     static func sendEqualizerSetGet(
         targetLevel: Int,
-        band: BossEqualizerBand,
+        band: BossAppleEqualizerBand,
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> BossEqualizerSettings {
+    ) async throws -> BossAppleEqualizerSettings {
         let packet = try equalizerSetGetPacket(targetLevel: targetLevel, band: band)
         let response = try await sendAndAwaitSameFunction(packet: packet, on: link, timeout: timeout)
         return try parseEqualizer(from: response)
     }
 
     static func sendAudioModeSettingsConfigSetGet(
-        _ config: BossAudioModeSettingsConfig,
+        _ config: BossAppleAudioModeSettingsConfig,
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> BossAudioModeSettingsConfig {
+    ) async throws -> BossAppleAudioModeSettingsConfig {
         let packet = try settingsConfigSetGetPacket(config)
         try await link.send(packet: packet)
         let response = try await nextResponse(
@@ -366,12 +366,12 @@ extension BossAppleController {
 
     static func sendAudioModeConfigSetGet(
         modeIndex: Int,
-        prompt: BossAudioModePrompt,
+        prompt: BossAppleAudioModePrompt,
         name: String,
-        settings: BossAudioModeSettingsConfig,
+        settings: BossAppleAudioModeSettingsConfig,
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> BossAudioModeConfig {
+    ) async throws -> BossAppleAudioModeConfig {
         let packet = try modeConfigSetGetPacket(modeIndex: modeIndex, prompt: prompt, name: name, settings: settings)
         let response = try await sendAndAwaitSameFunction(packet: packet, on: link, timeout: timeout)
         return try parseModeConfigDetail(from: response)
@@ -389,136 +389,106 @@ extension BossAppleController {
     }
 
     static func namesSupportedGetPacket() throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.namesSupportedGetPacket(runtime: runtime)
-        }
-        return BossAudioModesCodec.namesSupportedGetPacket()
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.namesSupportedGetPacket(runtime: runtime)
     }
 
     static func settingsGetAllStartPacket() throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.settingsGetAllStartPacket(runtime: runtime)
-        }
-        return BossSettingsCodec.settingsPacket(functionRaw: BossSettingsCodec.settingsGetAllFunctionRaw, operatorValue: .start)
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.settingsGetAllStartPacket(runtime: runtime)
     }
 
     static func modeConfigStartPacket() throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.modeConfigStartPacket(runtime: runtime)
-        }
-        return BossAudioModesCodec.modeConfigStartPacket()
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.modeConfigStartPacket(runtime: runtime)
     }
 
     static func currentModeGetPacket() throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.currentModeGetPacket(runtime: runtime)
-        }
-        return BossAudioModesCodec.currentModeGetPacket()
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.currentModeGetPacket(runtime: runtime)
     }
 
     static func equalizerGetPacket() throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.equalizerGetPacket(runtime: runtime)
-        }
-        return BossSettingsCodec.equalizerGetPacket()
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.equalizerGetPacket(runtime: runtime)
     }
 
     static func settingsConfigGetPacket() throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.settingsConfigGetPacket(runtime: runtime)
-        }
-        return BossAudioModesCodec.settingsConfigGetPacket()
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.settingsConfigGetPacket(runtime: runtime)
     }
 
     static func favoritesGetPacket() throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.favoritesGetPacket(runtime: runtime)
-        }
-        return BossAudioModesCodec.favoritesGetPacket()
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.favoritesGetPacket(runtime: runtime)
     }
 
     static func capabilitiesGetPacket() throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.capabilitiesGetPacket(runtime: runtime)
-        }
-        return BossAudioModesCodec.capabilitiesGetPacket()
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.capabilitiesGetPacket(runtime: runtime)
     }
 
-    static func equalizerSetGetPacket(targetLevel: Int, band: BossEqualizerBand) throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.equalizerSetGetPacket(targetLevel: targetLevel, band: band, runtime: runtime)
-        }
-        return try BossSettingsCodec.equalizerSetGetPacket(targetLevel: targetLevel, band: band)
+    static func equalizerSetGetPacket(targetLevel: Int, band: BossAppleEqualizerBand) throws -> BossAppleBmapPacket {
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.equalizerSetGetPacket(targetLevel: targetLevel, band: band, runtime: runtime)
     }
 
-    static func settingsConfigSetGetPacket(_ config: BossAudioModeSettingsConfig) throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.settingsConfigSetGetPacket(config, runtime: runtime)
-        }
-        return try BossAudioModesCodec.settingsConfigSetGetPacket(config)
+    static func settingsConfigSetGetPacket(_ config: BossAppleAudioModeSettingsConfig) throws -> BossAppleBmapPacket {
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.settingsConfigSetGetPacket(config, runtime: runtime)
     }
 
-    static func modeConfigSetGetPacket(modeIndex: Int, prompt: BossAudioModePrompt, name: String, settings: BossAudioModeSettingsConfig) throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.modeConfigSetGetPacket(modeIndex: modeIndex, prompt: prompt, name: name, settings: settings, runtime: runtime)
-        }
-        return try BossAudioModesCodec.modeConfigSetGetPacket(modeIndex: modeIndex, prompt: prompt, name: name, settings: settings)
+    static func modeConfigSetGetPacket(modeIndex: Int, prompt: BossAppleAudioModePrompt, name: String, settings: BossAppleAudioModeSettingsConfig) throws -> BossAppleBmapPacket {
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.modeConfigSetGetPacket(modeIndex: modeIndex, prompt: prompt, name: name, settings: settings, runtime: runtime)
     }
 
     static func favoritesSetGetPacket(numberOfModes: Int, favoriteModeIndices: [Int]) throws -> BossAppleBmapPacket {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.favoritesSetGetPacket(numberOfModes: numberOfModes, favoriteModeIndices: favoriteModeIndices, runtime: runtime)
-        }
-        return try BossAudioModesCodec.favoritesSetGetPacket(numberOfModes: numberOfModes, favoriteModeIndices: favoriteModeIndices)
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.favoritesSetGetPacket(numberOfModes: numberOfModes, favoriteModeIndices: favoriteModeIndices, runtime: runtime)
     }
 
-    static func parseSupportedPrompts(from packet: BossAppleBmapPacket) throws -> [BossAudioModePrompt] {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.parseSupportedPrompts(from: packet, runtime: runtime)
-        }
-        return try BossAudioModesCodec.parseSupportedPrompts(from: packet)
+    static func parseSupportedPrompts(from packet: BossAppleBmapPacket) throws -> [BossAppleAudioModePrompt] {
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.parseSupportedPrompts(from: packet, runtime: runtime)
     }
 
     static func parseCurrentMode(from packet: BossAppleBmapPacket) throws -> Int {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.parseCurrentMode(from: packet, runtime: runtime)
-        }
-        return try BossAudioModesCodec.parseCurrentMode(from: packet)
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.parseCurrentMode(from: packet, runtime: runtime)
     }
 
-    static func parseEqualizer(from packet: BossAppleBmapPacket) throws -> BossEqualizerSettings {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.parseEqualizer(from: packet, runtime: runtime)
-        }
-        return try BossSettingsCodec.parseEqualizer(from: packet)
+    static func parseEqualizer(from packet: BossAppleBmapPacket) throws -> BossAppleEqualizerSettings {
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.parseEqualizer(from: packet, runtime: runtime)
     }
 
-    static func parseSettingsConfig(from packet: BossAppleBmapPacket) throws -> BossAudioModeSettingsConfig {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.parseSettingsConfig(from: packet, runtime: runtime)
-        }
-        return try BossAudioModesCodec.parseSettingsConfig(from: packet)
+    static func parseSettingsConfig(from packet: BossAppleBmapPacket) throws -> BossAppleAudioModeSettingsConfig {
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.parseSettingsConfig(from: packet, runtime: runtime)
     }
 
     static func parseFavorites(from packet: BossAppleBmapPacket) throws -> [Int] {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.parseFavorites(from: packet, runtime: runtime)
-        }
-        return try BossAudioModesCodec.parseFavorites(from: packet)
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.parseFavorites(from: packet, runtime: runtime)
     }
 
-    static func parseCapabilities(from packet: BossAppleBmapPacket) throws -> BossAudioModesCapabilities {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.parseCapabilities(from: packet, runtime: runtime)
-        }
-        return try BossAudioModesCodec.parseCapabilities(from: packet)
+    static func parseCapabilities(from packet: BossAppleBmapPacket) throws -> BossAppleAudioModesCapabilities {
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.parseCapabilities(from: packet, runtime: runtime)
     }
 
-    static func parseModeConfigDetail(from packet: BossAppleBmapPacket) throws -> BossAudioModeConfig {
-        if let runtime = BossRustFfiRuntime.shared {
-            return try BossRustCodecBridge.parseModeConfigDetail(from: packet, runtime: runtime)
-        }
-        return try BossAudioModesCodec.parseModeConfigDetail(from: packet)
+    static func parseModeConfigDetail(from packet: BossAppleBmapPacket) throws -> BossAppleAudioModeConfig {
+        let runtime = try requireRustCodecRuntime()
+        return try BossRustCodecBridge.parseModeConfigDetail(from: packet, runtime: runtime)
     }
+}
 
+private extension BossAppleController {
+    static func requireRustCodecRuntime() throws -> BossRustFfiRuntime {
+        guard let runtime = BossRustFfiRuntime.shared else {
+            throw BossAppleControlError.unsupportedOperation("Rust runtime is required for protocol encoding and decoding")
+        }
+        return runtime
+    }
 }

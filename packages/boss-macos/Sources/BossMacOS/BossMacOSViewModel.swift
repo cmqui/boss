@@ -21,11 +21,11 @@ final class BossMacOSViewModel: ObservableObject {
     @Published private(set) var loadState: LoadState = .idle
     @Published private(set) var availableDevices: [BossAppleDiscoveredDevice] = []
     @Published var selectedDiscoveredDeviceID: UUID?
-    @Published private(set) var audioModes: [BossAudioModeConfig] = []
-    @Published private(set) var customProfileModes: [BossAudioModeConfig] = []
+    @Published private(set) var audioModes: [BossAppleAudioModeConfig] = []
+    @Published private(set) var customProfileModes: [BossAppleAudioModeConfig] = []
     @Published private(set) var currentAudioModeIndex: Int?
-    @Published private(set) var settings: BossAudioModeSettingsConfig?
-    @Published private(set) var equalizer: BossEqualizerSettings?
+    @Published private(set) var settings: BossAppleAudioModeSettingsConfig?
+    @Published private(set) var equalizer: BossAppleEqualizerSettings?
     @Published private(set) var deviceName = "Bose Device"
     @Published private(set) var deviceVariantName: String?
     @Published private(set) var firmwareVersion: String?
@@ -33,19 +33,19 @@ final class BossMacOSViewModel: ObservableObject {
     @Published private(set) var autoAwareEnabled: Bool?
     @Published private(set) var autoPlayPauseEnabled: Bool?
     @Published private(set) var autoAnswerEnabled: Bool?
-    @Published private(set) var volumeControlValue: BossVolumeControlValue?
+    @Published private(set) var volumeControlValue: BossAppleVolumeControlValue?
     @Published private(set) var lastResultMessage: String?
     @Published private(set) var waitingStatusMessage = "Looking for a Bose device nearby."
     @Published private(set) var hasDetachedSettingsDraft = false
     @Published private(set) var hasDetachedEqualizerDraft = false
     @Published var isPresentingSaveProfilePrompt = false
     @Published var pendingProfileName = ""
-    @Published private(set) var supportedPrompts: [BossAudioModePrompt] = []
+    @Published private(set) var supportedPrompts: [BossAppleAudioModePrompt] = []
     @Published var selectedSaveProfilePromptName = "None"
 
     @Published var selectedAudioModeIndex: Int?
     @Published var cncLevel = 0
-    @Published var spatialAudioMode: BossSpatialAudioMode = .off
+    @Published var spatialAudioMode: BossAppleSpatialAudioMode = .off
     @Published var windBlockEnabled = false
     @Published var ancToggleEnabled = false
     @Published var bassLevel = 0
@@ -101,7 +101,7 @@ final class BossMacOSViewModel: ObservableObject {
         settings != nil && hasDetachedSettingsDraft && hasAvailableCustomProfileSlot && !isBusy
     }
 
-    var selectableAudioModes: [BossAudioModeConfig] {
+    var selectableAudioModes: [BossAppleAudioModeConfig] {
         audioModes.filter { mode in
             if mode.userConfigurable {
                 return mode.userConfigured && hasCustomProfileName(mode)
@@ -110,7 +110,7 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
-    var selectableSaveProfilePrompts: [BossAudioModePrompt] {
+    var selectableSaveProfilePrompts: [BossAppleAudioModePrompt] {
         let nonNone = supportedPrompts.filter { $0 != .none }
         return nonNone.isEmpty ? supportedPrompts : nonNone
     }
@@ -215,7 +215,7 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
-    func setFavorite(_ isFavorite: Bool, for mode: BossAudioModeConfig) {
+    func setFavorite(_ isFavorite: Bool, for mode: BossAppleAudioModeConfig) {
         run(isFavorite ? "Adding favorite" : "Removing favorite") {
             let session = self.makeSession()
             if isFavorite {
@@ -229,7 +229,7 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
-    func deleteCustomProfile(_ mode: BossAudioModeConfig) {
+    func deleteCustomProfile(_ mode: BossAppleAudioModeConfig) {
         run("Deleting custom profile") {
             let session = self.makeSession()
             let displayName = self.customProfileDisplayName(for: mode)
@@ -307,7 +307,7 @@ final class BossMacOSViewModel: ObservableObject {
                     self.selectedAudioModeIndex = targetModeIndex
                 }
 
-                let patch = BossAudioModeSettingsConfigPatch(
+                let patch = BossAppleAudioModeSettingsConfigPatch(
                     cncLevel: self.rawCNCLevel(fromDisplay: self.cncLevel),
                     spatialAudioMode: self.spatialAudioMode,
                     windBlockEnabled: self.windBlockEnabled,
@@ -423,7 +423,7 @@ final class BossMacOSViewModel: ObservableObject {
         noteManualSettingsEdit()
     }
 
-    func setSpatialAudioModeDraft(_ mode: BossSpatialAudioMode) {
+    func setSpatialAudioModeDraft(_ mode: BossAppleSpatialAudioMode) {
         spatialAudioMode = mode
         noteManualSettingsEdit()
     }
@@ -524,7 +524,7 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
-    func setVolumeControl(_ value: BossVolumeControlValue) {
+    func setVolumeControl(_ value: BossAppleVolumeControlValue) {
         guard let previousValue = volumeControlValue else {
             return
         }
@@ -535,7 +535,7 @@ final class BossMacOSViewModel: ObservableObject {
                 let updated = try await session.setVolumeControl(
                     BossAppleVolumeControlValue(rawValue: value.rawValue) ?? .disabled
                 )
-                self.volumeControlValue = BossVolumeControlValue(rawValue: updated.value.rawValue) ?? .disabled
+                self.volumeControlValue = BossAppleVolumeControlValue(rawValue: updated.value.rawValue) ?? .disabled
                 self.lastResultMessage = "Volume control updated"
             } catch {
                 self.volumeControlValue = previousValue
@@ -857,7 +857,7 @@ final class BossMacOSViewModel: ObservableObject {
         applyDeviceSettings(snapshot.deviceSettings.settings)
     }
 
-    private func loadSupportedPrompts(using session: BossAppleSession) async -> [BossAudioModePrompt] {
+    private func loadSupportedPrompts(using session: BossAppleSession) async -> [BossAppleAudioModePrompt] {
         do {
             let prompts = try await session.supportedAudioModePrompts()
             return prompts.isEmpty ? fallbackSupportedPrompts : prompts
@@ -877,7 +877,7 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
-    private func applySettingsSnapshot(_ config: BossAudioModeSettingsConfig) {
+    private func applySettingsSnapshot(_ config: BossAppleAudioModeSettingsConfig) {
         settings = config
         cncLevel = displayCNCLevel(fromRaw: config.cncLevel)
         spatialAudioMode = config.spatialAudioMode
@@ -886,7 +886,7 @@ final class BossMacOSViewModel: ObservableObject {
         hasDetachedSettingsDraft = false
     }
 
-    private func applyEqualizerSnapshot(_ settings: BossEqualizerSettings?) {
+    private func applyEqualizerSnapshot(_ settings: BossAppleEqualizerSettings?) {
         equalizer = settings
         bassLevel = settings?.bass?.currentLevel ?? 0
         midLevel = settings?.mid?.currentLevel ?? 0
@@ -900,11 +900,11 @@ final class BossMacOSViewModel: ObservableObject {
         autoPlayPauseEnabled = deviceSettings.autoPlayPauseEnabled ?? deviceSettings.wearDetection?.isAutoPlayEnabled
         autoAnswerEnabled = deviceSettings.autoAnswerEnabled ?? deviceSettings.wearDetection?.isAutoAnswerEnabled
         volumeControlValue = deviceSettings.volumeControl.map {
-            BossVolumeControlValue(rawValue: $0.value.rawValue) ?? .disabled
+            BossAppleVolumeControlValue(rawValue: $0.value.rawValue) ?? .disabled
         }
     }
 
-    private func applyAudioModes(_ modes: [BossAudioModeConfig]) {
+    private func applyAudioModes(_ modes: [BossAppleAudioModeConfig]) {
         audioModes = modes
         customProfileModes = modes.filter(\.userConfigurable)
 
@@ -927,7 +927,7 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
-    private func applyDisplayedModeSettings(liveConfig: BossAudioModeSettingsConfig) {
+    private func applyDisplayedModeSettings(liveConfig: BossAppleAudioModeSettingsConfig) {
         if let selectedModeConfig,
            selectedModeConfig.modeIndex != currentAudioModeIndex {
             Self.log(debugSummary(
@@ -967,8 +967,8 @@ final class BossMacOSViewModel: ObservableObject {
             trebleLevel != (equalizer.treble?.currentLevel ?? 0)
     }
 
-    private func currentDraftConfig() -> BossAudioModeSettingsConfig {
-        BossAudioModeSettingsConfig(
+    private func currentDraftConfig() -> BossAppleAudioModeSettingsConfig {
+        BossAppleAudioModeSettingsConfig(
             cncLevel: rawCNCLevel(fromDisplay: cncLevel),
             autoCNCEnabled: settings?.autoCNCEnabled ?? false,
             spatialAudioMode: spatialAudioMode,
@@ -999,8 +999,8 @@ final class BossMacOSViewModel: ObservableObject {
         min(max(value, 0), cncDisplayMaximum)
     }
 
-    private func currentEqualizerPatch() -> BossEqualizerSettingsPatch {
-        BossEqualizerSettingsPatch(
+    private func currentEqualizerPatch() -> BossAppleEqualizerSettingsPatch {
+        BossAppleEqualizerSettingsPatch(
             bass: equalizer?.bass != nil ? bassLevel : nil,
             mid: equalizer?.mid != nil ? midLevel : nil,
             treble: equalizer?.treble != nil ? trebleLevel : nil
@@ -1009,15 +1009,15 @@ final class BossMacOSViewModel: ObservableObject {
 
     private func saveCustomModeSettingsSequentially(
         using session: BossAppleSession,
-        startingFrom initialMode: BossAudioModeConfig,
-        targetSettings: BossAudioModeSettingsConfig
-    ) async throws -> BossAudioModeConfig {
+        startingFrom initialMode: BossAppleAudioModeConfig,
+        targetSettings: BossAppleAudioModeSettingsConfig
+    ) async throws -> BossAppleAudioModeConfig {
         let normalizedName = normalizedCustomProfileName(initialMode.name)
         var workingMode = initialMode
 
         func saveStep(
             _ label: String,
-            transform: (BossAudioModeSettingsConfig) -> BossAudioModeSettingsConfig
+            transform: (BossAppleAudioModeSettingsConfig) -> BossAppleAudioModeSettingsConfig
         ) async throws {
             let stepSettings = transform(workingMode.settings)
             guard stepSettings != workingMode.settings else {
@@ -1046,7 +1046,7 @@ final class BossMacOSViewModel: ObservableObject {
         }
 
         try await saveStep("spatial") { current in
-            BossAudioModeSettingsConfig(
+            BossAppleAudioModeSettingsConfig(
                 cncLevel: current.cncLevel,
                 autoCNCEnabled: current.autoCNCEnabled,
                 spatialAudioMode: targetSettings.spatialAudioMode,
@@ -1057,7 +1057,7 @@ final class BossMacOSViewModel: ObservableObject {
 
         let ancWillChange = workingMode.settings.ancToggleEnabled != targetSettings.ancToggleEnabled
         try await saveStep("anc") { current in
-            BossAudioModeSettingsConfig(
+            BossAppleAudioModeSettingsConfig(
                 cncLevel: current.cncLevel,
                 autoCNCEnabled: current.autoCNCEnabled,
                 spatialAudioMode: current.spatialAudioMode,
@@ -1068,7 +1068,7 @@ final class BossMacOSViewModel: ObservableObject {
 
         if ancWillChange || workingMode.settings.windBlockEnabled != targetSettings.windBlockEnabled {
             try await saveStep("wind") { current in
-                BossAudioModeSettingsConfig(
+                BossAppleAudioModeSettingsConfig(
                     cncLevel: current.cncLevel,
                     autoCNCEnabled: current.autoCNCEnabled,
                     spatialAudioMode: current.spatialAudioMode,
@@ -1079,7 +1079,7 @@ final class BossMacOSViewModel: ObservableObject {
         }
 
         try await saveStep("cnc") { current in
-            BossAudioModeSettingsConfig(
+            BossAppleAudioModeSettingsConfig(
                 cncLevel: targetSettings.cncLevel,
                 autoCNCEnabled: current.autoCNCEnabled,
                 spatialAudioMode: current.spatialAudioMode,
@@ -1091,18 +1091,18 @@ final class BossMacOSViewModel: ObservableObject {
         return workingMode
     }
 
-    func customProfileDisplayName(for mode: BossAudioModeConfig) -> String {
+    func customProfileDisplayName(for mode: BossAppleAudioModeConfig) -> String {
         displayName(for: mode)
     }
 
-    private var selectedModeConfig: BossAudioModeConfig? {
+    private var selectedModeConfig: BossAppleAudioModeConfig? {
         guard let selectedAudioModeIndex = resolvedSelectedAudioModeIndex else {
             return nil
         }
         return audioModes.first(where: { $0.modeIndex == selectedAudioModeIndex })
     }
 
-    func canDelete(_ mode: BossAudioModeConfig) -> Bool {
+    func canDelete(_ mode: BossAppleAudioModeConfig) -> Bool {
         mode.userConfigurable && mode.userConfigured && hasCustomProfileName(mode)
     }
 
@@ -1110,7 +1110,7 @@ final class BossMacOSViewModel: ObservableObject {
         customProfileModes.contains { !$0.userConfigured || !hasCustomProfileName($0) }
     }
 
-    private func saveCustomProfile(profileName: String, prompt: BossAudioModePrompt) {
+    private func saveCustomProfile(profileName: String, prompt: BossAppleAudioModePrompt) {
         run("Saving custom profile") {
             let session = self.makeSession()
             let saved = try await session.saveCustomAudioMode(
@@ -1125,14 +1125,14 @@ final class BossMacOSViewModel: ObservableObject {
         }
     }
 
-    private func displayName(for mode: BossAudioModeConfig) -> String {
+    private func displayName(for mode: BossAppleAudioModeConfig) -> String {
         if !hasCustomProfileName(mode) {
             return mode.userConfigurable ? "Custom profile" : "Mode \(mode.modeIndex)"
         }
         return normalizedCustomProfileName(mode.name)
     }
 
-    private func hasCustomProfileName(_ mode: BossAudioModeConfig) -> Bool {
+    private func hasCustomProfileName(_ mode: BossAppleAudioModeConfig) -> Bool {
         let normalizedName = normalizedCustomProfileName(mode.name)
         return !normalizedName.isEmpty && normalizedName != "None"
     }
@@ -1141,20 +1141,20 @@ final class BossMacOSViewModel: ObservableObject {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func promptMatchingName(_ profileName: String) -> BossAudioModePrompt? {
+    private func promptMatchingName(_ profileName: String) -> BossAppleAudioModePrompt? {
         let normalizedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return BossAudioModePrompt.allKnown.first { $0.name.lowercased() == normalizedName }
+        return BossAppleAudioModePrompt.allKnown.first { $0.name.lowercased() == normalizedName }
     }
 
-    private func defaultPromptForNewCustomProfile() -> BossAudioModePrompt {
+    private func defaultPromptForNewCustomProfile() -> BossAppleAudioModePrompt {
         selectableSaveProfilePrompts.first ?? .none
     }
 
-    private var fallbackSupportedPrompts: [BossAudioModePrompt] {
-        BossAudioModePrompt.allKnown.filter { $0 != .none }
+    private var fallbackSupportedPrompts: [BossAppleAudioModePrompt] {
+        BossAppleAudioModePrompt.allKnown.filter { $0 != .none }
     }
 
-    private func resolvedSavePrompt(for profileName: String) -> BossAudioModePrompt {
+    private func resolvedSavePrompt(for profileName: String) -> BossAppleAudioModePrompt {
         if let exactMatch = promptMatchingName(profileName),
            supportedPrompts.contains(exactMatch) {
             return exactMatch
@@ -1202,10 +1202,10 @@ final class BossMacOSViewModel: ObservableObject {
         selectedModeIndex: Int?,
         currentModeIndex: Int?,
         incomingModeIndex: Int? = nil,
-        mode: BossAudioModeConfig? = nil,
-        draftSettings: BossAudioModeSettingsConfig? = nil,
-        returnedSettings: BossAudioModeSettingsConfig? = nil,
-        liveSettings: BossAudioModeSettingsConfig? = nil
+        mode: BossAppleAudioModeConfig? = nil,
+        draftSettings: BossAppleAudioModeSettingsConfig? = nil,
+        returnedSettings: BossAppleAudioModeSettingsConfig? = nil,
+        liveSettings: BossAppleAudioModeSettingsConfig? = nil
     ) -> String {
         var fields: [String] = [
             "selected=\(selectedModeIndex.map(String.init) ?? "nil")",
@@ -1235,11 +1235,11 @@ final class BossMacOSViewModel: ObservableObject {
         return "\(prefix) | " + fields.joined(separator: " | ")
     }
 
-    private func debugModeLabel(_ mode: BossAudioModeConfig) -> String {
+    private func debugModeLabel(_ mode: BossAppleAudioModeConfig) -> String {
         "\(customProfileDisplayName(for: mode))#\(mode.modeIndex){userConfigurable=\(mode.userConfigurable),userConfigured=\(mode.userConfigured),favorite=\(mode.favorite),prompt=\(mode.prompt.name),settings=\(debugSettingsLabel(mode.settings))}"
     }
 
-    private func debugSettingsLabel(_ settings: BossAudioModeSettingsConfig) -> String {
+    private func debugSettingsLabel(_ settings: BossAppleAudioModeSettingsConfig) -> String {
         "{cnc=\(settings.cncLevel),autoCNC=\(settings.autoCNCEnabled),spatial=\(String(describing: settings.spatialAudioMode)),wind=\(settings.windBlockEnabled),ancToggle=\(settings.ancToggleEnabled)}"
     }
 

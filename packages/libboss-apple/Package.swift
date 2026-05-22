@@ -17,9 +17,7 @@ let package = Package(
             targets: ["boss-bootstrap"]
         ),
     ],
-    dependencies: [
-        .package(path: "../libboss"),
-    ],
+    dependencies: [],
     targets: [
         .target(
             name: "CBossRustFFI",
@@ -29,7 +27,6 @@ let package = Package(
             name: "libbossApple",
             dependencies: [
                 "CBossRustFFI",
-                .product(name: "libboss", package: "libboss"),
             ]
         ),
         .executableTarget(

@@ -1,10 +1,9 @@
 use futures::executor::block_on;
-use libboss_rs_core::{
-    BleSegmentReassembler, BleSegmentation, BmapCodec, BmapFunctionBlock, BmapOperator,
-    BmapPacket, BossAudioModeSettingsConfig, BossAudioModesCodec, BossSettingsCodec,
-    BossVolumeControlValue,
+use libboss_core::{
+    BleSegmentReassembler, BleSegmentation, BmapCodec, BmapFunctionBlock, BmapOperator, BmapPacket,
+    BossAudioModeSettingsConfig, BossAudioModesCodec, BossSettingsCodec, BossVolumeControlValue,
 };
-use libboss_rs_session::{
+use libboss_session::{
     BootstrapSession, BossAudioModeSettingsWriteResult, BossCurrentAudioModeWriteResult,
     BossEqualizerWriteResult, BossLink, BossSession, BossSessionError, PacketSession,
     SessionConfiguration,
@@ -89,11 +88,11 @@ fn other_error(message: impl Into<String>) -> BossFfiError {
     }
 }
 
-fn prompt_from_bytes(byte1: u8, byte2: u8) -> libboss_rs_core::BossAudioModePrompt {
-    libboss_rs_core::BossAudioModePrompt::ALL_KNOWN
+fn prompt_from_bytes(byte1: u8, byte2: u8) -> libboss_core::BossAudioModePrompt {
+    libboss_core::BossAudioModePrompt::ALL_KNOWN
         .into_iter()
         .find(|prompt| prompt.byte1 == byte1 && prompt.byte2 == byte2)
-        .unwrap_or(libboss_rs_core::BossAudioModePrompt::NONE)
+        .unwrap_or(libboss_core::BossAudioModePrompt::NONE)
 }
 
 impl Default for BossFfiWriteDisposition {
@@ -288,7 +287,11 @@ pub extern "C" fn boss_audio_modes_favorites_get_packet(
     out_packet: *mut BossFfiBmapPacket,
     out_error: *mut BossFfiError,
 ) -> bool {
-    write_packet(out_packet, BossAudioModesCodec::favorites_get_packet(), out_error)
+    write_packet(
+        out_packet,
+        BossAudioModesCodec::favorites_get_packet(),
+        out_error,
+    )
 }
 
 #[no_mangle]
@@ -344,7 +347,8 @@ pub extern "C" fn boss_audio_modes_mode_config_set_get_packet(
     let name = if name_bytes.is_null() || name_len == 0 {
         String::new()
     } else {
-        String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(name_bytes, name_len) }).into_owned()
+        String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(name_bytes, name_len) })
+            .into_owned()
     };
     let prompt = prompt_from_bytes(prompt_byte1, prompt_byte2);
     match BossAudioModesCodec::mode_config_set_get_packet(
@@ -462,7 +466,9 @@ pub extern "C" fn boss_settings_on_head_detection_set_get_packet(
 ) -> bool {
     write_packet(
         out_packet,
-        BossSettingsCodec::on_head_detection_set_get_packet(&core_on_head_detection_from_ffi(value)),
+        BossSettingsCodec::on_head_detection_set_get_packet(&core_on_head_detection_from_ffi(
+            value,
+        )),
         out_error,
     )
 }
@@ -523,7 +529,7 @@ pub extern "C" fn boss_settings_equalizer_set_get_packet(
 ) -> bool {
     match BossSettingsCodec::equalizer_set_get_packet(
         target_level,
-        libboss_rs_core::BossEqualizerBand::from_raw(band_raw),
+        libboss_core::BossEqualizerBand::from_raw(band_raw),
     ) {
         Ok(packet) => write_packet(out_packet, packet, out_error),
         Err(error) => {
@@ -545,7 +551,12 @@ pub extern "C" fn boss_audio_modes_parse_supported_prompts(
     }
     let Ok(prompts) = with_packet(packet, out_error, |packet| {
         BossAudioModesCodec::parse_supported_prompts(packet)
-            .map(|prompts| prompts.into_iter().map(ffi_audio_mode_prompt_from_core).collect::<Vec<_>>())
+            .map(|prompts| {
+                prompts
+                    .into_iter()
+                    .map(ffi_audio_mode_prompt_from_core)
+                    .collect::<Vec<_>>()
+            })
             .map_err(|error| other_error(format!("{error:?}")))
     }) else {
         return false;
@@ -565,7 +576,8 @@ pub extern "C" fn boss_audio_modes_parse_current_mode(
         return false;
     }
     let Ok(mode_index) = with_packet(packet, out_error, |packet| {
-        BossAudioModesCodec::parse_current_mode(packet).map_err(|error| other_error(format!("{error:?}")))
+        BossAudioModesCodec::parse_current_mode(packet)
+            .map_err(|error| other_error(format!("{error:?}")))
     }) else {
         return false;
     };
@@ -580,7 +592,10 @@ pub extern "C" fn boss_audio_modes_parse_capabilities(
     out_error: *mut BossFfiError,
 ) -> bool {
     if out_capabilities.is_null() {
-        write_error(out_error, invalid_argument_error("out_capabilities was null"));
+        write_error(
+            out_error,
+            invalid_argument_error("out_capabilities was null"),
+        );
         return false;
     }
     let Ok(capabilities) = with_packet(packet, out_error, |packet| {
@@ -605,7 +620,8 @@ pub extern "C" fn boss_audio_modes_parse_favorites(
         return false;
     }
     let Ok(favorites) = with_packet(packet, out_error, |packet| {
-        BossAudioModesCodec::parse_favorites(packet).map_err(|error| other_error(format!("{error:?}")))
+        BossAudioModesCodec::parse_favorites(packet)
+            .map_err(|error| other_error(format!("{error:?}")))
     }) else {
         return false;
     };
@@ -729,7 +745,8 @@ pub extern "C" fn boss_settings_parse_enabled_flag(
         return false;
     }
     let Ok(enabled) = with_packet(packet, out_error, |packet| {
-        BossSettingsCodec::parse_enabled_flag(packet).map_err(|error| other_error(format!("{error:?}")))
+        BossSettingsCodec::parse_enabled_flag(packet)
+            .map_err(|error| other_error(format!("{error:?}")))
     }) else {
         return false;
     };
@@ -974,26 +991,26 @@ async fn next_stream_packet(
             BossFfiUpdateStreamKind::CurrentAudioMode => {
                 packet.function_block == BmapFunctionBlock::AudioModes
                     && packet.function.raw_value() == BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW
-                    && packet.operator == libboss_rs_core::BmapOperator::Status
+                    && packet.operator == libboss_core::BmapOperator::Status
             }
             BossFfiUpdateStreamKind::AudioModeSettings => {
                 packet.function_block == BmapFunctionBlock::AudioModes
                     && packet.function.raw_value()
                         == BossAudioModesCodec::SETTINGS_CONFIG_FUNCTION_RAW
-                    && packet.operator == libboss_rs_core::BmapOperator::Status
+                    && packet.operator == libboss_core::BmapOperator::Status
             }
             BossFfiUpdateStreamKind::Equalizer => {
                 packet.function_block == BmapFunctionBlock::Settings
                     && packet.function.raw_value() == BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW
-                    && packet.operator == libboss_rs_core::BmapOperator::Status
+                    && packet.operator == libboss_core::BmapOperator::Status
             }
             BossFfiUpdateStreamKind::DeviceSettings => {
                 packet.function_block == BmapFunctionBlock::Settings
-                    && packet.operator == libboss_rs_core::BmapOperator::Status
+                    && packet.operator == libboss_core::BmapOperator::Status
             }
             BossFfiUpdateStreamKind::AudioModeCatalog => {
                 packet.function_block == BmapFunctionBlock::AudioModes
-                    && packet.operator == libboss_rs_core::BmapOperator::Status
+                    && packet.operator == libboss_core::BmapOperator::Status
             }
         };
         if matches {
@@ -1253,7 +1270,7 @@ pub extern "C" fn boss_session_set_audio_mode_settings(
         return false;
     }
     if patch.has_spatial_audio_mode
-        && libboss_rs_core::BossSpatialAudioMode::from_raw(patch.spatial_audio_mode).is_none()
+        && libboss_core::BossSpatialAudioMode::from_raw(patch.spatial_audio_mode).is_none()
     {
         write_error(
             out_error,
@@ -1850,7 +1867,7 @@ pub extern "C" fn boss_session_save_custom_audio_mode(
         }
     };
     let Some(spatial_audio_mode) =
-        libboss_rs_core::BossSpatialAudioMode::from_raw(settings.spatial_audio_mode)
+        libboss_core::BossSpatialAudioMode::from_raw(settings.spatial_audio_mode)
     else {
         write_error(
             out_error,
@@ -1868,7 +1885,7 @@ pub extern "C" fn boss_session_save_custom_audio_mode(
                 wind_block_enabled: settings.wind_block_enabled,
                 anc_toggle_enabled: settings.anc_toggle_enabled,
             },
-            libboss_rs_core::BossAudioModePrompt::known(prompt_byte1, prompt_byte2),
+            libboss_core::BossAudioModePrompt::known(prompt_byte1, prompt_byte2),
             has_requested_slot.then_some(requested_slot),
             5_000,
         ))

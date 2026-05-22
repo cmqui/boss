@@ -2,6 +2,11 @@ name: Boss
 options:
   createIntermediateGroups: true
   groupSortPosition: top
+configs:
+  Debug: debug
+  Release: release
+  DebugStatic: debug
+  ReleaseStatic: release
 packages:
   libbossApple:
     path: ../libboss-apple
@@ -24,6 +29,20 @@ targets:
     type: application
     platform: macOS
     deploymentTarget: "14.0"
+    settings:
+      base:
+        BOSS_RUST_FFI_LINKAGE: dynamic
+        BOSS_RUST_FFI_PROFILE: debug
+      configs:
+        Release:
+          BOSS_RUST_FFI_PROFILE: release
+        DebugStatic:
+          BOSS_RUST_FFI_LINKAGE: static
+          OTHER_LDFLAGS: $(inherited) -Wl,-export_dynamic -Wl,-force_load,$(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/liblibboss_ffi.a
+        ReleaseStatic:
+          BOSS_RUST_FFI_PROFILE: release
+          BOSS_RUST_FFI_LINKAGE: static
+          OTHER_LDFLAGS: $(inherited) -Wl,-export_dynamic -Wl,-force_load,$(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/liblibboss_ffi.a
     sources:
       - path: Sources/BossMacOS
         excludes:
@@ -35,13 +54,35 @@ targets:
     dependencies:
       - package: libbossApple
         product: libbossApple
-    postBuildScripts:
-      - name: Build libboss-rs FFI
+    preBuildScripts:
+      - name: Build libboss FFI
         script: |
-          /bin/bash "${SRCROOT}/scripts/build-libboss-rs-ffi.sh"
+          /bin/bash "${SRCROOT}/scripts/build-libboss-ffi.sh" build
+        outputFiles:
+          - $(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/liblibboss_ffi.a
+          - $(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/liblibboss_ffi.dylib
+        basedOnDependencyAnalysis: false
+    postBuildScripts:
+      - name: Install libboss FFI dylib
+        script: |
+          /bin/bash "${SRCROOT}/scripts/build-libboss-ffi.sh" install
         basedOnDependencyAnalysis: false
 schemes:
   Boss:
     build:
       targets:
         Boss: all
+  Boss Static:
+    build:
+      targets:
+        Boss: all
+    run:
+      config: DebugStatic
+    test:
+      config: DebugStatic
+    analyze:
+      config: DebugStatic
+    archive:
+      config: ReleaseStatic
+    profile:
+      config: ReleaseStatic

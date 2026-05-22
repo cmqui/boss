@@ -4,7 +4,7 @@ extension BossAppleController {
     static func supportedAudioModePrompts(
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> [BossAudioModePrompt] {
+    ) async throws -> [BossAppleAudioModePrompt] {
         let response = try await sendAndAwaitSameFunction(
             packet: try namesSupportedGetPacket(),
             on: link,
@@ -63,11 +63,11 @@ extension BossAppleController {
     }
 
     static func nextResponse(
-        from stream: AsyncThrowingStream<BmapPacket, Error>,
-        matching predicate: @escaping @Sendable (BmapPacket) -> Bool,
+        from stream: AsyncThrowingStream<BossAppleBmapPacket, Error>,
+        matching predicate: @escaping @Sendable (BossAppleBmapPacket) -> Bool,
         timeout: Duration
-    ) async throws -> BmapPacket {
-        try await withThrowingTaskGroup(of: BmapPacket.self) { group in
+    ) async throws -> BossAppleBmapPacket {
+        try await withThrowingTaskGroup(of: BossAppleBmapPacket.self) { group in
             group.addTask {
                 for try await packet in stream {
                     if predicate(packet) {
@@ -87,10 +87,10 @@ extension BossAppleController {
     }
 
     static func sendAndAwaitSameFunction(
-        packet: BmapPacket,
+        packet: BossAppleBmapPacket,
         on link: BossAppleLink,
         timeout: Duration
-    ) async throws -> BmapPacket {
+    ) async throws -> BossAppleBmapPacket {
         try await link.send(packet: packet)
         let response = try await nextResponse(
             from: link.packets,

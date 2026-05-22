@@ -2,7 +2,6 @@ import CBossRustFFI
 import Darwin
 import Dispatch
 import Foundation
-import libboss
 
 final class BossRustSessionBridge: @unchecked Sendable {
     fileprivate let runtime: BossRustFfiRuntime
@@ -77,7 +76,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func audioModeSettingsUpdateStream(on transport: AppleBleBossTransport) -> AsyncThrowingStream<BossAudioModeSettingsConfig, Error> {
+    func audioModeSettingsUpdateStream(on transport: AppleBleBossTransport) -> AsyncThrowingStream<BossAppleAudioModeSettingsConfig, Error> {
         updateStream(on: transport, kind: BOSS_FFI_UPDATE_STREAM_KIND_AUDIO_MODE_SETTINGS) { handle in
             var config = BossFfiAudioModeSettingsConfig()
             var operationError = self.emptyError()
@@ -90,7 +89,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func equalizerUpdateStream(on transport: AppleBleBossTransport) -> AsyncThrowingStream<BossEqualizerSettings, Error> {
+    func equalizerUpdateStream(on transport: AppleBleBossTransport) -> AsyncThrowingStream<BossAppleEqualizerSettings, Error> {
         updateStream(on: transport, kind: BOSS_FFI_UPDATE_STREAM_KIND_EQUALIZER) { handle in
             var settings = BossFfiEqualizerSettings()
             var operationError = self.emptyError()
@@ -116,7 +115,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func audioModeCatalogUpdateStream(on transport: AppleBleBossTransport) -> AsyncThrowingStream<[BossAudioModeConfig], Error> {
+    func audioModeCatalogUpdateStream(on transport: AppleBleBossTransport) -> AsyncThrowingStream<[BossAppleAudioModeConfig], Error> {
         updateStream(on: transport, kind: BOSS_FFI_UPDATE_STREAM_KIND_AUDIO_MODE_CATALOG) { handle in
             var buffer = BossBuffer(data: nil, len: 0)
             var operationError = self.emptyError()
@@ -234,7 +233,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func supportedAudioModePrompts(on transport: AppleBleBossTransport) async throws -> [BossAudioModePrompt] {
+    func supportedAudioModePrompts(on transport: AppleBleBossTransport) async throws -> [BossAppleAudioModePrompt] {
         BossRustLogger.log("using Rust bridge for supportedAudioModePrompts")
         return try withSessionHandle(on: transport) { handle in
             var buffer = BossBuffer(data: nil, len: 0)
@@ -249,7 +248,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func audioModeConfigs(on transport: AppleBleBossTransport) async throws -> [BossAudioModeConfig] {
+    func audioModeConfigs(on transport: AppleBleBossTransport) async throws -> [BossAppleAudioModeConfig] {
         BossRustLogger.log("using Rust bridge for audioModeConfigs")
         return try withSessionHandle(on: transport) { handle in
             var buffer = BossBuffer(data: nil, len: 0)
@@ -264,7 +263,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func audioModeCapabilities(on transport: AppleBleBossTransport) async throws -> BossAudioModesCapabilities {
+    func audioModeCapabilities(on transport: AppleBleBossTransport) async throws -> BossAppleAudioModesCapabilities {
         BossRustLogger.log("using Rust bridge for audioModeCapabilities")
         return try withSessionHandle(on: transport) { handle in
             var capabilities = BossFfiAudioModesCapabilities()
@@ -278,7 +277,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func audioModeSettingsConfig(on transport: AppleBleBossTransport) async throws -> BossAudioModeSettingsConfig {
+    func audioModeSettingsConfig(on transport: AppleBleBossTransport) async throws -> BossAppleAudioModeSettingsConfig {
         BossRustLogger.log("using Rust bridge for audioModeSettingsConfig")
         return try withSessionHandle(on: transport) { handle in
             var config = BossFfiAudioModeSettingsConfig()
@@ -310,7 +309,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
-    func equalizerSettingsIfAvailable(on transport: AppleBleBossTransport) async throws -> BossEqualizerSettings? {
+    func equalizerSettingsIfAvailable(on transport: AppleBleBossTransport) async throws -> BossAppleEqualizerSettings? {
         BossRustLogger.log("using Rust bridge for equalizerSettingsIfAvailable")
         return try withSessionHandle(on: transport) { handle in
             try directOptionalSetting {
@@ -427,14 +426,14 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
 
         let autoAwareEnabled: BossAppleObservedSetting<Bool> = try directObservedSetting {
-            var enabled = false
-            var operationError = emptyError()
-            let success = runtime.bossSessionEnabledSetting(
-                handle,
-                BossSettingsCodec.autoAwareFunctionRaw,
-                &enabled,
-                &operationError
-            )
+                var enabled = false
+                var operationError = emptyError()
+                let success = runtime.bossSessionEnabledSetting(
+                    handle,
+                    BossAppleSettingsProtocol.autoAwareFunctionRaw,
+                    &enabled,
+                    &operationError
+                )
             guard success else {
                 defer { runtime.bossErrorFree(operationError) }
                 throw map(error: operationError)
@@ -443,14 +442,14 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
 
         let autoPlayPauseEnabled: BossAppleObservedSetting<Bool> = try directObservedSetting {
-            var enabled = false
-            var operationError = emptyError()
-            let success = runtime.bossSessionEnabledSetting(
-                handle,
-                BossSettingsCodec.autoPlayPauseFunctionRaw,
-                &enabled,
-                &operationError
-            )
+                var enabled = false
+                var operationError = emptyError()
+                let success = runtime.bossSessionEnabledSetting(
+                    handle,
+                    BossAppleSettingsProtocol.autoPlayPauseFunctionRaw,
+                    &enabled,
+                    &operationError
+                )
             guard success else {
                 defer { runtime.bossErrorFree(operationError) }
                 throw map(error: operationError)
@@ -467,7 +466,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
                 var operationError = emptyError()
                 let success = runtime.bossSessionEnabledSetting(
                     handle,
-                    BossSettingsCodec.autoAnswerFunctionRaw,
+                    BossAppleSettingsProtocol.autoAnswerFunctionRaw,
                     &enabled,
                     &operationError
                 )
@@ -540,13 +539,13 @@ final class BossRustSessionBridge: @unchecked Sendable {
 
     func setAudioModeSettings(
         on transport: AppleBleBossTransport,
-        update: BossAudioModeSettingsConfigPatch
+        update: BossAppleAudioModeSettingsConfigPatch
     ) async throws -> BossAppleAudioModeSettingsWriteResult {
         BossRustLogger.log("using Rust bridge for setAudioModeSettings")
         let result = try withSessionHandle(on: transport) { handle in
             var result = BossFfiAudioModeSettingsWriteResult(
                 disposition: BOSS_FFI_WRITE_DISPOSITION_UNCHANGED,
-                config: Self.ffiConfig(from: BossAudioModeSettingsConfig(
+                config: Self.ffiConfig(from: BossAppleAudioModeSettingsConfig(
                     cncLevel: 0,
                     autoCNCEnabled: false,
                     spatialAudioMode: .off,
@@ -583,13 +582,13 @@ final class BossRustSessionBridge: @unchecked Sendable {
 
     func setEqualizer(
         on transport: AppleBleBossTransport,
-        update: BossEqualizerSettingsPatch
+        update: BossAppleEqualizerSettingsPatch
     ) async throws -> BossAppleEqualizerWriteResult {
         BossRustLogger.log("using Rust bridge for setEqualizer")
         let result = try withSessionHandle(on: transport) { handle in
             var result = BossFfiEqualizerWriteResult(
                 disposition: BOSS_FFI_WRITE_DISPOSITION_UNCHANGED,
-                settings: Self.ffiEqualizerSettings(from: BossEqualizerSettings(ranges: []))
+                settings: Self.ffiEqualizerSettings(from: BossAppleEqualizerSettings(ranges: []))
             )
             var operationError = emptyError()
             let success = runtime.bossSessionSetEqualizer(
@@ -752,10 +751,10 @@ final class BossRustSessionBridge: @unchecked Sendable {
     func saveCustomAudioMode(
         on transport: AppleBleBossTransport,
         name: String,
-        settings: BossAudioModeSettingsConfig,
-        prompt: BossAudioModePrompt,
+        settings: BossAppleAudioModeSettingsConfig,
+        prompt: BossAppleAudioModePrompt,
         requestedSlot: Int?
-    ) async throws -> BossAudioModeConfig {
+    ) async throws -> BossAppleAudioModeConfig {
         BossRustLogger.log("using Rust bridge for saveCustomAudioMode(slot: \(requestedSlot.map(String.init) ?? "auto"))")
         return try withSessionHandle(on: transport) { handle in
             var result = BossFfiAudioModeConfig()
@@ -785,7 +784,7 @@ final class BossRustSessionBridge: @unchecked Sendable {
     func deleteCustomAudioMode(
         on transport: AppleBleBossTransport,
         slot: Int
-    ) async throws -> BossAudioModeConfig {
+    ) async throws -> BossAppleAudioModeConfig {
         BossRustLogger.log("using Rust bridge for deleteCustomAudioMode(slot: \(slot))")
         return try withSessionHandle(on: transport) { handle in
             var result = BossFfiAudioModeConfig()

@@ -2,8 +2,8 @@ use std::ptr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libboss_rs_core::{BmapCodec, BmapPacket, BossAudioModeConfig, BossTransportKind};
-use libboss_rs_session::{
+use libboss_core::{BmapCodec, BmapPacket, BossAudioModeConfig, BossTransportKind};
+use libboss_session::{
     BossDeviceSettingsReport, BossLink, BossLinkError, BossSession, BossSessionError,
 };
 

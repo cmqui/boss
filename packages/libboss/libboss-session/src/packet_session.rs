@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use libboss_rs_core::{
+use libboss_core::{
     BmapFunction, BmapFunctionBlock, BmapOperator, BmapOperatorType, BmapPacket,
     BossAudioModeConfig, BossAudioModePrompt, BossAudioModeSettingsConfig,
     BossAudioModesCapabilities, BossAudioModesCodec, BossEqualizerBand, BossEqualizerSettings,
@@ -23,7 +23,7 @@ impl<L: BossLink> PacketSession<L> {
         Self { link }
     }
 
-    pub fn transport_kind(&self) -> libboss_rs_core::BossTransportKind {
+    pub fn transport_kind(&self) -> libboss_core::BossTransportKind {
         self.link.transport_kind()
     }
 
@@ -379,11 +379,9 @@ impl<L: BossLink> PacketSession<L> {
             last_settings = Some(BossSettingsCodec::parse_equalizer(&response)?);
         }
         last_settings.ok_or_else(|| {
-            BossSessionError::SettingsCodec(
-                libboss_rs_core::BossSettingsCodecError::InvalidPayload(
-                    "At least one equalizer band update is required".into(),
-                ),
-            )
+            BossSessionError::SettingsCodec(libboss_core::BossSettingsCodecError::InvalidPayload(
+                "At least one equalizer band update is required".into(),
+            ))
         })
     }
 

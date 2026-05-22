@@ -1,16 +1,16 @@
 [package]
-name = "libboss-rs-session"
+name = "libboss-session"
 edition.workspace = true
 license.workspace = true
 version.workspace = true
 
 [lib]
-name = "libboss_rs_session"
+name = "libboss_session"
 path = "src/lib.rs"
 
 [dependencies]
 async-trait = "0.1"
-libboss-rs-core = { path = "../libboss-rs-core" }
+libboss-core = { path = "../libboss-core" }
 
 [dev-dependencies]
 futures = "0.3"

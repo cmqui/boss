@@ -1,20 +1,35 @@
 # libboss
 
-`libboss` is a Swift package for the ground layer of Bose's BMAP protocol, currently tailored to QC Ultra 2 HP bootstrap flows.
+`libboss` is the Rust source of truth for portable BMAP protocol, parsing, and session logic.
 
-Current scope:
+Workspace crates:
 
-- raw BMAP packet encode/decode
-- BLE framing and segmentation
-- stream-safe packet extraction
-- transport-agnostic bootstrap session
-- typed ProductInfo bootstrap parsers
-- typed Settings and AudioModes BMAP codecs/snapshot parsers
+- `libboss-core`: protocol types, codecs, parsers, and portable value models
+- `libboss-session`: transport-abstract bootstrap and session helpers
+- `libboss-ffi`: C ABI for Swift and other host languages
 
-Out of scope in this milestone:
+## Common Commands
 
-- live `CoreBluetooth` transport
-- authentication
-- notification subscriptions
-- device-specific command-line UX
-- firmware transfer orchestration
+Build the FFI dylib:
+
+```sh
+cargo build -p libboss-ffi
+```
+
+Run tests:
+
+```sh
+cargo test
+```
+
+Format the workspace:
+
+```sh
+cargo fmt --all
+```
+
+## Role In This Repo
+
+- `libboss-apple` uses `libboss-ffi` for protocol/session work
+- `bossctl` and `boss-macos` consume the Apple layer, not this workspace directly
+- the old Swift implementation lives in [`../libboss-OLD`](../libboss-OLD/README.md) and is deprecated
