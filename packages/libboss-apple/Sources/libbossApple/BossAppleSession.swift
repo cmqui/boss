@@ -35,6 +35,26 @@ public struct BossAppleWorkspaceSnapshot: Sendable, Equatable {
     }
 }
 
+struct BossAppleSessionOperationOverrides: Sendable {
+    var bootstrap: (@Sendable () async throws -> BossAppleBootstrappedDevice)?
+    var currentAudioModeUpdateStream: (@Sendable () -> AsyncThrowingStream<Int, Error>)?
+    var audioModeSettingsUpdateStream: (@Sendable () -> AsyncThrowingStream<BossAppleAudioModeSettingsConfig, Error>)?
+    var equalizerUpdateStream: (@Sendable () -> AsyncThrowingStream<BossAppleEqualizerSettings, Error>)?
+    var favoriteAudioModeIndices: (@Sendable () async throws -> [Int])?
+    var audioModeCapabilities: (@Sendable () async throws -> BossAppleAudioModesCapabilities)?
+    var setFavoriteAudioModeIndices: (@Sendable ([Int], Int) async throws -> [Int])?
+    var audioModeConfigs: (@Sendable () async throws -> [BossAppleAudioModeConfig])?
+    var setCurrentAudioMode: (@Sendable (Int, Bool) async throws -> BossAppleCurrentAudioModeWriteResult)?
+    var setAudioModeSettings: (@Sendable (BossAppleAudioModeSettingsConfigPatch) async throws -> BossAppleAudioModeSettingsWriteResult)?
+    var setEqualizer: (@Sendable (BossAppleEqualizerSettingsPatch) async throws -> BossAppleEqualizerWriteResult)?
+    var deleteCustomAudioMode: (@Sendable (Int) async throws -> BossAppleAudioModeConfig)?
+    var saveCustomAudioMode: (@Sendable (String, BossAppleAudioModeSettingsConfig, BossAppleAudioModePrompt, Int?) async throws -> BossAppleAudioModeConfig)?
+    var setAudioModeFavorite: (@Sendable (Int, Bool) async throws -> [Int])?
+    var currentAudioMode: (@Sendable () async throws -> Int)?
+    var audioModeSettings: (@Sendable () async throws -> BossAppleAudioModeSettingsConfig)?
+    var equalizer: (@Sendable () async throws -> BossAppleEqualizerSettings?)?
+}
+
 public actor BossAppleSession {
     private struct ConnectedLink {
         let transport: AppleBleBossTransport
@@ -49,11 +69,25 @@ public actor BossAppleSession {
 
     public let connection: BossAppleConnectionOptions
 
+    private let operationOverrides: BossAppleSessionOperationOverrides?
+    private let rustBridgeProvider: @Sendable () -> BossRustSessionBridge?
     private var connectedLink: ConnectedLink?
     private var cachedBootstrappedDevice: BossAppleBootstrappedDevice?
 
     public init(connection: BossAppleConnectionOptions = BossAppleConnectionOptions()) {
         self.connection = connection
+        self.operationOverrides = nil
+        self.rustBridgeProvider = { BossRustSessionBridge.shared }
+    }
+
+    init(
+        connection: BossAppleConnectionOptions = BossAppleConnectionOptions(),
+        operationOverrides: BossAppleSessionOperationOverrides? = nil,
+        rustBridgeProvider: @escaping @Sendable () -> BossRustSessionBridge? = { BossRustSessionBridge.shared }
+    ) {
+        self.connection = connection
+        self.operationOverrides = operationOverrides
+        self.rustBridgeProvider = rustBridgeProvider
     }
 
     deinit {
@@ -74,7 +108,13 @@ public actor BossAppleSession {
             return cachedBootstrappedDevice
         }
 
-        guard let rustBridge = BossRustSessionBridge.shared else {
+        if let override = operationOverrides?.bootstrap {
+            let bootstrappedDevice = try await override()
+            cachedBootstrappedDevice = bootstrappedDevice
+            return bootstrappedDevice
+        }
+
+        guard let rustBridge = rustBridgeProvider() else {
             throw BossAppleControlError.unsupportedOperation("Rust runtime is required for bootstrap")
         }
         let bootstrappedDevice = try await withRustBleTransportRetrying(
@@ -137,7 +177,10 @@ public actor BossAppleSession {
     }
 
     public func currentAudioModeUpdateStream() -> AsyncThrowingStream<Int, Error> {
-        guard let rustBridge = BossRustSessionBridge.shared else {
+        if let override = operationOverrides?.currentAudioModeUpdateStream {
+            return override()
+        }
+        guard let rustBridge = rustBridgeProvider() else {
             return Self.rustRequiredStream()
         }
         return reconnectingRustStream(
@@ -148,7 +191,10 @@ public actor BossAppleSession {
     }
 
     public func audioModeSettingsUpdateStream() -> AsyncThrowingStream<BossAppleAudioModeSettingsConfig, Error> {
-        guard let rustBridge = BossRustSessionBridge.shared else {
+        if let override = operationOverrides?.audioModeSettingsUpdateStream {
+            return override()
+        }
+        guard let rustBridge = rustBridgeProvider() else {
             return Self.rustRequiredStream()
         }
         return reconnectingRustStream(
@@ -159,7 +205,10 @@ public actor BossAppleSession {
     }
 
     public func equalizerUpdateStream() -> AsyncThrowingStream<BossAppleEqualizerSettings, Error> {
-        guard let rustBridge = BossRustSessionBridge.shared else {
+        if let override = operationOverrides?.equalizerUpdateStream {
+            return override()
+        }
+        guard let rustBridge = rustBridgeProvider() else {
             return Self.rustRequiredStream()
         }
         return reconnectingRustStream(
@@ -258,6 +307,9 @@ public actor BossAppleSession {
     }
 
     public func favoriteAudioModeIndices() async throws -> [Int] {
+        if let override = operationOverrides?.favoriteAudioModeIndices {
+            return try await override()
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.favoriteAudioModeIndices(on: transport)
@@ -265,6 +317,9 @@ public actor BossAppleSession {
     }
 
     public func audioModeCapabilities() async throws -> BossAppleAudioModesCapabilities {
+        if let override = operationOverrides?.audioModeCapabilities {
+            return try await override()
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.audioModeCapabilities(on: transport)
@@ -282,6 +337,9 @@ public actor BossAppleSession {
             numberOfModes = try await audioModeCapabilities().totalModes
         }
 
+        if let override = operationOverrides?.setFavoriteAudioModeIndices {
+            return try await override(indices, numberOfModes)
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.setFavoriteAudioModeIndices(
@@ -300,6 +358,9 @@ public actor BossAppleSession {
     }
 
     private func readAudioModeConfigs() async throws -> [BossAppleAudioModeConfig] {
+        if let override = operationOverrides?.audioModeConfigs {
+            return try await override()
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.audioModeConfigs(on: transport)
@@ -317,6 +378,9 @@ public actor BossAppleSession {
         index targetIndex: Int,
         playVoicePrompt: Bool = false
     ) async throws -> BossAppleCurrentAudioModeWriteResult {
+        if let override = operationOverrides?.setCurrentAudioMode {
+            return try await override(targetIndex, playVoicePrompt)
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
             try await rustBridge.setCurrentAudioMode(
@@ -330,6 +394,9 @@ public actor BossAppleSession {
     public func setAudioModeSettings(
         _ update: BossAppleAudioModeSettingsConfigPatch
     ) async throws -> BossAppleAudioModeSettingsWriteResult {
+        if let override = operationOverrides?.setAudioModeSettings {
+            return try await override(update)
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
             try await rustBridge.setAudioModeSettings(on: transport, update: update)
@@ -339,6 +406,9 @@ public actor BossAppleSession {
     public func setEqualizer(
         _ update: BossAppleEqualizerSettingsPatch
     ) async throws -> BossAppleEqualizerWriteResult {
+        if let override = operationOverrides?.setEqualizer {
+            return try await override(update)
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
             try await rustBridge.setEqualizer(on: transport, update: update)
@@ -467,6 +537,9 @@ public actor BossAppleSession {
     }
 
     public func deleteCustomAudioMode(slot: Int) async throws -> BossAppleAudioModeConfig {
+        if let override = operationOverrides?.deleteCustomAudioMode {
+            return try await override(slot)
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
             try await rustBridge.deleteCustomAudioMode(on: transport, slot: slot)
@@ -479,6 +552,9 @@ public actor BossAppleSession {
         prompt: BossAppleAudioModePrompt = .none,
         slot requestedSlot: Int? = nil
     ) async throws -> BossAppleAudioModeConfig {
+        if let override = operationOverrides?.saveCustomAudioMode {
+            return try await override(name, settings, prompt, requestedSlot)
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
             try await rustBridge.saveCustomAudioMode(
@@ -540,6 +616,9 @@ public actor BossAppleSession {
     }
 
     private func setAudioModeFavorite(index: Int, isFavorite: Bool) async throws -> [Int] {
+        if let override = operationOverrides?.setAudioModeFavorite {
+            return try await override(index, isFavorite)
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.setAudioModeFavorite(on: transport, index: index, isFavorite: isFavorite)
@@ -552,6 +631,9 @@ public actor BossAppleSession {
         settings: BossAppleAudioModeSettingsConfig,
         prompt: BossAppleAudioModePrompt
     ) async throws -> BossAppleAudioModeConfig {
+        if let override = operationOverrides?.saveCustomAudioMode {
+            return try await override(name, settings, prompt, slot)
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
             try await rustBridge.saveCustomAudioMode(
@@ -565,6 +647,9 @@ public actor BossAppleSession {
     }
 
     private func readCurrentAudioMode() async throws -> Int {
+        if let override = operationOverrides?.currentAudioMode {
+            return try await override()
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.currentAudioMode(on: transport)
@@ -572,6 +657,9 @@ public actor BossAppleSession {
     }
 
     private func readAudioModeSettingsConfig() async throws -> BossAppleAudioModeSettingsConfig {
+        if let override = operationOverrides?.audioModeSettings {
+            return try await override()
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.audioModeSettingsConfig(on: transport)
@@ -579,6 +667,9 @@ public actor BossAppleSession {
     }
 
     private func readEqualizerSettingsIfAvailable() async throws -> BossAppleEqualizerSettings? {
+        if let override = operationOverrides?.equalizer {
+            return try await override()
+        }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.equalizerSettingsIfAvailable(on: transport)
@@ -916,7 +1007,7 @@ public actor BossAppleSession {
     }
 
     private func requireRustBridge() throws -> BossRustSessionBridge {
-        guard let rustBridge = BossRustSessionBridge.shared else {
+        guard let rustBridge = rustBridgeProvider() else {
             throw BossAppleControlError.unsupportedOperation("Rust runtime is required for BossAppleSession")
         }
         return rustBridge
