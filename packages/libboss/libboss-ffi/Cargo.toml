@@ -5,7 +5,7 @@ license.workspace = true
 version.workspace = true
 
 [lib]
-name = "libboss_ffi"
+name = "boss_ffi"
 path = "src/lib.rs"
 crate-type = ["staticlib", "cdylib"]
 

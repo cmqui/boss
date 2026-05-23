@@ -2,6 +2,82 @@ import CBossRustFFI
 import Darwin
 import Foundation
 
+enum BossRustFfiRuntimeSearchPolicy {
+    static let explicitDylibEnvVar = "LIBBOSS_FFI_DYLIB"
+    static let legacyExplicitDylibEnvVar = "LIBBOSS_RS_FFI_DYLIB"
+    static let explicitHomebrewPrefixEnvVar = "LIBBOSS_FFI_HOMEBREW_PREFIX"
+    static let allowRepositorySearchEnvVar = "LIBBOSS_FFI_ALLOW_REPOSITORY_SEARCH"
+
+    static func explicitLibraryPath(environment: [String: String]) -> String? {
+        if let explicit = nonEmptyEnvironmentValue(named: explicitDylibEnvVar, environment: environment) {
+            return explicit
+        }
+        return nonEmptyEnvironmentValue(named: legacyExplicitDylibEnvVar, environment: environment)
+    }
+
+    static func explicitHomebrewLibraryPath(environment: [String: String]) -> String? {
+        guard let prefix = nonEmptyEnvironmentValue(named: explicitHomebrewPrefixEnvVar, environment: environment) else {
+            return nil
+        }
+        return URL(fileURLWithPath: prefix, isDirectory: true)
+            .appendingPathComponent("lib")
+            .appendingPathComponent("libboss_ffi.dylib")
+            .path
+    }
+
+    static func allowsRepositorySearch(environment: [String: String]) -> Bool {
+        if let explicit = nonEmptyEnvironmentValue(named: allowRepositorySearchEnvVar, environment: environment) {
+            return parseBooleanEnvironmentValue(explicit)
+        }
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    private static func nonEmptyEnvironmentValue(
+        named name: String,
+        environment: [String: String]
+    ) -> String? {
+        guard let value = environment[name]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    private static func parseBooleanEnvironmentValue(_ value: String) -> Bool {
+        switch value.lowercased() {
+        case "1", "true", "yes", "on":
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+enum BossRustFfiRuntimeChannel: String, Sendable {
+    case linkedStatic = "linked-static"
+    case explicitDylib = "explicit-dylib"
+    case explicitHomebrewPrefix = "homebrew-shared-runtime"
+    case bundledFrameworks = "bundled-frameworks"
+    case repositoryDebugFallback = "repository-debug-fallback"
+
+    var isDevelopmentOnly: Bool {
+        switch self {
+        case .repositoryDebugFallback:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+struct BossRustFfiRuntimeCandidate: Sendable {
+    let path: String
+    let channel: BossRustFfiRuntimeChannel
+}
+
 final class BossRustFfiRuntime: @unchecked Sendable {
     typealias BufferFreeFn = @convention(c) (BossBuffer) -> Void
     typealias BufferListFreeFn = @convention(c) (BossBufferList) -> Void
@@ -511,22 +587,19 @@ final class BossRustFfiRuntime: @unchecked Sendable {
 
     static let shared: BossRustFfiRuntime? = {
         #if LIBBOSS_STATIC_LINKED
-        BossRustLogger.log("using directly linked libboss ffi symbols")
+        BossRustLogger.log("using libboss ffi via \(BossRustFfiRuntimeChannel.linkedStatic.rawValue)")
         return BossRustFfiRuntime(linked: ())
         #else
-        if let processHandle = dlopen(nil, RTLD_NOW | RTLD_LOCAL) {
-            if let runtime = BossRustFfiRuntime(processHandle, ownsHandle: false) {
-                BossRustLogger.log("using linked libboss ffi symbols from current process")
-                return runtime
-            }
-        }
-
-        for candidate in candidateLibraryPaths() {
-            guard let loaded = dlopen(candidate, RTLD_NOW | RTLD_LOCAL) else {
+        for candidate in candidateLibraryCandidates() {
+            guard let loaded = dlopen(candidate.path, RTLD_NOW | RTLD_LOCAL) else {
                 continue
             }
             if let runtime = BossRustFfiRuntime(loaded, ownsHandle: true) {
-                BossRustLogger.log("loaded libboss ffi from \(candidate)")
+                var message = "using libboss ffi via \(candidate.channel.rawValue): \(candidate.path)"
+                if candidate.channel.isDevelopmentOnly {
+                    message += " [dev-only fallback]"
+                }
+                BossRustLogger.log(message)
                 return runtime
             }
             dlclose(loaded)
@@ -536,48 +609,94 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         #endif
     }()
 
-    private static func candidateLibraryPaths() -> [String] {
-        var paths: [String] = []
-        if let explicit = ProcessInfo.processInfo.environment["LIBBOSS_FFI_DYLIB"], !explicit.isEmpty {
-            paths.append(explicit)
-        } else if let legacyExplicit = ProcessInfo.processInfo.environment["LIBBOSS_RS_FFI_DYLIB"], !legacyExplicit.isEmpty {
-            paths.append(legacyExplicit)
+    private static func candidateLibraryCandidates() -> [BossRustFfiRuntimeCandidate] {
+        let environment = ProcessInfo.processInfo.environment
+        var candidates: [BossRustFfiRuntimeCandidate] = []
+
+        // Supported runtime channels:
+        // 1. explicit dylib path override
+        // 2. explicit shared Homebrew runtime prefix
+        // 3. bundled app Frameworks dylib
+        // 4. local development repository probing in debug/test contexts only
+        if let explicit = BossRustFfiRuntimeSearchPolicy.explicitLibraryPath(environment: environment) {
+            candidates.append(BossRustFfiRuntimeCandidate(path: explicit, channel: .explicitDylib))
+        }
+        if let explicitHomebrew = BossRustFfiRuntimeSearchPolicy.explicitHomebrewLibraryPath(environment: environment) {
+            candidates.append(BossRustFfiRuntimeCandidate(path: explicitHomebrew, channel: .explicitHomebrewPrefix))
         }
 
-        let dylibName = "liblibboss_ffi.dylib"
-        let profiles = ffiBuildProfiles()
+        let dylibName = "libboss_ffi.dylib"
 
-        if let embedded = Bundle.main.path(forResource: "liblibboss_ffi", ofType: "dylib", inDirectory: "Frameworks") {
-            paths.append(embedded)
+        if let embedded = Bundle.main.path(forResource: "libboss_ffi", ofType: "dylib", inDirectory: "Frameworks") {
+            candidates.append(BossRustFfiRuntimeCandidate(path: embedded, channel: .bundledFrameworks))
         }
         if let frameworksURL = Bundle.main.privateFrameworksURL {
-            paths.append(frameworksURL.appendingPathComponent(dylibName).path)
+            candidates.append(
+                BossRustFfiRuntimeCandidate(
+                    path: frameworksURL.appendingPathComponent(dylibName).path,
+                    channel: .bundledFrameworks
+                )
+            )
         }
         if let executableURL = Bundle.main.executableURL {
             let frameworksURL = executableURL
                 .deletingLastPathComponent()
                 .appendingPathComponent("../Frameworks/\(dylibName)")
-            paths.append(frameworksURL.standardizedFileURL.path)
+            candidates.append(
+                BossRustFfiRuntimeCandidate(
+                    path: frameworksURL.standardizedFileURL.path,
+                    channel: .bundledFrameworks
+                )
+            )
         }
 
-        for profile in profiles {
-            for base in repositorySearchRoots() {
-                paths.append(base.appendingPathComponent("libboss/target/\(profile)/\(dylibName)").path)
-                paths.append(base.appendingPathComponent("packages/libboss/target/\(profile)/\(dylibName)").path)
+        if BossRustFfiRuntimeSearchPolicy.allowsRepositorySearch(environment: environment) {
+            BossRustLogger.log("repository-relative libboss ffi probing is enabled for local development")
+            let profiles = ffiBuildProfiles()
+            for profile in profiles {
+                for base in repositorySearchRoots() {
+                    candidates.append(
+                        BossRustFfiRuntimeCandidate(
+                            path: base.appendingPathComponent("libboss/target/\(profile)/\(dylibName)").path,
+                            channel: .repositoryDebugFallback
+                        )
+                    )
+                    candidates.append(
+                        BossRustFfiRuntimeCandidate(
+                            path: base.appendingPathComponent("packages/libboss/target/\(profile)/\(dylibName)").path,
+                            channel: .repositoryDebugFallback
+                        )
+                    )
+                }
+            }
+
+            let cwd = FileManager.default.currentDirectoryPath
+            for profile in profiles {
+                candidates.append(
+                    BossRustFfiRuntimeCandidate(
+                        path: "\(cwd)/../libboss/target/\(profile)/\(dylibName)",
+                        channel: .repositoryDebugFallback
+                    )
+                )
+                candidates.append(
+                    BossRustFfiRuntimeCandidate(
+                        path: "\(cwd)/packages/libboss/target/\(profile)/\(dylibName)",
+                        channel: .repositoryDebugFallback
+                    )
+                )
+                candidates.append(
+                    BossRustFfiRuntimeCandidate(
+                        path: "\(cwd)/target/\(profile)/\(dylibName)",
+                        channel: .repositoryDebugFallback
+                    )
+                )
             }
         }
 
-        let cwd = FileManager.default.currentDirectoryPath
-        for profile in profiles {
-            paths.append("\(cwd)/../libboss/target/\(profile)/\(dylibName)")
-            paths.append("\(cwd)/packages/libboss/target/\(profile)/\(dylibName)")
-            paths.append("\(cwd)/target/\(profile)/\(dylibName)")
-        }
-
-        var deduped: [String] = []
+        var deduped: [BossRustFfiRuntimeCandidate] = []
         var seen = Set<String>()
-        for path in paths where seen.insert(path).inserted {
-            deduped.append(path)
+        for candidate in candidates where seen.insert(candidate.path).inserted {
+            deduped.append(candidate)
         }
         return deduped
     }

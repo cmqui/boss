@@ -11,15 +11,22 @@ cd ../boss-macos && swift run Boss
 
 The macOS app supports both Rust FFI modes:
 
-- `Boss` scheme: runtime-loaded `liblibboss_ffi.dylib`
-- `Boss Static` scheme: force-loads `liblibboss_ffi.a` into the app binary
+- `Boss` scheme: runtime-loaded `libboss_ffi.dylib`
+- `Boss Static` scheme: force-loads `libboss_ffi.a` into the app binary
 
 The Xcode project runs `scripts/build-libboss-ffi.sh` before each build to compile Rust. Dynamic builds also copy the dylib into `Boss.app/Contents/Frameworks`. Install [Rust](https://rustup.rs) so `cargo` is available (`~/.cargo/bin`); Xcode does not load your shell profile by default.
 
 If you run outside Xcode without embedding the dylib, point at a built copy explicitly:
 
 ```sh
-export LIBBOSS_FFI_DYLIB="$PWD/../libboss/target/debug/liblibboss_ffi.dylib"
+export LIBBOSS_FFI_DYLIB="$PWD/../libboss/target/debug/libboss_ffi.dylib"
+swift run Boss
+```
+
+For a shared Homebrew runtime channel, point the app at the installed runtime prefix instead:
+
+```sh
+export LIBBOSS_FFI_HOMEBREW_PREFIX="/opt/homebrew/opt/libboss-ffi"
 swift run Boss
 ```
 

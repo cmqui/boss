@@ -227,7 +227,7 @@ public struct BossAppleController: Sendable {
         try await BossAppleSession(connection: connection).bootstrap()
     }
 
-    public func settingsSnapshot() async throws -> BossAppleSettingsSnapshot {
+    func settingsSnapshot() async throws -> BossAppleSettingsSnapshot {
         try await BossAppleSession(connection: connection).settingsSnapshot()
     }
 

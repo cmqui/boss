@@ -126,15 +126,15 @@ ARTIFACT_DIR+="/${PROFILE}"
 
 case "${CRATE_TYPE}" in
   staticlib)
-    ARTIFACT_NAME="liblibboss_ffi.a"
+    ARTIFACT_NAME="libboss_ffi.a"
     ;;
   cdylib)
     case "$(uname -s)" in
       Darwin)
-        ARTIFACT_NAME="liblibboss_ffi.dylib"
+        ARTIFACT_NAME="libboss_ffi.dylib"
         ;;
       Linux)
-        ARTIFACT_NAME="liblibboss_ffi.so"
+        ARTIFACT_NAME="libboss_ffi.so"
         ;;
       *)
         echo "[build-ffi-artifact] Unsupported host platform for cdylib naming" >&2

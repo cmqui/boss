@@ -105,7 +105,7 @@ public actor BossAppleSession {
         }
     }
 
-    public func settingsSnapshot() async throws -> BossAppleSettingsSnapshot {
+    func settingsSnapshot() async throws -> BossAppleSettingsSnapshot {
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.settingsSnapshot(on: transport)

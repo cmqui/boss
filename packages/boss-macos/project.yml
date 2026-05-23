@@ -40,11 +40,11 @@ targets:
           BOSS_RUST_FFI_PROFILE: release
         DebugStatic:
           BOSS_RUST_FFI_LINKAGE: static
-          OTHER_LDFLAGS: $(inherited) -Wl,-export_dynamic -Wl,-force_load,$(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/liblibboss_ffi.a
+          OTHER_LDFLAGS: $(inherited) -Wl,-export_dynamic -Wl,-force_load,$(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/libboss_ffi.a
         ReleaseStatic:
           BOSS_RUST_FFI_PROFILE: release
           BOSS_RUST_FFI_LINKAGE: static
-          OTHER_LDFLAGS: $(inherited) -Wl,-export_dynamic -Wl,-force_load,$(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/liblibboss_ffi.a
+          OTHER_LDFLAGS: $(inherited) -Wl,-export_dynamic -Wl,-force_load,$(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/libboss_ffi.a
     sources:
       - path: Sources/BossMacOS
         excludes:
@@ -65,8 +65,8 @@ targets:
         script: |
           /bin/bash "${SRCROOT}/scripts/build-libboss-ffi.sh" build
         outputFiles:
-          - $(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/liblibboss_ffi.a
-          - $(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/liblibboss_ffi.dylib
+          - $(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/libboss_ffi.a
+          - $(SRCROOT)/../libboss/target/$(BOSS_RUST_FFI_PROFILE)/libboss_ffi.dylib
         basedOnDependencyAnalysis: false
     postBuildScripts:
       - name: Install libboss FFI dylib

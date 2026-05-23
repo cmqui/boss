@@ -1024,14 +1024,14 @@ public extension BossAppleDeviceSettings {
     }
 }
 
-public struct BossAppleSettingsSnapshot: Sendable {
+struct BossAppleSettingsSnapshot: Sendable {
     private let packetsByFunctionRaw: [UInt8: BossAppleBmapPacket]
 
     init(packetsByFunctionRaw: [UInt8: BossAppleBmapPacket]) {
         self.packetsByFunctionRaw = packetsByFunctionRaw
     }
 
-    public init(encodedPackets bytes: Data) throws {
+    init(encodedPackets bytes: Data) throws {
         guard let runtime = BossRustFfiRuntime.shared else {
             throw BossAppleControlError.unsupportedOperation("Rust runtime is required for settings snapshot decoding")
         }
@@ -1065,49 +1065,49 @@ public struct BossAppleSettingsSnapshot: Sendable {
         packetsByFunctionRaw[functionRaw]
     }
 
-    public func standbyTimer() throws -> BossAppleStandbyTimerValue? {
+    func standbyTimer() throws -> BossAppleStandbyTimerValue? {
         guard let packet = packet(functionRaw: BossAppleSettingsProtocol.standbyTimerFunctionRaw) else {
             return nil
         }
         return try BossRustCodecBridge.parseStandbyTimer(from: packet, runtime: requireRustRuntime())
     }
 
-    public func autoAware() throws -> Bool? {
+    func autoAware() throws -> Bool? {
         guard let packet = packet(functionRaw: BossAppleSettingsProtocol.autoAwareFunctionRaw) else {
             return nil
         }
         return try BossRustCodecBridge.parseEnabledFlag(from: packet, runtime: requireRustRuntime())
     }
 
-    public func onHeadDetection() throws -> BossAppleOnHeadDetectionValue? {
+    func onHeadDetection() throws -> BossAppleOnHeadDetectionValue? {
         guard let packet = packet(functionRaw: BossAppleSettingsProtocol.onHeadDetectionFunctionRaw) else {
             return nil
         }
         return try BossRustCodecBridge.parseOnHeadDetection(from: packet, runtime: requireRustRuntime())
     }
 
-    public func autoPlayPause() throws -> Bool? {
+    func autoPlayPause() throws -> Bool? {
         guard let packet = packet(functionRaw: BossAppleSettingsProtocol.autoPlayPauseFunctionRaw) else {
             return nil
         }
         return try BossRustCodecBridge.parseEnabledFlag(from: packet, runtime: requireRustRuntime())
     }
 
-    public func autoAnswer() throws -> Bool? {
+    func autoAnswer() throws -> Bool? {
         if let packet = packet(functionRaw: BossAppleSettingsProtocol.autoAnswerFunctionRaw) {
             return try BossRustCodecBridge.parseEnabledFlag(from: packet, runtime: requireRustRuntime())
         }
         return try onHeadDetection()?.isAutoAnswerEnabled
     }
 
-    public func volumeControl() throws -> BossAppleVolumeControlStatus? {
+    func volumeControl() throws -> BossAppleVolumeControlStatus? {
         guard let packet = packet(functionRaw: BossAppleSettingsProtocol.volumeControlFunctionRaw) else {
             return nil
         }
         return try BossRustCodecBridge.parseVolumeControlStatus(from: packet, runtime: requireRustRuntime())
     }
 
-    public func deviceSettings() throws -> BossAppleDeviceSettings {
+    func deviceSettings() throws -> BossAppleDeviceSettings {
         BossAppleDeviceSettings(
             wearDetection: try onHeadDetection(),
             autoAwareEnabled: try autoAware(),

@@ -41,8 +41,8 @@ if [[ ! -x "${BUILD_SCRIPT}" ]]; then
   exit 1
 fi
 
-DYLIB="${LIBBOSS_DIR}/target/${PROFILE}/liblibboss_ffi.dylib"
-STATICLIB="${LIBBOSS_DIR}/target/${PROFILE}/liblibboss_ffi.a"
+DYLIB="${LIBBOSS_DIR}/target/${PROFILE}/libboss_ffi.dylib"
+STATICLIB="${LIBBOSS_DIR}/target/${PROFILE}/libboss_ffi.a"
 
 if [[ "${LINKAGE}" == "dynamic" ]]; then
   "${BUILD_SCRIPT}" --profile "${PROFILE}" --crate-type cdylib

@@ -16,6 +16,12 @@ cd ../libboss && cargo build -p libboss-ffi
 cd ../bossctl
 ```
 
+For a shared Homebrew runtime, point `bossctl` at the installed Rust FFI prefix:
+
+```sh
+export LIBBOSS_FFI_HOMEBREW_PREFIX="/opt/homebrew/opt/libboss-ffi"
+```
+
 Then run commands such as:
 
 ```sh

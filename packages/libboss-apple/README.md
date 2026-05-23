@@ -14,8 +14,7 @@ Current scope:
 
 Session APIs such as `bootstrap()` require Rust `libboss-ffi`, either via:
 
-- a runtime-loaded `liblibboss_ffi.dylib`
-- symbols already linked into the current process
+- a runtime-loaded `libboss_ffi.dylib`
 - direct static linking with `LIBBOSS_STATIC_LINKED`
 
 Build the dylib:
@@ -25,7 +24,30 @@ cd packages/libboss
 cargo build -p libboss-ffi
 ```
 
-At runtime, `BossRustSessionBridge` looks for the dylib in the app bundle `Frameworks/`, repo-relative build paths, or `LIBBOSS_FFI_DYLIB`.
+At runtime, `BossRustSessionBridge` resolves the Rust FFI in this order:
+
+1. explicitly provided dylib path via `LIBBOSS_FFI_DYLIB`
+2. explicitly provided shared Homebrew runtime prefix via `LIBBOSS_FFI_HOMEBREW_PREFIX`
+3. bundled `Frameworks/libboss_ffi.dylib`
+4. repo-relative debug artifact search only for local development and tests
+
+Repo-relative probing is intentionally a development fallback, not the supported release story. You can disable it with `LIBBOSS_FFI_ALLOW_REPOSITORY_SEARCH=0` or re-enable it explicitly with `LIBBOSS_FFI_ALLOW_REPOSITORY_SEARCH=1`.
+When `LIBBOSS_FFI_LOG=1` is enabled, the loader reports which runtime channel won and labels repo-relative probing as a dev-only fallback.
+
+Supported runtime channels:
+
+- SwiftPM local development and tests: explicit dylib path or debug-only repo probing
+- macOS local Xcode development: bundled dylib or static-link scheme
+- macOS Homebrew distribution: shared dylib resolved from one explicit Homebrew runtime prefix
+- iOS: static linking
+
+For the shared Homebrew channel, point both `bossctl` and `boss-macos` at the same installed runtime prefix, for example:
+
+```sh
+export LIBBOSS_FFI_HOMEBREW_PREFIX="/opt/homebrew/opt/libboss-ffi"
+```
+
+That resolves `libboss_ffi.dylib` at `"$LIBBOSS_FFI_HOMEBREW_PREFIX/lib/libboss_ffi.dylib"`.
 
 The `boss-macos` Xcode project supports both runtime dylib loading and a static-link scheme. It runs `scripts/build-libboss-ffi.sh` before each build to compile Rust, and dynamic builds also copy the dylib into `Boss.app/Contents/Frameworks`.
 

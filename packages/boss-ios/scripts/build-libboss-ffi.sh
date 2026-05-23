@@ -31,7 +31,7 @@ case "${SDK_NAME_VALUE}" in
     ;;
 esac
 
-DESTINATION="${LIBBOSS_DIR}/target/apple-static/current/liblibboss_ffi.a"
+DESTINATION="${LIBBOSS_DIR}/target/apple-static/current/libboss_ffi.a"
 
 if [[ ! -x "${BUILD_SCRIPT}" ]]; then
   echo "[build-libboss-ffi-ios] Expected helper at ${BUILD_SCRIPT}" >&2
