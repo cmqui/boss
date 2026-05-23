@@ -68,7 +68,8 @@ extension BossAppViewModel {
             let saved = try await session.saveCustomAudioMode(
                 name: profileName,
                 settings: self.currentDraftConfig(),
-                prompt: prompt
+                prompt: prompt,
+                slot: nil
             )
             self.applySettingsSnapshot(saved.settings)
             self.currentAudioModeIndex = saved.modeIndex

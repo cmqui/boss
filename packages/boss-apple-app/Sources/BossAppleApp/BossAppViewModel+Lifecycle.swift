@@ -72,12 +72,12 @@ extension BossAppViewModel {
         )
     }
 
-    func makeSession() -> BossAppleSession {
+    func makeSession() -> any BossAppSessioning {
         let currentOptions = makeConnectionOptions()
         if let session {
             return session
         }
-        let newSession = BossAppleSession(connection: currentOptions)
+        let newSession = sessionFactory(currentOptions)
         session = newSession
         return newSession
     }
@@ -90,7 +90,7 @@ extension BossAppViewModel {
         }
     }
 
-    func reloadAllState(using session: BossAppleSession) async throws {
+    func reloadAllState(using session: any BossAppSessioning) async throws {
         async let workspaceSnapshot = session.loadWorkspaceSnapshot()
         async let promptsTask = loadSupportedPrompts(using: session)
         async let firmwareVersionTask = loadFirmwareVersion(using: session)
@@ -121,7 +121,7 @@ extension BossAppViewModel {
         ))
     }
 
-    func startBackgroundLoad(using session: BossAppleSession) {
+    func startBackgroundLoad(using session: any BossAppSessioning) {
         cancelBackgroundLoad()
         workspaceUpdateTask = Task { [weak self] in
             guard let self else {
@@ -180,7 +180,7 @@ extension BossAppViewModel {
         }
     }
 
-    func refreshAudioModeCatalog(using session: BossAppleSession) async throws {
+    func refreshAudioModeCatalog(using session: any BossAppSessioning) async throws {
         let modes = try await session.audioModeConfigs()
         await MainActor.run {
             guard self.appScreen == .workspace else {
@@ -203,7 +203,7 @@ extension BossAppViewModel {
         workspaceUpdateTask = nil
     }
 
-    func loadSupportedPrompts(using session: BossAppleSession) async -> [BossAppleAudioModePrompt] {
+    func loadSupportedPrompts(using session: any BossAppSessioning) async -> [BossAppleAudioModePrompt] {
         do {
             let prompts = try await session.supportedAudioModePrompts()
             return prompts.isEmpty ? fallbackSupportedPrompts : prompts
@@ -215,9 +215,9 @@ extension BossAppViewModel {
         }
     }
 
-    func loadFirmwareVersion(using session: BossAppleSession) async -> String? {
+    func loadFirmwareVersion(using session: any BossAppSessioning) async -> String? {
         do {
-            return try await session.firmwareVersion().version
+            return try await session.firmwareVersion(port: 0, deviceID: 0).version
         } catch {
             return nil
         }

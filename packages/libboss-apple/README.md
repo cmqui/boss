@@ -8,7 +8,7 @@ Current scope:
 - Bose BMAP service and characteristic handling
 - ATT-MTU-aware BLE writes and notification ingestion
 - typed controller/session APIs for macOS and iOS apps
-- `boss-bootstrap` for live hardware validation
+- bootstrap support consumed by tools such as `bossctl`
 
 ## Rust FFI Runtime
 
@@ -29,12 +29,12 @@ At runtime, `BossRustSessionBridge` looks for the dylib in the app bundle `Frame
 
 The `boss-macos` Xcode project supports both runtime dylib loading and a static-link scheme. It runs `scripts/build-libboss-ffi.sh` before each build to compile Rust, and dynamic builds also copy the dylib into `Boss.app/Contents/Frameworks`.
 
-## Running
+## CLI Validation
 
 ```sh
 cd packages/libboss && cargo build -p libboss-ffi
-cd ../libboss-apple
-swift run boss-bootstrap --name Bose --timeout 20
+cd ../bossctl
+swift run bossctl bootstrap --name Bose --timeout 20
 ```
 
 Useful options:

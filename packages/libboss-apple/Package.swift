@@ -12,10 +12,6 @@ let package = Package(
             name: "libbossApple",
             targets: ["libbossApple"]
         ),
-        .executable(
-            name: "boss-bootstrap",
-            targets: ["boss-bootstrap"]
-        ),
     ],
     dependencies: [],
     targets: [
@@ -27,12 +23,6 @@ let package = Package(
             name: "libbossApple",
             dependencies: [
                 "CBossRustFFI",
-            ]
-        ),
-        .executableTarget(
-            name: "boss-bootstrap",
-            dependencies: [
-                "libbossApple",
             ]
         ),
         .testTarget(

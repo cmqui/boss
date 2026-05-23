@@ -22,5 +22,9 @@ let package = Package(
                 .product(name: "libbossApple", package: "libboss-apple"),
             ]
         ),
+        .testTarget(
+            name: "bossctlTests",
+            dependencies: ["bossctl"]
+        ),
     ]
 )

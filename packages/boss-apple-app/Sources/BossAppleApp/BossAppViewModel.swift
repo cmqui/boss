@@ -57,14 +57,27 @@ public final class BossAppViewModel: ObservableObject {
     var discoveryTask: Task<Void, Never>?
     var workspaceUpdateTask: Task<Void, Never>?
     static let audioModeCatalogPollInterval = 6
-    var session: BossAppleSession?
+    var session: (any BossAppSessioning)?
     var selectedDeviceIdentifier: UUID?
     var isManualDeviceSelection = false
     var isConnectingSelectedDevice = false
+    let sessionFactory: (BossAppleConnectionOptions) -> any BossAppSessioning
     let cncTotalSteps = 11
     var cncDisplayMaximum: Int { cncTotalSteps - 1 }
 
-    public init() {}
+    public init() {
+        self.sessionFactory = { options in
+            BossAppleSession(connection: options)
+        }
+    }
+
+    init(
+        sessionFactory: @escaping (BossAppleConnectionOptions) -> any BossAppSessioning = { options in
+            BossAppleSession(connection: options)
+        }
+    ) {
+        self.sessionFactory = sessionFactory
+    }
 
     public var isBusy: Bool {
         if case .loading = loadState {

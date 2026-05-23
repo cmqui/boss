@@ -1,88 +1,116 @@
 import Foundation
 import libbossApple
 
+protocol BossctlOutputWriting {
+    func writeLine(_ line: String)
+}
+
+struct BossctlStandardOutputWriter: BossctlOutputWriting {
+    func writeLine(_ line: String) {
+        print(line)
+    }
+}
+
 extension BossctlCLI {
-    static func printWearDetectionFallbackPaths(for patch: BossAppleOnHeadDetectionPatch) {
+    static func printWearDetectionFallbackPaths(
+        for patch: BossAppleOnHeadDetectionPatch,
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
         if patch.isAutoPlayEnabled != nil {
-            print("Applied subordinate setting path: auto-play-pause (settings 0x18)")
+            output.writeLine("Applied subordinate setting path: auto-play-pause (settings 0x18)")
         }
         if patch.isAutoAnswerEnabled != nil {
-            print("Applied subordinate setting path: auto-answer (settings 0x1B)")
+            output.writeLine("Applied subordinate setting path: auto-answer (settings 0x1B)")
         }
         if patch.isAutoTransparencyEnabled != nil {
-            print("Applied subordinate setting path: auto-aware / auto-transparency (settings 0x1D)")
+            output.writeLine("Applied subordinate setting path: auto-aware / auto-transparency (settings 0x1D)")
         }
     }
 
-    static func printOnHeadDetection(_ value: BossAppleOnHeadDetectionValue) {
-        print("On-head detection: \(value.isEnabled)")
-        print("Auto-play: \(formatOptionalBool(value.isAutoPlayEnabled))")
-        print("Auto-answer: \(formatOptionalBool(value.isAutoAnswerEnabled))")
-        print("Auto-transparency: \(formatOptionalBool(value.isAutoTransparencyEnabled))")
+    static func printOnHeadDetection(
+        _ value: BossAppleOnHeadDetectionValue,
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
+        output.writeLine("On-head detection: \(value.isEnabled)")
+        output.writeLine("Auto-play: \(formatOptionalBool(value.isAutoPlayEnabled))")
+        output.writeLine("Auto-answer: \(formatOptionalBool(value.isAutoAnswerEnabled))")
+        output.writeLine("Auto-transparency: \(formatOptionalBool(value.isAutoTransparencyEnabled))")
     }
 
-    static func printWearDetectionSettingsReport(_ report: BossAppleDeviceSettingsReport) {
+    static func printWearDetectionSettingsReport(
+        _ report: BossAppleDeviceSettingsReport,
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
         if let wearDetection = report.wearDetection.value {
-            print("On-head detection: \(wearDetection.isEnabled) [\(describe(report.wearDetection))]")
+            output.writeLine("On-head detection: \(wearDetection.isEnabled) [\(describe(report.wearDetection))]")
         } else {
-            print("On-head detection: unavailable [\(describe(report.wearDetection))]")
+            output.writeLine("On-head detection: unavailable [\(describe(report.wearDetection))]")
         }
 
         let autoPlay = report.wearDetection.value?.isAutoPlayEnabled ?? report.autoPlayPauseEnabled.value
         let autoAnswer = report.wearDetection.value?.isAutoAnswerEnabled ?? report.autoAnswerEnabled.value
         let autoTransparency = report.wearDetection.value?.isAutoTransparencyEnabled ?? report.autoAwareEnabled.value
 
-        print("Auto-play: \(formatOptionalBool(autoPlay))")
-        print("Auto-answer: \(formatOptionalBool(autoAnswer))")
-        print("Auto-transparency: \(formatOptionalBool(autoTransparency))")
+        output.writeLine("Auto-play: \(formatOptionalBool(autoPlay))")
+        output.writeLine("Auto-answer: \(formatOptionalBool(autoAnswer))")
+        output.writeLine("Auto-transparency: \(formatOptionalBool(autoTransparency))")
     }
 
-    static func printDeviceSettingsReport(_ report: BossAppleDeviceSettingsReport) {
+    static func printDeviceSettingsReport(
+        _ report: BossAppleDeviceSettingsReport,
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
         if let wearDetection = report.wearDetection.value {
-            print("Wear detection: \(wearDetection.isEnabled) [\(describe(report.wearDetection))]")
-            print("Auto-play: \(formatOptionalBool(wearDetection.isAutoPlayEnabled))")
-            print("Auto-answer: \(formatOptionalBool(wearDetection.isAutoAnswerEnabled))")
-            print("Auto-transparency: \(formatOptionalBool(wearDetection.isAutoTransparencyEnabled))")
+            output.writeLine("Wear detection: \(wearDetection.isEnabled) [\(describe(report.wearDetection))]")
+            output.writeLine("Auto-play: \(formatOptionalBool(wearDetection.isAutoPlayEnabled))")
+            output.writeLine("Auto-answer: \(formatOptionalBool(wearDetection.isAutoAnswerEnabled))")
+            output.writeLine("Auto-transparency: \(formatOptionalBool(wearDetection.isAutoTransparencyEnabled))")
         } else {
-            print("Wear detection: unavailable [\(describe(report.wearDetection))]")
+            output.writeLine("Wear detection: unavailable [\(describe(report.wearDetection))]")
         }
 
         if let autoAwareEnabled = report.autoAwareEnabled.value {
-            print("Auto-aware: \(autoAwareEnabled) [\(describe(report.autoAwareEnabled))]")
+            output.writeLine("Auto-aware: \(autoAwareEnabled) [\(describe(report.autoAwareEnabled))]")
         } else {
-            print("Auto-aware: unavailable [\(describe(report.autoAwareEnabled))]")
+            output.writeLine("Auto-aware: unavailable [\(describe(report.autoAwareEnabled))]")
         }
 
         if let autoPlayPauseEnabled = report.autoPlayPauseEnabled.value {
-            print("Auto-play-pause: \(autoPlayPauseEnabled) [\(describe(report.autoPlayPauseEnabled))]")
+            output.writeLine("Auto-play-pause: \(autoPlayPauseEnabled) [\(describe(report.autoPlayPauseEnabled))]")
         } else {
-            print("Auto-play-pause: unavailable [\(describe(report.autoPlayPauseEnabled))]")
+            output.writeLine("Auto-play-pause: unavailable [\(describe(report.autoPlayPauseEnabled))]")
         }
 
         if let autoAnswerEnabled = report.autoAnswerEnabled.value {
-            print("Auto-answer: \(autoAnswerEnabled) [\(describe(report.autoAnswerEnabled))]")
+            output.writeLine("Auto-answer: \(autoAnswerEnabled) [\(describe(report.autoAnswerEnabled))]")
         } else {
-            print("Auto-answer: unavailable [\(describe(report.autoAnswerEnabled))]")
+            output.writeLine("Auto-answer: unavailable [\(describe(report.autoAnswerEnabled))]")
         }
 
         if let volumeControl = report.volumeControl.value {
-            print("Volume control: \(volumeControl.value.displayName) [\(describe(report.volumeControl))]")
+            output.writeLine("Volume control: \(volumeControl.value.displayName) [\(describe(report.volumeControl))]")
             if let supportedValues = volumeControl.supportedValues, !supportedValues.isEmpty {
                 let supportedModes = supportedValues.map(\.displayName).joined(separator: ", ")
-                print("Volume control supported modes: \(supportedModes)")
+                output.writeLine("Volume control supported modes: \(supportedModes)")
             }
         } else {
-            print("Volume control: unavailable [\(describe(report.volumeControl))]")
+            output.writeLine("Volume control: unavailable [\(describe(report.volumeControl))]")
         }
     }
 
-    static func printEqualizer(_ settings: BossAppleEqualizerSettings) {
+    static func printEqualizer(
+        _ settings: BossAppleEqualizerSettings,
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
         for band in settings.ranges {
-            print("\(band.band.displayName.capitalized): \(band.currentLevel) [range \(band.minLevel)...\(band.maxLevel)]")
+            output.writeLine("\(band.band.displayName.capitalized): \(band.currentLevel) [range \(band.minLevel)...\(band.maxLevel)]")
         }
     }
 
-    static func printEqualizerWriteResult(_ result: BossAppleEqualizerWriteResult) {
+    static func printEqualizerWriteResult(
+        _ result: BossAppleEqualizerWriteResult,
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
         let prefix: String
         let settings: BossAppleEqualizerSettings
         switch result {
@@ -96,37 +124,45 @@ extension BossctlCLI {
             prefix = "Equalizer update sent; verification inconclusive"
             settings = target
         }
-        print(prefix)
-        printEqualizer(settings)
+        output.writeLine(prefix)
+        printEqualizer(settings, output: output)
     }
 
-    static func printAudioModeSettingsConfig(_ config: BossAppleAudioModeSettingsConfig) {
-        print("CNC level: \(config.cncLevel) (0=max ANC, 10=most ambient)")
-        print("Auto CNC: \(config.autoCNCEnabled)")
-        print("Spatial audio: \(config.spatialAudioMode.displayName)")
-        print("Wind block: \(config.windBlockEnabled)")
-        print("ANC toggle: \(config.ancToggleEnabled)")
+    static func printAudioModeSettingsConfig(
+        _ config: BossAppleAudioModeSettingsConfig,
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
+        output.writeLine("CNC level: \(config.cncLevel) (0=max ANC, 10=most ambient)")
+        output.writeLine("Auto CNC: \(config.autoCNCEnabled)")
+        output.writeLine("Spatial audio: \(config.spatialAudioMode.displayName)")
+        output.writeLine("Wind block: \(config.windBlockEnabled)")
+        output.writeLine("ANC toggle: \(config.ancToggleEnabled)")
     }
 
-    static func printFavoriteAudioModes(_ favorites: [Int], modes: [BossAppleAudioModeInfo]) {
+    static func printFavoriteAudioModes(
+        _ favorites: [Int],
+        modes: [BossAppleAudioModeInfo],
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
         guard !favorites.isEmpty else {
-            print("Favorite audio modes: none")
+            output.writeLine("Favorite audio modes: none")
             return
         }
         let modesByIndex = Dictionary(uniqueKeysWithValues: modes.map { ($0.modeIndex, $0.name) })
-        print("Favorite audio modes:")
+        output.writeLine("Favorite audio modes:")
         for index in favorites.sorted() {
             if let name = modesByIndex[index] {
-                print("  \(index): \(name)")
+                output.writeLine("  \(index): \(name)")
             } else {
-                print("  \(index)")
+                output.writeLine("  \(index)")
             }
         }
     }
 
     static func printAudioModeSettingsConfigWriteResult(
         _ result: BossAppleAudioModeSettingsWriteResult,
-        output: AudioModeSettingsOutput
+        output: AudioModeSettingsOutput,
+        writer: BossctlOutputWriting = BossctlStandardOutputWriter()
     ) {
         let state: AudioModeSettingsWriteState
         let config: BossAppleAudioModeSettingsConfig
@@ -146,13 +182,13 @@ extension BossctlCLI {
         case .full:
             switch state {
             case .unchanged:
-                print("Audio mode settings unchanged:")
+                writer.writeLine("Audio mode settings unchanged:")
             case .updated:
-                print("Audio mode settings updated:")
+                writer.writeLine("Audio mode settings updated:")
             case .verificationInconclusive:
-                print("Audio mode settings update sent; verification inconclusive")
+                writer.writeLine("Audio mode settings update sent; verification inconclusive")
             }
-            printAudioModeSettingsConfig(config)
+            printAudioModeSettingsConfig(config, output: writer)
         case .field(let field):
             let prefix: String
             switch state {
@@ -163,7 +199,7 @@ extension BossctlCLI {
             case .verificationInconclusive:
                 prefix = "\(field.label) update sent; verification inconclusive"
             }
-            print("\(prefix): \(field.value(from: config))")
+            writer.writeLine("\(prefix): \(field.value(from: config))")
         }
     }
 
@@ -179,14 +215,17 @@ extension BossctlCLI {
         return BossAppleBmapErrorCode(rawValue: rawValue)
     }
 
-    static func printBootstrap(_ device: BossAppleBootstrappedDevice) {
-        print("Transport: \(device.transportKind.rawValue)")
-        print("BMAP: \(device.bmapVersion.version)")
-        print("Product: \(device.productName) (\(String(format: "0x%04X", device.productID)))")
+    static func printBootstrap(
+        _ device: BossAppleBootstrappedDevice,
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
+        output.writeLine("Transport: \(device.transportKind.rawValue)")
+        output.writeLine("BMAP: \(device.bmapVersion.version)")
+        output.writeLine("Product: \(device.productName) (\(String(format: "0x%04X", device.productID)))")
         let variantLabel = device.productVariant.variantName ?? "Unknown"
-        print("Variant: \(variantLabel) (raw=\(String(format: "0x%02X", device.productVariant.variant)))")
+        output.writeLine("Variant: \(variantLabel) (raw=\(String(format: "0x%02X", device.productVariant.variant)))")
         let blocks = device.supportedFunctionBlocks.allBlocks().map(\.displayName).joined(separator: ", ")
-        print("Function blocks: \(blocks)")
+        output.writeLine("Function blocks: \(blocks)")
     }
 
     static func describe(_ config: BossAppleAudioModeSettingsConfig) -> String {

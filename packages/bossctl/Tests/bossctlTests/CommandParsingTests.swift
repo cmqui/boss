@@ -1,0 +1,136 @@
+import XCTest
+import libbossApple
+
+@testable import bossctl
+
+final class CommandParsingTests: XCTestCase {
+    func testBootstrapHappyPathParsesConnectionOptions() throws {
+        let command = try Command.parse(arguments: [
+            "bootstrap",
+            "--name", "Ultra",
+            "--timeout", "9",
+            "--characteristic", "secure",
+        ])
+
+        guard case .bootstrap(let options) = command else {
+            return XCTFail("Expected bootstrap command")
+        }
+
+        XCTAssertEqual(options.nameContains, "Ultra")
+        XCTAssertNil(options.identifier)
+        XCTAssertEqual(options.timeoutSeconds, 9)
+        XCTAssertEqual(options.characteristicPreference, .secure)
+    }
+
+    func testSettingsHappyPathParsesEqualizerPatch() throws {
+        let command = try Command.parse(arguments: [
+            "settings",
+            "set",
+            "equalizer",
+            "--bass", "3",
+            "--treble", "-1",
+            "--timeout", "12",
+        ])
+
+        guard case .settings(let settings) = command else {
+            return XCTFail("Expected settings command")
+        }
+
+        XCTAssertEqual(settings.connection.timeoutSeconds, 12)
+        guard case .setEqualizer(let patch) = settings.action else {
+            return XCTFail("Expected equalizer patch action")
+        }
+        XCTAssertEqual(patch, BossAppleEqualizerSettingsPatch(bass: 3, treble: -1))
+    }
+
+    func testAudioModeHappyPathParsesCurrentModeSelectionByName() throws {
+        let command = try Command.parse(arguments: [
+            "audio-mode",
+            "set",
+            "current",
+            "--mode", "Quiet",
+            "--play-voice-prompt", "true",
+        ])
+
+        guard case .audioMode(let audioMode) = command else {
+            return XCTFail("Expected audio-mode command")
+        }
+
+        guard case .setCurrent(let selection, let playVoicePrompt) = audioMode.action else {
+            return XCTFail("Expected current mode write action")
+        }
+        guard case .name(let modeName) = selection else {
+            return XCTFail("Expected mode name selection")
+        }
+
+        XCTAssertEqual(modeName, "Quiet")
+        XCTAssertTrue(playVoicePrompt)
+    }
+
+    func testMissingFlagValueProducesUsageError() {
+        XCTAssertThrowsError(try Command.parse(arguments: [
+            "settings",
+            "set",
+            "standby-timer",
+            "--minutes",
+        ])) { error in
+            XCTAssertEqual((error as? UsageError)?.message, "Missing value for --minutes")
+        }
+    }
+
+    func testBadUUIDProducesUsageError() {
+        XCTAssertThrowsError(try ConnectionOptions.parse(arguments: [
+            "--identifier", "not-a-uuid",
+        ])) { error in
+            XCTAssertEqual((error as? UsageError)?.message, "Invalid UUID for --identifier: not-a-uuid")
+        }
+    }
+
+    func testInvalidTimeoutProducesUsageError() {
+        XCTAssertThrowsError(try ConnectionOptions.parse(arguments: [
+            "--timeout", "fast",
+        ])) { error in
+            XCTAssertEqual((error as? UsageError)?.message, "Invalid integer for --timeout: fast")
+        }
+    }
+
+    func testUnsupportedCharacteristicValueProducesUsageError() {
+        XCTAssertThrowsError(try ConnectionOptions.parse(arguments: [
+            "--characteristic", "legacy",
+        ])) { error in
+            XCTAssertEqual((error as? UsageError)?.message, "Invalid value for --characteristic: legacy")
+        }
+    }
+
+    func testAudioModeRejectsConflictingSelectionFlags() {
+        XCTAssertThrowsError(try Command.parse(arguments: [
+            "audio-mode",
+            "favorite",
+            "--index", "1",
+            "--mode", "Quiet",
+        ])) { error in
+            XCTAssertEqual((error as? UsageError)?.message, "Specify only one of --index or --mode")
+        }
+    }
+
+    func testAudioModeRejectsOutOfRangeCNCLevel() {
+        XCTAssertThrowsError(try Command.parse(arguments: [
+            "audio-mode",
+            "cnc",
+            "--level", "11",
+        ])) { error in
+            XCTAssertEqual((error as? UsageError)?.message, "Invalid CNC level for --level: 11")
+        }
+    }
+
+    func testSettingsRejectsUnsupportedVolumeControlMode() {
+        XCTAssertThrowsError(try Command.parse(arguments: [
+            "settings",
+            "set",
+            "volume-control",
+            "--mode", "swipe",
+        ])) { error in
+            XCTAssertEqual((error as? UsageError)?.message, "Invalid volume control value for --mode: swipe")
+        }
+    }
+}

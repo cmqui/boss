@@ -9,7 +9,7 @@ extension BossAppViewModel {
         }
         run("Switching mode") {
             let session = self.makeSession()
-            let result = try await session.setCurrentAudioMode(index: index)
+            let result = try await session.setCurrentAudioMode(index: index, playVoicePrompt: false)
             let resultMessage: String
 
             switch result {
@@ -93,7 +93,7 @@ extension BossAppViewModel {
                         selectedModeIndex: targetModeIndex,
                         currentModeIndex: self.currentAudioModeIndex
                     ))
-                    _ = try await session.setCurrentAudioMode(index: targetModeIndex)
+                    _ = try await session.setCurrentAudioMode(index: targetModeIndex, playVoicePrompt: false)
                     self.currentAudioModeIndex = targetModeIndex
                     self.selectedAudioModeIndex = targetModeIndex
                 }
@@ -157,7 +157,7 @@ extension BossAppViewModel {
 
             if let targetModeIndex,
                self.currentAudioModeIndex != targetModeIndex {
-                _ = try await session.setCurrentAudioMode(index: targetModeIndex)
+                _ = try await session.setCurrentAudioMode(index: targetModeIndex, playVoicePrompt: false)
                 self.currentAudioModeIndex = targetModeIndex
                 self.selectedAudioModeIndex = targetModeIndex
             }
@@ -292,7 +292,7 @@ extension BossAppViewModel {
         }
     }
 
-    func reloadModeWorkspace(using session: BossAppleSession) async throws {
+    func reloadModeWorkspace(using session: any BossAppSessioning) async throws {
         let snapshot = try await session.refreshModeWorkspaceSnapshot()
         currentAudioModeIndex = snapshot.currentAudioModeIndex
         Self.log(debugSummary(
@@ -437,7 +437,7 @@ extension BossAppViewModel {
     }
 
     func saveCustomModeSettingsSequentially(
-        using session: BossAppleSession,
+        using session: any BossAppSessioning,
         startingFrom initialMode: BossAppleAudioModeConfig,
         targetSettings: BossAppleAudioModeSettingsConfig
     ) async throws -> BossAppleAudioModeConfig {
@@ -533,7 +533,7 @@ extension BossAppViewModel {
         assign: @escaping (Bool) -> Void,
         label: String,
         successMessage: String,
-        operation: @escaping (BossAppleSession) async throws -> Bool
+        operation: @escaping (any BossAppSessioning) async throws -> Bool
     ) {
         guard let previousValue = current else {
             return
