@@ -8,8 +8,8 @@ use libboss_session::{
 };
 
 use crate::{
-    invalid_argument_error, session_error_to_ffi, write_error, BossBuffer, BossFfiError,
-    BossFfiLinkStatus, BossFfiSessionCallbacks, BossFfiUpdateStreamKind,
+    conversions::session_error_to_ffi, invalid_argument_error, write_error, BossBuffer,
+    BossFfiError, BossFfiLinkStatus, BossFfiSessionCallbacks, BossFfiUpdateStreamKind,
 };
 
 struct FfiLinkInner {

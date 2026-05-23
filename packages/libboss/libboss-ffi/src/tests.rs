@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::sync::Mutex;
 
-use libboss_core::{BmapFunction, BmapFunctionBlock, BmapOperator};
+use libboss_core::{BmapCodec, BmapFunction, BmapFunctionBlock, BmapOperator, BmapPacket};
 
 use crate::*;
 

@@ -8,7 +8,9 @@ Tools and UI experiments for controlling Bose devices over BMAP.
 - `packages/libboss-OLD`: deprecated Swift reference implementation retained temporarily
 - `packages/libboss-apple`: Apple/CoreBluetooth transport and controller APIs
 - `packages/bossctl`: CLI for inspecting and changing device settings
+- `packages/boss-apple-app`: apple-specific shared app logic
 - `packages/boss-macos`: macOS app UI
+- `packages/boss-ios`: iOS app UI
 
 ## Quick Start
 
