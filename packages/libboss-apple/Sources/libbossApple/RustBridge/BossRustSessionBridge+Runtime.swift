@@ -25,6 +25,13 @@ enum BossRustFfiRuntimeSearchPolicy {
             .path
     }
 
+    static func standardHomebrewLibraryPaths() -> [String] {
+        [
+            "/opt/homebrew/opt/libboss/lib/libboss_ffi.dylib",
+            "/usr/local/opt/libboss/lib/libboss_ffi.dylib",
+        ]
+    }
+
     static func allowsRepositorySearch(environment: [String: String]) -> Bool {
         if let explicit = nonEmptyEnvironmentValue(named: allowRepositorySearchEnvVar, environment: environment) {
             return parseBooleanEnvironmentValue(explicit)
@@ -616,13 +623,17 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         // Supported runtime channels:
         // 1. explicit dylib path override
         // 2. explicit shared Homebrew runtime prefix
-        // 3. bundled app Frameworks dylib
-        // 4. local development repository probing in debug/test contexts only
+        // 3. standard shared Homebrew runtime paths
+        // 4. bundled app Frameworks dylib
+        // 5. local development repository probing in debug/test contexts only
         if let explicit = BossRustFfiRuntimeSearchPolicy.explicitLibraryPath(environment: environment) {
             candidates.append(BossRustFfiRuntimeCandidate(path: explicit, channel: .explicitDylib))
         }
         if let explicitHomebrew = BossRustFfiRuntimeSearchPolicy.explicitHomebrewLibraryPath(environment: environment) {
             candidates.append(BossRustFfiRuntimeCandidate(path: explicitHomebrew, channel: .explicitHomebrewPrefix))
+        }
+        for standardHomebrew in BossRustFfiRuntimeSearchPolicy.standardHomebrewLibraryPaths() {
+            candidates.append(BossRustFfiRuntimeCandidate(path: standardHomebrew, channel: .explicitHomebrewPrefix))
         }
 
         let dylibName = "libboss_ffi.dylib"

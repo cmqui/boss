@@ -47,7 +47,7 @@ MACOS_X86_64_SWIFT_TRIPLE ?= x86_64-apple-macosx14.0
 	homebrew-archive-runtime-arm64 homebrew-archive-runtime-x86_64 \
 	homebrew-archive-bossctl-arm64 homebrew-archive-bossctl-x86_64 \
 	homebrew-archive-boss-ui \
-	homebrew-archive-release \
+	homebrew-archive-release homebrew-archive-release-notarized \
 	homebrew-package-runtime homebrew-package-bossctl homebrew-package-boss-ui homebrew-package \
 	ci
 
@@ -88,6 +88,7 @@ help:
 		'  homebrew-archive-bossctl-x86_64 Archive the x86_64 bossctl release artifact' \
 		'  homebrew-archive-boss-ui Archive the universal boss-ui release artifact' \
 		'  homebrew-archive-release Build the full set of Homebrew release archives' \
+		'  homebrew-archive-release-notarized Build the full Homebrew release set and require a notarized boss-ui app archive' \
 		'  homebrew-package-runtime Show the libboss Homebrew formula path' \
 		'  homebrew-package-bossctl Show the bossctl Homebrew formula path' \
 		'  homebrew-package-boss-ui Show the boss-ui Homebrew cask path' \
@@ -225,8 +226,7 @@ homebrew-archive-bossctl-x86_64: homebrew-stage-bossctl-x86_64
 
 homebrew-archive-boss-ui: homebrew-stage-boss-ui
 	mkdir -p $(HOMEBREW_DIST_DIR)
-	rm -f $(HOMEBREW_DIST_DIR)/boss-ui-$(RELEASE_VERSION)-macos-universal.zip
-	cd $(HOMEBREW_BOSS_UI_STAGE_DIR) && ditto -c -k --sequesterRsrc --keepParent Boss.app $(HOMEBREW_DIST_DIR)/boss-ui-$(RELEASE_VERSION)-macos-universal.zip
+	$(HOMEBREW_PACKAGING_DIR)/scripts/sign-and-notarize-boss-ui.sh $(HOMEBREW_BOSS_UI_STAGE_DIR)/Boss.app $(HOMEBREW_DIST_DIR)/boss-ui-$(RELEASE_VERSION)-macos-universal.zip
 
 homebrew-archive-release: \
 	homebrew-archive-runtime-arm64 \
@@ -234,6 +234,9 @@ homebrew-archive-release: \
 	homebrew-archive-bossctl-arm64 \
 	homebrew-archive-bossctl-x86_64 \
 	homebrew-archive-boss-ui
+
+homebrew-archive-release-notarized:
+	BOSS_MACOS_REQUIRE_NOTARIZATION=1 $(MAKE) homebrew-archive-release RELEASE_VERSION=$(RELEASE_VERSION)
 
 homebrew-package-runtime:
 	@printf '%s\n' "$(HOMEBREW_PACKAGING_DIR)/Formula/libboss.rb"

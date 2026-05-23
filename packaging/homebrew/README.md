@@ -25,6 +25,7 @@ Runtime contract:
   `$(brew --prefix)/opt/libboss/lib/libboss_ffi.dylib`
 - Homebrew wrappers or launch scripts should set:
   `LIBBOSS_FFI_HOMEBREW_PREFIX=$(brew --prefix)/opt/libboss`
+- `boss-ui` also recognizes the standard Homebrew `opt/libboss` paths directly, so the cask app no longer needs a launcher wrapper just to find the shared runtime
 
 Compatibility contract:
 
@@ -52,7 +53,8 @@ Status:
 - the repo now also provides release-oriented per-arch staging and archive targets:
   - `make homebrew-stage-release`
   - `make homebrew-archive-release RELEASE_VERSION=<version>`
-- the staged `Boss.app` removes its embedded `libboss_ffi.dylib` and replaces the app executable with a wrapper that sets `LIBBOSS_FFI_HOMEBREW_PREFIX` before launching the real binary
+  - `make homebrew-archive-release-notarized RELEASE_VERSION=<version>`
+- the staged `Boss.app` removes its embedded `libboss_ffi.dylib` and keeps a normal app executable; the shared runtime is resolved through the standard Homebrew `opt/libboss` locations or the explicit env var override
 - the release-oriented staging flow now produces:
   - `packaging/homebrew/staging/libboss/arm64/lib/libboss_ffi.dylib`
   - `packaging/homebrew/staging/libboss/x86_64/lib/libboss_ffi.dylib`
@@ -65,5 +67,11 @@ Status:
   - `bossctl-<version>-macos-arm64.tar.gz`
   - `bossctl-<version>-macos-x86_64.tar.gz`
   - `boss-ui-<version>-macos-universal.zip`
+- notarized `boss-ui` release archives require:
+  - `BOSS_MACOS_DEVELOPER_IDENTITY`
+    Example: `Developer ID Application: Your Name (TEAMID)`
+  - `BOSS_MACOS_NOTARY_KEYCHAIN_PROFILE`
+    Create once with `xcrun notarytool store-credentials <profile-name> ...`
+- `make homebrew-archive-release-notarized` fails fast if those notarization inputs are missing
 - the checked-in formulae and cask still need real release URLs, checksums, and publication-time artifact wiring before they can be used in a tap
 - the checked-in formulae and cask now assume GitHub Releases hosted from `cmqui/boss`; publication still requires replacing the placeholder `sha256` values and copying or syncing the files into the `cmqui/homebrew-boss` tap repository

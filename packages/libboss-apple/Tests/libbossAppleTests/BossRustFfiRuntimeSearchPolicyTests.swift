@@ -44,6 +44,16 @@ final class BossRustFfiRuntimeSearchPolicyTests: XCTestCase {
         XCTAssertNil(path)
     }
 
+    func testStandardHomebrewLibraryPathsCoverAppleSiliconAndIntelPrefixes() {
+        XCTAssertEqual(
+            BossRustFfiRuntimeSearchPolicy.standardHomebrewLibraryPaths(),
+            [
+                "/opt/homebrew/opt/libboss/lib/libboss_ffi.dylib",
+                "/usr/local/opt/libboss/lib/libboss_ffi.dylib",
+            ]
+        )
+    }
+
     func testRepositorySearchEnvVarCanDisableDebugFallback() {
         let allowed = BossRustFfiRuntimeSearchPolicy.allowsRepositorySearch(environment: [
             BossRustFfiRuntimeSearchPolicy.allowRepositorySearchEnvVar: "0",

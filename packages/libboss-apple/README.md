@@ -28,8 +28,9 @@ At runtime, `BossRustSessionBridge` resolves the Rust FFI in this order:
 
 1. explicitly provided dylib path via `LIBBOSS_FFI_DYLIB`
 2. explicitly provided shared Homebrew runtime prefix via `LIBBOSS_FFI_HOMEBREW_PREFIX`
-3. bundled `Frameworks/libboss_ffi.dylib`
-4. repo-relative debug artifact search only for local development and tests
+3. standard shared Homebrew paths under `/opt/homebrew/opt/libboss` and `/usr/local/opt/libboss`
+4. bundled `Frameworks/libboss_ffi.dylib`
+5. repo-relative debug artifact search only for local development and tests
 
 Repo-relative probing is intentionally a development fallback, not the supported release story. You can disable it with `LIBBOSS_FFI_ALLOW_REPOSITORY_SEARCH=0` or re-enable it explicitly with `LIBBOSS_FFI_ALLOW_REPOSITORY_SEARCH=1`.
 When `LIBBOSS_FFI_LOG=1` is enabled, the loader reports which runtime channel won and labels repo-relative probing as a dev-only fallback.
@@ -44,10 +45,12 @@ Supported runtime channels:
 For the shared Homebrew channel, point both `bossctl` and `boss-macos` at the same installed runtime prefix, for example:
 
 ```sh
-export LIBBOSS_FFI_HOMEBREW_PREFIX="/opt/homebrew/opt/libboss-ffi"
+export LIBBOSS_FFI_HOMEBREW_PREFIX="/opt/homebrew/opt/libboss"
 ```
 
 That resolves `libboss_ffi.dylib` at `"$LIBBOSS_FFI_HOMEBREW_PREFIX/lib/libboss_ffi.dylib"`.
+
+The packaged `boss-ui` cask does not need a launcher wrapper to set that variable because the runtime also checks the standard `opt/libboss` locations directly.
 
 The `boss-macos` Xcode project supports both runtime dylib loading and a static-link scheme. It runs `scripts/build-libboss-ffi.sh` before each build to compile Rust, and dynamic builds also copy the dylib into `Boss.app/Contents/Frameworks`.
 

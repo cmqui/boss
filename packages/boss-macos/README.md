@@ -26,9 +26,11 @@ swift run Boss
 For a shared Homebrew runtime channel, point the app at the installed runtime prefix instead:
 
 ```sh
-export LIBBOSS_FFI_HOMEBREW_PREFIX="/opt/homebrew/opt/libboss-ffi"
+export LIBBOSS_FFI_HOMEBREW_PREFIX="/opt/homebrew/opt/libboss"
 swift run Boss
 ```
+
+The packaged `boss-ui` cask also checks the standard Homebrew `opt/libboss` locations directly, so the app bundle does not need a launcher wrapper just to locate the shared runtime.
 
 Build a release `.app` bundle:
 
