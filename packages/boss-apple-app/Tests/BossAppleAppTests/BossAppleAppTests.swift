@@ -11,4 +11,30 @@ final class BossAppleAppTests: XCTestCase {
         XCTAssertEqual(viewModel.deviceName, "Bose Device")
         XCTAssertFalse(viewModel.isBusy)
     }
+
+    func testRuntimeConfigurationPrefersExplicitMockFlags() {
+        XCTAssertEqual(
+            BossAppRuntimeConfiguration.current(
+                arguments: ["Boss", "--mock-device"],
+                environment: [:]
+            ),
+            .mockDevice
+        )
+
+        XCTAssertEqual(
+            BossAppRuntimeConfiguration.current(
+                arguments: ["Boss", "--live-device"],
+                environment: ["BOSS_USE_MOCK_DEVICE": "1"]
+            ),
+            .bluetooth
+        )
+
+        XCTAssertEqual(
+            BossAppRuntimeConfiguration.current(
+                arguments: ["Boss"],
+                environment: ["BOSS_DEVICE_BACKEND": "mock"]
+            ),
+            .mockDevice
+        )
+    }
 }

@@ -34,11 +34,13 @@ extension BossAppViewModel {
             return
         }
         loadState = .loading("Scanning for Bose devices")
-        waitingStatusMessage = "Scanning for a nearby Bose device..."
+        waitingStatusMessage = usesMockDeviceBackend
+            ? "Loading the mock QC Ultra 2 HP device..."
+            : "Scanning for a nearby Bose device..."
         Self.log("Starting: Device discovery scan")
 
         do {
-            let devices = try await AppleBossDeviceDiscovery.discoverDevices(
+            let devices = try await discoveryProvider.discoverDevices(
                 connection: BossAppleConnectionOptions(
                     nameContains: nameFilter,
                     scanTimeout: .seconds(4)
@@ -53,14 +55,20 @@ extension BossAppViewModel {
                 selectedDiscoveredDeviceID = devices.first?.id
             }
             if devices.count == 1, let device = devices.first, !isManualDeviceSelection {
-                waitingStatusMessage = "Found \(device.name). Opening controls..."
+                waitingStatusMessage = usesMockDeviceBackend
+                    ? "Found mock \(device.name). Opening controls..."
+                    : "Found \(device.name). Opening controls..."
                 loadState = .idle
                 connect(to: device)
                 return
             }
             waitingStatusMessage = devices.isEmpty
-                ? "No Bose devices found yet. Retrying automatically..."
-                : "Select a Bose device to open its controls."
+                ? (usesMockDeviceBackend
+                    ? "No mock Bose devices are available right now. Retrying automatically..."
+                    : "No Bose devices found yet. Retrying automatically...")
+                : (usesMockDeviceBackend
+                    ? "Select the mock Bose device to open its controls."
+                    : "Select a Bose device to open its controls.")
             loadState = .idle
             Self.log("Completed: Device discovery scan (\(devices.count) devices)")
         } catch {
@@ -84,15 +92,17 @@ extension BossAppViewModel {
         selectedDiscoveredDeviceID = device.id
         selectedDeviceIdentifier = device.id
         deviceName = device.name
-        waitingStatusMessage = "Found \(device.name). Opening controls..."
-        run("Connecting to \(device.name)") {
+        waitingStatusMessage = usesMockDeviceBackend
+            ? "Opening mock controls for \(device.name)..."
+            : "Found \(device.name). Opening controls..."
+        run(usesMockDeviceBackend ? "Opening mock device" : "Connecting to \(device.name)") {
             await self.clearSession()
             let session = self.makeSession()
             do {
                 try await self.reloadAllState(using: session)
                 self.isConnectingSelectedDevice = false
                 self.appScreen = .workspace
-                self.waitingStatusMessage = "Connected."
+                self.waitingStatusMessage = self.usesMockDeviceBackend ? "Connected to mock device." : "Connected."
                 self.startBackgroundLoad(using: session)
             } catch {
                 self.isConnectingSelectedDevice = false

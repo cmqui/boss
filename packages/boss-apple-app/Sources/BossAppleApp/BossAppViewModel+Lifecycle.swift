@@ -5,12 +5,12 @@ extension BossAppViewModel {
     public func refresh() {
         cancelDiscoveryLoop()
         cancelBackgroundLoad()
-        run("Connecting") {
+        run(usesMockDeviceBackend ? "Opening mock device" : "Connecting") {
             let session = self.makeSession()
             do {
                 try await self.reloadAllState(using: session)
                 self.appScreen = .workspace
-                self.waitingStatusMessage = "Connected."
+                self.waitingStatusMessage = self.usesMockDeviceBackend ? "Connected to mock device." : "Connected."
                 self.startBackgroundLoad(using: session)
             } catch {
                 await self.clearSession()
@@ -57,7 +57,7 @@ extension BossAppViewModel {
             await self.clearSession()
         }
         resetWorkspaceState()
-        enterWaitingMode(message: "Looking for a Bose device nearby.")
+        enterWaitingMode(message: usesMockDeviceBackend ? "Mock QC Ultra 2 HP mode is enabled." : "Looking for a Bose device nearby.")
         startDiscoveryLoopIfNeeded(forceImmediateRefresh: true)
     }
 

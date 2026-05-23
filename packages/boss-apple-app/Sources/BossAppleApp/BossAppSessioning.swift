@@ -29,3 +29,13 @@ protocol BossAppSessioning: AnyObject, Sendable {
 }
 
 extension BossAppleSession: BossAppSessioning {}
+
+protocol BossAppDiscoveryProviding: Sendable {
+    func discoverDevices(connection: BossAppleConnectionOptions) async throws -> [BossAppleDiscoveredDevice]
+}
+
+struct BossBluetoothDiscoveryProvider: BossAppDiscoveryProviding {
+    func discoverDevices(connection: BossAppleConnectionOptions) async throws -> [BossAppleDiscoveredDevice] {
+        try await AppleBossDeviceDiscovery.discoverDevices(connection: connection)
+    }
+}

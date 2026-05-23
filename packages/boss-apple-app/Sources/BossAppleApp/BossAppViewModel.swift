@@ -61,22 +61,33 @@ public final class BossAppViewModel: ObservableObject {
     var selectedDeviceIdentifier: UUID?
     var isManualDeviceSelection = false
     var isConnectingSelectedDevice = false
+    let discoveryProvider: any BossAppDiscoveryProviding
     let sessionFactory: (BossAppleConnectionOptions) -> any BossAppSessioning
+    let runtimeConfiguration: BossAppRuntimeConfiguration
     let cncTotalSteps = 11
     var cncDisplayMaximum: Int { cncTotalSteps - 1 }
 
-    public init() {
-        self.sessionFactory = { options in
-            BossAppleSession(connection: options)
-        }
+    public convenience init(configuration: BossAppRuntimeConfiguration = .current()) {
+        self.init(
+            runtimeConfiguration: configuration,
+            discoveryProvider: Self.makeDiscoveryProvider(configuration: configuration),
+            sessionFactory: Self.makeSessionFactory(configuration: configuration)
+        )
     }
 
     init(
+        runtimeConfiguration: BossAppRuntimeConfiguration = .bluetooth,
+        discoveryProvider: any BossAppDiscoveryProviding = BossBluetoothDiscoveryProvider(),
         sessionFactory: @escaping (BossAppleConnectionOptions) -> any BossAppSessioning = { options in
             BossAppleSession(connection: options)
         }
     ) {
+        self.runtimeConfiguration = runtimeConfiguration
+        self.discoveryProvider = discoveryProvider
         self.sessionFactory = sessionFactory
+        if runtimeConfiguration.deviceBackend == .mock {
+            waitingStatusMessage = "Mock QC Ultra 2 HP mode is enabled."
+        }
     }
 
     public var isBusy: Bool {
@@ -143,5 +154,35 @@ public final class BossAppViewModel: ObservableObject {
         }
 
         return selectableAudioModes.first?.modeIndex
+    }
+
+    public var usesMockDeviceBackend: Bool {
+        runtimeConfiguration.deviceBackend == .mock
+    }
+
+    private static func makeDiscoveryProvider(
+        configuration: BossAppRuntimeConfiguration
+    ) -> any BossAppDiscoveryProviding {
+        switch configuration.deviceBackend {
+        case .bluetooth:
+            return BossBluetoothDiscoveryProvider()
+        case .mock:
+            return MockBossAppDiscoveryProvider()
+        }
+    }
+
+    private static func makeSessionFactory(
+        configuration: BossAppRuntimeConfiguration
+    ) -> (BossAppleConnectionOptions) -> any BossAppSessioning {
+        switch configuration.deviceBackend {
+        case .bluetooth:
+            return { options in
+                BossAppleSession(connection: options)
+            }
+        case .mock:
+            return { options in
+                MockBossAppSession(connection: options)
+            }
+        }
     }
 }
