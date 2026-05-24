@@ -131,6 +131,9 @@ public final class BossAppViewModel: ObservableObject {
     public var selectableAudioModes: [BossAppleAudioModeConfig] {
         audioModes.filter { mode in
             if mode.userConfigurable {
+                if mode.modeIndex == currentAudioModeIndex {
+                    return true
+                }
                 return mode.userConfigured && hasCustomProfileName(mode)
             }
             return true

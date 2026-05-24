@@ -885,12 +885,10 @@ impl<L: BossLink> BossSession<L> {
             .await
     }
 
-    fn first_free_custom_audio_mode_slot(configs: &[BossAudioModeConfig]) -> Option<i32> {
+    pub(crate) fn first_free_custom_audio_mode_slot(configs: &[BossAudioModeConfig]) -> Option<i32> {
         configs
             .iter()
-            .find(|config| {
-                config.user_configurable && !config.user_configured && config.name.is_empty()
-            })
+            .find(|config| config.user_configurable && config.name.is_empty())
             .map(|config| config.mode_index)
     }
 }

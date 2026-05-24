@@ -548,6 +548,48 @@ mod tests {
     }
 
     #[test]
+    fn boss_session_first_free_custom_audio_mode_slot_accepts_empty_named_slot_even_if_flagged_configured(
+    ) {
+        let configs = vec![
+            BossAudioModeConfig {
+                mode_index: 4,
+                prompt: BossAudioModePrompt::NONE,
+                name: String::new(),
+                favorite: false,
+                user_configurable: true,
+                user_configured: true,
+                settings: BossAudioModeSettingsConfig {
+                    cnc_level: 10,
+                    auto_cnc_enabled: false,
+                    spatial_audio_mode: BossSpatialAudioMode::Off,
+                    wind_block_enabled: false,
+                    anc_toggle_enabled: false,
+                },
+            },
+            BossAudioModeConfig {
+                mode_index: 6,
+                prompt: BossAudioModePrompt::NONE,
+                name: "Comfort".into(),
+                favorite: true,
+                user_configurable: true,
+                user_configured: true,
+                settings: BossAudioModeSettingsConfig {
+                    cnc_level: 10,
+                    auto_cnc_enabled: false,
+                    spatial_audio_mode: BossSpatialAudioMode::Off,
+                    wind_block_enabled: false,
+                    anc_toggle_enabled: false,
+                },
+            },
+        ];
+
+        assert_eq!(
+            BossSession::<MockLink>::first_free_custom_audio_mode_slot(&configs),
+            Some(4)
+        );
+    }
+
+    #[test]
     fn boss_session_device_settings_reducer_updates_standalone_flags() {
         let initial = BossDeviceSettingsReport {
             wear_detection: BossObservedSetting {

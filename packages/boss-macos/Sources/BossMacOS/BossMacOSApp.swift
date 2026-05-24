@@ -131,7 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func restoreMainWindow() {
-        guard let window = NSApp.windows.first(where: { $0.title == mainWindowTitle }) ?? NSApp.windows.first else {
+        guard let window = preferredMainWindow() else {
             return
         }
 
@@ -141,7 +141,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         window.orderFrontRegardless()
         window.makeKeyAndOrderFront(nil)
-        window.makeMain()
+        if window.canBecomeMain {
+            window.makeMain()
+        }
+    }
+
+    private static func preferredMainWindow() -> NSWindow? {
+        NSApp.windows.first(where: isRestorableMainWindow)
+            ?? NSApp.windows.first(where: isFocusableTitledWindow)
+    }
+
+    private static func isRestorableMainWindow(_ window: NSWindow) -> Bool {
+        window.title == mainWindowTitle && isFocusableTitledWindow(window)
+    }
+
+    private static func isFocusableTitledWindow(_ window: NSWindow) -> Bool {
+        window.styleMask.contains(.titled) && window.canBecomeKey && window.canBecomeMain
     }
 
     private static func detectLoginItemLaunch() -> Bool {

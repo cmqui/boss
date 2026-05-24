@@ -632,9 +632,6 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         if let explicitHomebrew = BossRustFfiRuntimeSearchPolicy.explicitHomebrewLibraryPath(environment: environment) {
             candidates.append(BossRustFfiRuntimeCandidate(path: explicitHomebrew, channel: .explicitHomebrewPrefix))
         }
-        for standardHomebrew in BossRustFfiRuntimeSearchPolicy.standardHomebrewLibraryPaths() {
-            candidates.append(BossRustFfiRuntimeCandidate(path: standardHomebrew, channel: .explicitHomebrewPrefix))
-        }
 
         let dylibName = "libboss_ffi.dylib"
 
@@ -702,6 +699,10 @@ final class BossRustFfiRuntime: @unchecked Sendable {
                     )
                 )
             }
+        }
+
+        for standardHomebrew in BossRustFfiRuntimeSearchPolicy.standardHomebrewLibraryPaths() {
+            candidates.append(BossRustFfiRuntimeCandidate(path: standardHomebrew, channel: .explicitHomebrewPrefix))
         }
 
         var deduped: [BossRustFfiRuntimeCandidate] = []

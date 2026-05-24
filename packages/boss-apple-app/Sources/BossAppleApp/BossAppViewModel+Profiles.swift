@@ -5,11 +5,13 @@ extension BossAppViewModel {
     public func setFavorite(_ isFavorite: Bool, for mode: BossAppleAudioModeConfig) {
         run(isFavorite ? "Adding favorite" : "Removing favorite") {
             let session = self.makeSession()
+            let favoriteIndices: [Int]
             if isFavorite {
-                _ = try await session.favoriteAudioMode(index: mode.modeIndex)
+                favoriteIndices = try await session.favoriteAudioMode(index: mode.modeIndex)
             } else {
-                _ = try await session.unfavoriteAudioMode(index: mode.modeIndex)
+                favoriteIndices = try await session.unfavoriteAudioMode(index: mode.modeIndex)
             }
+            self.applyFavoriteIndices(favoriteIndices)
             self.lastResultMessage = isFavorite
                 ? "Added \"\(self.customProfileDisplayName(for: mode))\" to favorites"
                 : "Removed \"\(self.customProfileDisplayName(for: mode))\" from favorites"
@@ -20,7 +22,14 @@ extension BossAppViewModel {
         run("Deleting custom profile") {
             let session = self.makeSession()
             let displayName = self.customProfileDisplayName(for: mode)
-            _ = try await session.deleteCustomAudioMode(slot: mode.modeIndex)
+            let deleted = try await session.deleteCustomAudioMode(slot: mode.modeIndex)
+            var updatedModes = self.audioModes
+            if let existingIndex = updatedModes.firstIndex(where: { $0.modeIndex == deleted.modeIndex }) {
+                updatedModes[existingIndex] = deleted
+                self.applyAudioModes(updatedModes)
+            } else {
+                self.applyAudioModes(try await session.audioModeConfigs())
+            }
             self.lastResultMessage = "Deleted \"\(displayName)\""
         }
     }
@@ -55,7 +64,7 @@ extension BossAppViewModel {
     }
 
     public func canDelete(_ mode: BossAppleAudioModeConfig) -> Bool {
-        mode.userConfigurable && mode.userConfigured && hasCustomProfileName(mode)
+        mode.userConfigurable && mode.userConfigured
     }
 
     var hasAvailableCustomProfileSlot: Bool {
@@ -71,9 +80,18 @@ extension BossAppViewModel {
                 prompt: prompt,
                 slot: nil
             )
-            self.applySettingsSnapshot(saved.settings)
-            self.currentAudioModeIndex = saved.modeIndex
+            self.applyAudioModes(self.mergedAudioModes(with: saved))
+            let switchResult = try await session.setCurrentAudioMode(index: saved.modeIndex, playVoicePrompt: false)
+            switch switchResult {
+            case .unchanged(let currentIndex):
+                self.currentAudioModeIndex = currentIndex
+            case .updated(let updatedIndex):
+                self.currentAudioModeIndex = updatedIndex
+            case .verificationInconclusive(let targetIndex):
+                self.currentAudioModeIndex = targetIndex
+            }
             self.selectedAudioModeIndex = saved.modeIndex
+            try await self.reloadModeWorkspace(using: session)
             self.lastResultMessage = "Saved profile \"\(saved.name)\""
         }
     }
@@ -105,6 +123,32 @@ extension BossAppViewModel {
 
     var fallbackSupportedPrompts: [BossAppleAudioModePrompt] {
         BossAppleAudioModePrompt.allKnown.filter { $0 != .none }
+    }
+
+    func applyFavoriteIndices(_ favoriteIndices: [Int]) {
+        let favoriteSet = Set(favoriteIndices)
+        applyAudioModes(audioModes.map { mode in
+            BossAppleAudioModeConfig(
+                modeIndex: mode.modeIndex,
+                prompt: mode.prompt,
+                name: mode.name,
+                favorite: favoriteSet.contains(mode.modeIndex),
+                userConfigurable: mode.userConfigurable,
+                userConfigured: mode.userConfigured,
+                settings: mode.settings
+            )
+        })
+    }
+
+    func mergedAudioModes(with updatedMode: BossAppleAudioModeConfig) -> [BossAppleAudioModeConfig] {
+        var mergedModes = audioModes
+        if let existingIndex = mergedModes.firstIndex(where: { $0.modeIndex == updatedMode.modeIndex }) {
+            mergedModes[existingIndex] = updatedMode
+        } else {
+            mergedModes.append(updatedMode)
+            mergedModes.sort { $0.modeIndex < $1.modeIndex }
+        }
+        return mergedModes
     }
 
     func resolvedSavePrompt(for profileName: String) -> BossAppleAudioModePrompt {

@@ -7,11 +7,16 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
     var workspaceSnapshot: BossAppleWorkspaceSnapshot = .fixture()
     var workspaceSnapshotError: Error?
     var refreshModeWorkspaceSnapshotResult: BossAppleModeWorkspaceSnapshot = .fixture()
+    var audioModeConfigsResult: [BossAppleAudioModeConfig]?
+    var modeWorkspaceUpdateSnapshots: [BossAppleModeWorkspaceSnapshot] = []
     var supportedPrompts: [BossAppleAudioModePrompt] = [.quiet]
     var firmwareVersionInfo = BossAppleFirmwareVersionInfo(version: "1.0.0", port: 0)
     var currentAudioModeWriteResult: BossAppleCurrentAudioModeWriteResult = .unchanged(1)
     var audioModeSettingsWriteResult: BossAppleAudioModeSettingsWriteResult = .unchanged(.fixture())
     var equalizerWriteResult: BossAppleEqualizerWriteResult = .unchanged(.fixture())
+    var saveCustomAudioModeError: Error?
+    var savedCustomAudioModeResult: BossAppleAudioModeConfig?
+    var saveCustomAudioModeCalls: [SavedCustomModeCall] = []
     var closeCallCount = 0
     var setCurrentAudioModeCalls: [Int] = []
     var audioModeSettingsPatches: [BossAppleAudioModeSettingsConfigPatch] = []
@@ -33,6 +38,9 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
 
     func modeWorkspaceUpdates(interval: Duration) -> AsyncThrowingStream<BossAppleModeWorkspaceSnapshot, Error> {
         AsyncThrowingStream { continuation in
+            for snapshot in modeWorkspaceUpdateSnapshots {
+                continuation.yield(snapshot)
+            }
             continuation.finish()
         }
     }
@@ -42,7 +50,7 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
     }
 
     func audioModeConfigs() async throws -> [BossAppleAudioModeConfig] {
-        workspaceSnapshot.audioModes
+        audioModeConfigsResult ?? workspaceSnapshot.audioModes
     }
 
     func firmwareVersion(port: Int, deviceID: Int) async throws -> BossAppleFirmwareVersionInfo {
@@ -88,7 +96,16 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
         prompt: BossAppleAudioModePrompt,
         slot requestedSlot: Int?
     ) async throws -> BossAppleAudioModeConfig {
-        .fixture(
+        saveCustomAudioModeCalls.append(
+            SavedCustomModeCall(name: name, settings: settings, prompt: prompt, slot: requestedSlot)
+        )
+        if let saveCustomAudioModeError {
+            throw saveCustomAudioModeError
+        }
+        if let savedCustomAudioModeResult {
+            return savedCustomAudioModeResult
+        }
+        return BossAppleAudioModeConfig.fixture(
             modeIndex: requestedSlot ?? 10,
             name: name,
             prompt: prompt,
@@ -99,10 +116,21 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
     }
 }
 
+struct SavedCustomModeCall: Equatable {
+    let name: String
+    let settings: BossAppleAudioModeSettingsConfig
+    let prompt: BossAppleAudioModePrompt
+    let slot: Int?
+}
+
 extension BossAppleWorkspaceSnapshot {
     static func fixture(
         currentAudioModeIndex: Int = 1,
-        settings: BossAppleAudioModeSettingsConfig = .fixture()
+        settings: BossAppleAudioModeSettingsConfig = .fixture(),
+        audioModes: [BossAppleAudioModeConfig] = [
+            .fixture(modeIndex: 1, name: "Quiet", prompt: .quiet, settings: .fixture(cncLevel: 3)),
+            .fixture(modeIndex: 2, name: "Aware", prompt: .aware, settings: .fixture(cncLevel: 4)),
+        ]
     ) -> BossAppleWorkspaceSnapshot {
         BossAppleWorkspaceSnapshot(
             bootstrappedDevice: BossAppleBootstrappedDevice(
@@ -116,10 +144,7 @@ extension BossAppleWorkspaceSnapshot {
                 defaultPort: 0
             ),
             modeWorkspace: .fixture(currentAudioModeIndex: currentAudioModeIndex, settings: settings),
-            audioModes: [
-                .fixture(modeIndex: 1, name: "Quiet", prompt: .quiet, settings: .fixture(cncLevel: 3)),
-                .fixture(modeIndex: 2, name: "Aware", prompt: .aware, settings: .fixture(cncLevel: 4)),
-            ]
+            audioModes: audioModes
         )
     }
 }

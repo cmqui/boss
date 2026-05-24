@@ -54,34 +54,64 @@ extension BossAppViewModel {
                     mode: selectedMode,
                     draftSettings: draftSettings
                 ))
-                let saved = try await self.saveCustomModeSettingsSequentially(
-                    using: session,
-                    startingFrom: selectedMode,
-                    targetSettings: draftSettings
-                )
-                Self.log(self.debugSummary(
-                    "Custom mode save returned",
-                    selectedModeIndex: self.resolvedSelectedAudioModeIndex,
-                    currentModeIndex: self.currentAudioModeIndex,
-                    mode: saved,
-                    draftSettings: draftSettings,
-                    returnedSettings: saved.settings
-                ))
-                self.applySettingsSnapshot(saved.settings)
-                self.selectedAudioModeIndex = saved.modeIndex
+                do {
+                    let saved = try await self.saveCustomModeSettingsSequentially(
+                        using: session,
+                        startingFrom: selectedMode,
+                        targetSettings: draftSettings
+                    )
+                    Self.log(self.debugSummary(
+                        "Custom mode save returned",
+                        selectedModeIndex: self.resolvedSelectedAudioModeIndex,
+                        currentModeIndex: self.currentAudioModeIndex,
+                        mode: saved,
+                        draftSettings: draftSettings,
+                        returnedSettings: saved.settings
+                    ))
+                    self.applySettingsSnapshot(saved.settings)
+                    self.selectedAudioModeIndex = saved.modeIndex
 
-                var updatedModes = self.audioModes
-                if let existingIndex = updatedModes.firstIndex(where: { $0.modeIndex == saved.modeIndex }) {
-                    updatedModes[existingIndex] = saved
-                    self.applyAudioModes(updatedModes)
-                } else {
-                    self.applyAudioModes(try await session.audioModeConfigs())
-                }
+                    var updatedModes = self.audioModes
+                    if let existingIndex = updatedModes.firstIndex(where: { $0.modeIndex == saved.modeIndex }) {
+                        updatedModes[existingIndex] = saved
+                        self.applyAudioModes(updatedModes)
+                    } else {
+                        self.applyAudioModes(try await session.audioModeConfigs())
+                    }
 
-                if saved.settings == draftSettings {
-                    self.lastResultMessage = "Updated \"\(self.customProfileDisplayName(for: saved))\""
-                } else {
-                    self.lastResultMessage = "Updated \"\(self.customProfileDisplayName(for: saved))\", but firmware normalized the settings"
+                    if saved.settings == draftSettings {
+                        self.lastResultMessage = "Updated \"\(self.customProfileDisplayName(for: saved))\""
+                    } else {
+                        self.lastResultMessage = "Updated \"\(self.customProfileDisplayName(for: saved))\", but firmware normalized the settings"
+                    }
+                } catch {
+                    guard self.isCustomAudioModeSlotNotEditableError(error),
+                          selectedMode.modeIndex == self.currentAudioModeIndex else {
+                        throw error
+                    }
+
+                    Self.log(self.debugSummary(
+                        "Custom mode save failed; retrying as live current-mode settings write",
+                        selectedModeIndex: selectedMode.modeIndex,
+                        currentModeIndex: self.currentAudioModeIndex,
+                        mode: selectedMode,
+                        draftSettings: draftSettings
+                    ) + " error=\(Self.describe(error))")
+
+                    let liveResult = try await self.writeLiveModeSettings(
+                        using: session,
+                        draftSettings: draftSettings
+                    )
+                    try await self.reloadModeWorkspace(using: session)
+                    let refreshedModes = try await session.audioModeConfigs()
+                    self.applyAudioModes(refreshedModes)
+
+                    if let refreshedMode = refreshedModes.first(where: { $0.modeIndex == selectedMode.modeIndex }),
+                       refreshedMode.settings == draftSettings {
+                        self.lastResultMessage = "Updated \"\(self.customProfileDisplayName(for: refreshedMode))\" after live fallback"
+                    } else {
+                        self.lastResultMessage = "\(liveResult); current mode updated, but the saved profile may not have persisted this change"
+                    }
                 }
             } else {
                 let targetModeIndex = self.resolvedSelectedAudioModeIndex
@@ -98,51 +128,16 @@ extension BossAppViewModel {
                     self.selectedAudioModeIndex = targetModeIndex
                 }
 
-                let patch = BossAppleAudioModeSettingsConfigPatch(
-                    cncLevel: self.rawCNCLevel(fromDisplay: self.cncLevel),
-                    spatialAudioMode: self.spatialAudioMode,
-                    windBlockEnabled: self.windBlockEnabled,
-                    ancToggleEnabled: self.ancToggleEnabled
-                )
                 Self.log(self.debugSummary(
                     "Writing live mode settings patch",
                     selectedModeIndex: self.resolvedSelectedAudioModeIndex,
                     currentModeIndex: self.currentAudioModeIndex,
                     draftSettings: draftSettings
                 ))
-                let result = try await session.setAudioModeSettings(patch)
-                switch result {
-                case .unchanged(let config):
-                    Self.log(self.debugSummary(
-                        "Live mode settings returned unchanged",
-                        selectedModeIndex: self.resolvedSelectedAudioModeIndex,
-                        currentModeIndex: self.currentAudioModeIndex,
-                        draftSettings: draftSettings,
-                        returnedSettings: config
-                    ))
-                    self.applySettingsSnapshot(config)
-                    self.lastResultMessage = "Mode settings unchanged"
-                case .updated(let config):
-                    Self.log(self.debugSummary(
-                        "Live mode settings returned updated",
-                        selectedModeIndex: self.resolvedSelectedAudioModeIndex,
-                        currentModeIndex: self.currentAudioModeIndex,
-                        draftSettings: draftSettings,
-                        returnedSettings: config
-                    ))
-                    self.applySettingsSnapshot(config)
-                    self.lastResultMessage = "Mode settings updated"
-                case .verificationInconclusive(let config):
-                    Self.log(self.debugSummary(
-                        "Live mode settings verification inconclusive",
-                        selectedModeIndex: self.resolvedSelectedAudioModeIndex,
-                        currentModeIndex: self.currentAudioModeIndex,
-                        draftSettings: draftSettings,
-                        returnedSettings: config
-                    ))
-                    self.applySettingsSnapshot(config)
-                    self.lastResultMessage = "Mode settings verification was inconclusive"
-                }
+                self.lastResultMessage = try await self.writeLiveModeSettings(
+                    using: session,
+                    draftSettings: draftSettings
+                )
             }
         }
     }
@@ -176,6 +171,66 @@ extension BossAppViewModel {
             }
 
             try await self.reloadModeWorkspace(using: session)
+        }
+    }
+
+    func writeLiveModeSettings(
+        using session: any BossAppSessioning,
+        draftSettings: BossAppleAudioModeSettingsConfig
+    ) async throws -> String {
+        let patch = BossAppleAudioModeSettingsConfigPatch(
+            cncLevel: rawCNCLevel(fromDisplay: cncLevel),
+            spatialAudioMode: spatialAudioMode,
+            windBlockEnabled: windBlockEnabled,
+            ancToggleEnabled: ancToggleEnabled
+        )
+        let result = try await session.setAudioModeSettings(patch)
+        switch result {
+        case .unchanged(let config):
+            Self.log(debugSummary(
+                "Live mode settings returned unchanged",
+                selectedModeIndex: resolvedSelectedAudioModeIndex,
+                currentModeIndex: currentAudioModeIndex,
+                draftSettings: draftSettings,
+                returnedSettings: config
+            ))
+            applySettingsSnapshot(config)
+            return "Mode settings unchanged"
+        case .updated(let config):
+            Self.log(debugSummary(
+                "Live mode settings returned updated",
+                selectedModeIndex: resolvedSelectedAudioModeIndex,
+                currentModeIndex: currentAudioModeIndex,
+                draftSettings: draftSettings,
+                returnedSettings: config
+            ))
+            applySettingsSnapshot(config)
+            return "Mode settings updated"
+        case .verificationInconclusive(let config):
+            Self.log(debugSummary(
+                "Live mode settings verification inconclusive",
+                selectedModeIndex: resolvedSelectedAudioModeIndex,
+                currentModeIndex: currentAudioModeIndex,
+                draftSettings: draftSettings,
+                returnedSettings: config
+            ))
+            applySettingsSnapshot(config)
+            return "Mode settings verification was inconclusive"
+        }
+    }
+
+    func isCustomAudioModeSlotNotEditableError(_ error: Error) -> Bool {
+        guard let controlError = error as? BossAppleControlError else {
+            return false
+        }
+        switch controlError {
+        case .customAudioModeSlotNotEditable:
+            return true
+        case .unsupportedOperation(let message):
+            return message.contains("CustomAudioModeSlotNotEditable")
+                || message.localizedCaseInsensitiveContains("slot is not editable")
+        default:
+            return false
         }
     }
 
@@ -295,6 +350,7 @@ extension BossAppViewModel {
     func reloadModeWorkspace(using session: any BossAppSessioning) async throws {
         let snapshot = try await session.refreshModeWorkspaceSnapshot()
         currentAudioModeIndex = snapshot.currentAudioModeIndex
+        syncSelectedAudioModeToCurrentModeIfNeeded()
         Self.log(debugSummary(
             "Reloaded mode workspace snapshot",
             selectedModeIndex: selectedAudioModeIndex,
@@ -344,7 +400,8 @@ extension BossAppViewModel {
 
         if !hasDetachedSettingsDraft,
            let selectedModeConfig,
-           selectedModeConfig.modeIndex != currentAudioModeIndex {
+           let knownCurrentModeIndex,
+           selectedModeConfig.modeIndex != knownCurrentModeIndex {
             Self.log(debugSummary(
                 "Applying selected mode settings from catalog",
                 selectedModeIndex: selectedAudioModeIndex,
@@ -356,9 +413,19 @@ extension BossAppViewModel {
         }
     }
 
+    func syncSelectedAudioModeToCurrentModeIfNeeded() {
+        guard !hasDetachedSettingsDraft,
+              let knownCurrentModeIndex,
+              selectableAudioModes.contains(where: { $0.modeIndex == knownCurrentModeIndex }) else {
+            return
+        }
+        selectedAudioModeIndex = knownCurrentModeIndex
+    }
+
     func applyDisplayedModeSettings(liveConfig: BossAppleAudioModeSettingsConfig) {
         if let selectedModeConfig,
-           selectedModeConfig.modeIndex != currentAudioModeIndex {
+           let knownCurrentModeIndex,
+           selectedModeConfig.modeIndex != knownCurrentModeIndex {
             Self.log(debugSummary(
                 "Ignoring live settings in favor of selected catalog mode",
                 selectedModeIndex: selectedAudioModeIndex,
@@ -377,6 +444,14 @@ extension BossAppViewModel {
             liveSettings: liveConfig
         ))
         applySettingsSnapshot(liveConfig)
+    }
+
+    var knownCurrentModeIndex: Int? {
+        guard let currentAudioModeIndex,
+              audioModes.contains(where: { $0.modeIndex == currentAudioModeIndex }) else {
+            return nil
+        }
+        return currentAudioModeIndex
     }
 
     func noteManualSettingsEdit() {

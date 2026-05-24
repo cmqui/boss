@@ -288,11 +288,9 @@ struct ContentView: View {
                 Text(label)
             }
             .foregroundStyle(.secondary)
-        case .failed:
-            Label(
-                "Operation failed. Check console output.", systemImage: "exclamationmark.triangle"
-            )
-            .foregroundStyle(.red)
+        case .failed(let message):
+            Label(message, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.red)
         case .ready:
             Label("Connected", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
@@ -671,11 +669,9 @@ private struct SidebarDeviceHeader: View {
                 Text(label)
             }
             .foregroundStyle(palette.secondaryText)
-        case .failed:
-            Label(
-                "Operation failed. Check console output.", systemImage: "exclamationmark.triangle"
-            )
-            .foregroundStyle(.red)
+        case .failed(let message):
+            Label(message, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.red)
         case .ready:
             Label("Connected", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)

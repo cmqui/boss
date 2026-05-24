@@ -39,6 +39,7 @@ swift run bossctl audio-mode get current --name Bose
 swift run bossctl audio-mode set current --index 1 --name Bose
 swift run bossctl audio-mode get settings-config --name Bose
 swift run bossctl audio-mode set settings-config --cnc 5 --spatial off --wind-block false --anc-toggle true --name Bose
+swift run bossctl audio-mode delete --index 7 --name Bose
 ```
 
 ## Notes

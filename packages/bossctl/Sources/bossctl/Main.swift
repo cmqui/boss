@@ -134,8 +134,16 @@ struct BossctlCLI {
                 for mode in modes {
                     let currentMarker = mode.modeIndex == currentIndex ? "*" : " "
                     let favoriteMarker = mode.favorite ? " favorite" : ""
-                    let customMarker = mode.userConfigured ? " user-configured" : (mode.userConfigurable ? " user-configurable" : "")
-                    print("\(currentMarker) \(mode.modeIndex): \(mode.name)\(favoriteMarker)\(customMarker)")
+                    let customMarker: String
+                    let displayName: String
+                    if mode.userConfigurable && mode.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        displayName = "<empty custom slot>"
+                        customMarker = " reusable-custom-slot"
+                    } else {
+                        displayName = mode.name
+                        customMarker = mode.userConfigured ? " user-configured" : (mode.userConfigurable ? " user-configurable" : "")
+                    }
+                    print("\(currentMarker) \(mode.modeIndex): \(displayName)\(favoriteMarker)\(customMarker)")
                 }
 
             case .getCurrent:
@@ -180,6 +188,15 @@ struct BossctlCLI {
                 let action = isFavorite ? "favorited" : "unfavorited"
                 print("Audio mode \(targetIndex) \(action)")
                 printFavoriteAudioModes(favorites, modes: modes)
+
+            case .delete(let selection):
+                let targetIndex = try await resolveAudioModeSelection(selection, controller: controller)
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                let deleted = try await session.deleteCustomAudioMode(slot: targetIndex)
+                let displayName = deleted.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? "<empty custom slot>"
+                    : deleted.name
+                print("Deleted audio mode \(targetIndex): \(displayName)")
             }
         }
     }

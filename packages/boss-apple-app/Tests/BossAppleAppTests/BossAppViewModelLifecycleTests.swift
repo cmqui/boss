@@ -45,6 +45,40 @@ final class BossAppViewModelLifecycleTests: XCTestCase {
         XCTAssertNil(viewModel.session)
         XCTAssertEqual(session.closeCallCount, 1)
     }
+
+    func testBackgroundHardwareModeChangeReselectsCurrentModeWhenNotEditingDraft() async throws {
+        let session = FakeBossAppSession()
+        let deviceModes = [
+            BossAppleAudioModeConfig.fixture(
+                modeIndex: 0,
+                name: "Quiet",
+                prompt: .quiet,
+                settings: .fixture(cncLevel: 4)
+            ),
+            BossAppleAudioModeConfig.fixture(
+                modeIndex: 6,
+                name: "Aware",
+                prompt: .aware,
+                settings: .fixture(cncLevel: 3)
+            ),
+        ]
+        session.workspaceSnapshot = .fixture(currentAudioModeIndex: 6, audioModes: deviceModes)
+        session.modeWorkspaceUpdateSnapshots = [
+            .fixture(currentAudioModeIndex: 0, settings: .fixture(cncLevel: 4))
+        ]
+        session.refreshModeWorkspaceSnapshotResult = .fixture(currentAudioModeIndex: 0, settings: .fixture(cncLevel: 4))
+
+        let viewModel = BossAppViewModel(sessionFactory: { _ in session })
+
+        viewModel.refresh()
+        await waitUntil { viewModel.loadState == .ready }
+        await waitUntil { viewModel.currentAudioModeIndex == 0 }
+
+        XCTAssertEqual(viewModel.selectedAudioModeIndex, 0)
+        XCTAssertEqual(viewModel.resolvedSelectedAudioModeIndex, 0)
+        XCTAssertEqual(viewModel.lastResultMessage, "Mode changed on device; controls refreshed")
+        XCTAssertFalse(viewModel.hasDetachedSettingsDraft)
+    }
 }
 
 private extension BossAppViewModelLifecycleTests {

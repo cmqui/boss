@@ -90,6 +90,57 @@ final class BossAppleSessionPublicApiTests: XCTestCase {
         XCTAssertEqual(writes.equalizerPatch, equalizerPatch)
     }
 
+    func testCurrentAudioModeReusesLastKnownValueWhenOverrideReturns255() async throws {
+        let counter = CallCounter()
+        var overrides = BossAppleSessionOperationOverrides()
+        overrides.currentAudioMode = {
+            let invocation = await counter.nextValue()
+            return invocation == 1 ? 6 : 255
+        }
+
+        let session = BossAppleSession(operationOverrides: overrides)
+
+        let first = try await session.currentAudioMode()
+        let second = try await session.currentAudioMode()
+
+        XCTAssertEqual(first, 6)
+        XCTAssertEqual(second, 6)
+    }
+
+    func testRefreshModeWorkspaceSnapshotReusesLastKnownValueWhenOverrideReturns255() async throws {
+        let counter = CallCounter()
+        let settings = sampleAudioModeSettingsConfig()
+        let equalizer = sampleEqualizerSettings()
+        let deviceSettings = sampleDeviceSettingsReport()
+        var overrides = BossAppleSessionOperationOverrides()
+        overrides.refreshModeWorkspaceSnapshot = {
+            let invocation = await counter.nextValue()
+            return BossAppleModeWorkspaceSnapshot(
+                currentAudioModeIndex: invocation == 1 ? 6 : 255,
+                settings: settings,
+                equalizer: equalizer,
+                deviceSettings: deviceSettings
+            )
+        }
+
+        let session = BossAppleSession(operationOverrides: overrides)
+        let first = try await session.refreshModeWorkspaceSnapshot()
+        let second = try await session.refreshModeWorkspaceSnapshot()
+
+        XCTAssertEqual(first.currentAudioModeIndex, 6)
+        XCTAssertEqual(second.currentAudioModeIndex, 6)
+    }
+
+    func testCurrentAudioModeUpdateStreamReusesLastKnownValueWhenStreamYields255() async throws {
+        var overrides = BossAppleSessionOperationOverrides()
+        overrides.currentAudioModeUpdateStream = { makeStream(elements: [6, 255, 6]) }
+
+        let session = BossAppleSession(operationOverrides: overrides)
+        let updates = try await collect(session.currentAudioModeUpdateStream())
+
+        XCTAssertEqual(updates, [6, 6, 6])
+    }
+
     func testFavoritesOperationsCoverReadSetAndSingleModeFavoritePaths() async throws {
         let recorder = FavoritesRecorder()
         var overrides = BossAppleSessionOperationOverrides()
@@ -312,6 +363,23 @@ private extension BossAppleSessionPublicApiTests {
             ]
         )
     }
+
+    func sampleDeviceSettingsReport() -> BossAppleDeviceSettingsReport {
+        BossAppleDeviceSettingsReport(
+            wearDetection: BossAppleObservedSetting(
+                value: BossAppleOnHeadDetectionValue(
+                    isEnabled: true,
+                    isAutoPlayEnabled: true,
+                    isAutoAnswerEnabled: false,
+                    isAutoTransparencyEnabled: nil
+                )
+            ),
+            autoAwareEnabled: BossAppleObservedSetting(value: true),
+            autoPlayPauseEnabled: BossAppleObservedSetting(value: true),
+            autoAnswerEnabled: BossAppleObservedSetting(value: false),
+            volumeControl: BossAppleObservedSetting(value: BossAppleVolumeControlStatus(value: .button))
+        )
+    }
 }
 
 private actor CallCounter {
@@ -323,6 +391,11 @@ private actor CallCounter {
 
     func currentValue() -> Int {
         value
+    }
+
+    func nextValue() -> Int {
+        value += 1
+        return value
     }
 }
 

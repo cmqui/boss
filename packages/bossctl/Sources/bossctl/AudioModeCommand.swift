@@ -104,6 +104,11 @@ struct AudioModeCommand {
             let selection = try parser.requiredAudioModeSelection()
             let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
             return AudioModeCommand(connection: connection, action: .setFavorite(selection: selection, isFavorite: false))
+        case "delete":
+            var parser = ArgumentParser(arguments: args)
+            let selection = try parser.requiredAudioModeSelection()
+            let connection = try ConnectionOptions.parse(arguments: parser.remainingArguments())
+            return AudioModeCommand(connection: connection, action: .delete(selection: selection))
         default:
             throw UsageError(Command.usage)
         }
@@ -118,6 +123,7 @@ enum AudioModeAction {
     case setSettingsConfig(BossAppleAudioModeSettingsConfigPatch, output: AudioModeSettingsOutput)
     case getFavorites
     case setFavorite(selection: AudioModeSelection, isFavorite: Bool)
+    case delete(selection: AudioModeSelection)
 }
 
 enum AudioModeSelection {

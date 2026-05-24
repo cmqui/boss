@@ -123,6 +123,28 @@ final class CommandParsingTests: XCTestCase {
         }
     }
 
+    func testAudioModeDeleteParsesSelectionByIndex() throws {
+        let command = try Command.parse(arguments: [
+            "audio-mode",
+            "delete",
+            "--index", "7",
+        ])
+
+        guard case .audioMode(let audioMode) = command else {
+            return XCTFail("Expected audio-mode command")
+        }
+
+        guard case .delete(let selection) = audioMode.action else {
+            return XCTFail("Expected delete action")
+        }
+
+        guard case .index(let index) = selection else {
+            return XCTFail("Expected index selection")
+        }
+
+        XCTAssertEqual(index, 7)
+    }
+
     func testSettingsRejectsUnsupportedVolumeControlMode() {
         XCTAssertThrowsError(try Command.parse(arguments: [
             "settings",

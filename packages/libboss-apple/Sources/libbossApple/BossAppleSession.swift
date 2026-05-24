@@ -37,6 +37,7 @@ public struct BossAppleWorkspaceSnapshot: Sendable, Equatable {
 
 struct BossAppleSessionOperationOverrides: Sendable {
     var bootstrap: (@Sendable () async throws -> BossAppleBootstrappedDevice)?
+    var refreshModeWorkspaceSnapshot: (@Sendable () async throws -> BossAppleModeWorkspaceSnapshot)?
     var currentAudioModeUpdateStream: (@Sendable () -> AsyncThrowingStream<Int, Error>)?
     var audioModeSettingsUpdateStream: (@Sendable () -> AsyncThrowingStream<BossAppleAudioModeSettingsConfig, Error>)?
     var equalizerUpdateStream: (@Sendable () -> AsyncThrowingStream<BossAppleEqualizerSettings, Error>)?
@@ -56,6 +57,8 @@ struct BossAppleSessionOperationOverrides: Sendable {
 }
 
 public actor BossAppleSession {
+    private static let unknownCurrentAudioModeIndex = 255
+
     private struct ConnectedLink {
         let transport: AppleBleBossTransport
         let preference: AppleBossCharacteristicPreference
@@ -73,6 +76,7 @@ public actor BossAppleSession {
     private let rustBridgeProvider: @Sendable () -> BossRustSessionBridge?
     private var connectedLink: ConnectedLink?
     private var cachedBootstrappedDevice: BossAppleBootstrappedDevice?
+    private var lastKnownCurrentAudioModeIndex: Int?
 
     public init(connection: BossAppleConnectionOptions = BossAppleConnectionOptions()) {
         self.connection = connection
@@ -139,10 +143,14 @@ public actor BossAppleSession {
     }
 
     public func refreshModeWorkspaceSnapshot() async throws -> BossAppleModeWorkspaceSnapshot {
+        if let override = operationOverrides?.refreshModeWorkspaceSnapshot {
+            return normalize(try await override())
+        }
         let rustBridge = try requireRustBridge()
-        return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+        let snapshot = try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.refreshModeWorkspaceSnapshot(on: transport)
         }
+        return normalize(snapshot)
     }
 
     func settingsSnapshot() async throws -> BossAppleSettingsSnapshot {
@@ -177,16 +185,46 @@ public actor BossAppleSession {
     }
 
     public func currentAudioModeUpdateStream() -> AsyncThrowingStream<Int, Error> {
+        let session = self
         if let override = operationOverrides?.currentAudioModeUpdateStream {
-            return override()
+            return AsyncThrowingStream { continuation in
+                let task = Task {
+                    do {
+                        for try await value in override() {
+                            continuation.yield(await session.normalizeCurrentAudioModeIndex(value))
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+                continuation.onTermination = { _ in
+                    task.cancel()
+                }
+            }
         }
         guard let rustBridge = rustBridgeProvider() else {
             return Self.rustRequiredStream()
         }
-        return reconnectingRustStream(
+        let baseStream = reconnectingRustStream(
             initial: { try await self.readCurrentAudioMode() }
         ) { transport in
             rustBridge.currentAudioModeUpdateStream(on: transport)
+        }
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for try await value in baseStream {
+                        continuation.yield(await session.normalizeCurrentAudioModeIndex(value))
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
         }
     }
 
@@ -299,7 +337,7 @@ public actor BossAppleSession {
     }
 
     public func currentAudioMode() async throws -> Int {
-        try await readCurrentAudioMode()
+        normalizeCurrentAudioModeIndex(try await readCurrentAudioMode())
     }
 
     public func audioModeSettings() async throws -> BossAppleAudioModeSettingsConfig {
@@ -379,16 +417,20 @@ public actor BossAppleSession {
         playVoicePrompt: Bool = false
     ) async throws -> BossAppleCurrentAudioModeWriteResult {
         if let override = operationOverrides?.setCurrentAudioMode {
-            return try await override(targetIndex, playVoicePrompt)
+            let result = try await override(targetIndex, playVoicePrompt)
+            recordCurrentAudioModeWriteResult(result)
+            return result
         }
         let rustBridge = try requireRustBridge()
-        return try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
+        let result = try await withRustBleTransportRetrying(preferredPreferences: [.secure, .unsecure]) { transport in
             try await rustBridge.setCurrentAudioMode(
                 on: transport,
                 targetIndex: targetIndex,
                 playVoicePrompt: playVoicePrompt
             )
         }
+        recordCurrentAudioModeWriteResult(result)
+        return result
     }
 
     public func setAudioModeSettings(
@@ -653,6 +695,32 @@ public actor BossAppleSession {
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
             try await rustBridge.currentAudioMode(on: transport)
+        }
+    }
+
+    private func normalize(_ snapshot: BossAppleModeWorkspaceSnapshot) -> BossAppleModeWorkspaceSnapshot {
+        BossAppleModeWorkspaceSnapshot(
+            currentAudioModeIndex: normalizeCurrentAudioModeIndex(snapshot.currentAudioModeIndex),
+            settings: snapshot.settings,
+            equalizer: snapshot.equalizer,
+            deviceSettings: snapshot.deviceSettings
+        )
+    }
+
+    private func normalizeCurrentAudioModeIndex(_ index: Int) -> Int {
+        guard index == Self.unknownCurrentAudioModeIndex else {
+            lastKnownCurrentAudioModeIndex = index
+            return index
+        }
+        return lastKnownCurrentAudioModeIndex ?? index
+    }
+
+    private func recordCurrentAudioModeWriteResult(_ result: BossAppleCurrentAudioModeWriteResult) {
+        switch result {
+        case .unchanged(let index), .updated(let index):
+            _ = normalizeCurrentAudioModeIndex(index)
+        case .verificationInconclusive:
+            break
         }
     }
 

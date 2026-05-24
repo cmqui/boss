@@ -52,6 +52,7 @@ enum Command {
       bossctl audio-mode favorites [connection options]
       bossctl audio-mode favorite (--index <n> | --mode <name>) [connection options]
       bossctl audio-mode unfavorite (--index <n> | --mode <name>) [connection options]
+      bossctl audio-mode delete (--index <n> | --mode <name>) [connection options]
 
     Connection options:
       --name <substring>

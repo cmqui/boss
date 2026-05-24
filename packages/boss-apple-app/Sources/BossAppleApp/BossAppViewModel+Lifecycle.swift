@@ -143,6 +143,7 @@ extension BossAppViewModel {
 
                         let modeChanged = self.currentAudioModeIndex != snapshot.currentAudioModeIndex
                         self.currentAudioModeIndex = snapshot.currentAudioModeIndex
+                        self.syncSelectedAudioModeToCurrentModeIfNeeded()
                         Self.log(self.debugSummary(
                             "Mode workspace poll update",
                             selectedModeIndex: self.selectedAudioModeIndex,
@@ -247,6 +248,18 @@ extension BossAppViewModel {
     }
 
     static func describe(_ error: Error) -> String {
+        if let controlError = error as? BossAppleControlError {
+            switch controlError {
+            case .noFreeCustomAudioModeSlot:
+                return "No free custom profile slots are available on the device. Delete an existing custom profile or overwrite one instead."
+            case .customAudioModeSlotNotEditable(let slot):
+                return "Custom profile slot \(slot) is not editable."
+            case .customAudioModeSlotNotFound(let slot):
+                return "Custom profile slot \(slot) was not found on the device."
+            default:
+                break
+            }
+        }
         if let localizedError = error as? LocalizedError,
            let description = localizedError.errorDescription {
             return description
