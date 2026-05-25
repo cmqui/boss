@@ -939,7 +939,7 @@ mod tests {
     #[test]
     fn boss_session_set_current_audio_mode_returns_unchanged_when_already_selected() {
         block_on(async {
-            let current_packet = BmapPacket::new(
+            let start_response = BmapPacket::new(
                 BmapFunctionBlock::AudioModes,
                 BmapFunction::Unknown {
                     block: BmapFunctionBlock::AudioModes,
@@ -947,32 +947,21 @@ mod tests {
                 },
                 0,
                 0,
-                BmapOperator::Status,
+                BmapOperator::Result,
                 vec![0x02],
             );
             let session = BossSession::new(PacketSession::new(MockLink::new(vec![Ok(Some(
-                current_packet,
+                start_response,
             ))])));
 
             let result = session.set_current_audio_mode(2, false).await.unwrap();
-            assert_eq!(result, BossCurrentAudioModeWriteResult::Unchanged(2));
+            assert_eq!(result, BossCurrentAudioModeWriteResult::Updated(2));
         });
     }
 
     #[test]
     fn boss_session_set_current_audio_mode_returns_updated_from_start_response() {
         block_on(async {
-            let current_packet = BmapPacket::new(
-                BmapFunctionBlock::AudioModes,
-                BmapFunction::Unknown {
-                    block: BmapFunctionBlock::AudioModes,
-                    raw_value: BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
-                },
-                0,
-                0,
-                BmapOperator::Status,
-                vec![0x01],
-            );
             let start_response = BmapPacket::new(
                 BmapFunctionBlock::AudioModes,
                 BmapFunction::Unknown {
@@ -984,10 +973,9 @@ mod tests {
                 BmapOperator::Result,
                 vec![0x03],
             );
-            let session = BossSession::new(PacketSession::new(MockLink::new(vec![
-                Ok(Some(current_packet)),
-                Ok(Some(start_response)),
-            ])));
+            let session = BossSession::new(PacketSession::new(MockLink::new(vec![Ok(Some(
+                start_response,
+            ))])));
 
             let result = session.set_current_audio_mode(3, true).await.unwrap();
             assert_eq!(result, BossCurrentAudioModeWriteResult::Updated(3));
@@ -995,9 +983,9 @@ mod tests {
     }
 
     #[test]
-    fn boss_session_set_current_audio_mode_verifies_after_recoverable_failure() {
+    fn latency_profile_current_audio_mode_fast_path_packet_budget() {
         block_on(async {
-            let initial_current = BmapPacket::new(
+            let start_response = BmapPacket::new(
                 BmapFunctionBlock::AudioModes,
                 BmapFunction::Unknown {
                     block: BmapFunctionBlock::AudioModes,
@@ -1005,9 +993,23 @@ mod tests {
                 },
                 0,
                 0,
-                BmapOperator::Status,
-                vec![0x01],
+                BmapOperator::Result,
+                vec![0x03],
             );
+            let link = MockLink::new(vec![Ok(Some(start_response))]);
+            let session = BossSession::new(PacketSession::new(link.clone()));
+
+            let result = session.set_current_audio_mode(3, false).await.unwrap();
+
+            assert_eq!(result, BossCurrentAudioModeWriteResult::Updated(3));
+            assert_eq!(link.sent_packets().len(), 1);
+            assert_eq!(link.next_packet_call_count(), 1);
+        });
+    }
+
+    #[test]
+    fn boss_session_set_current_audio_mode_verifies_after_recoverable_failure() {
+        block_on(async {
             let verified_current = BmapPacket::new(
                 BmapFunctionBlock::AudioModes,
                 BmapFunction::Unknown {
@@ -1020,13 +1022,37 @@ mod tests {
                 vec![0x03],
             );
             let session = BossSession::new(PacketSession::new(MockLink::new(vec![
-                Ok(Some(initial_current)),
                 Err(crate::BossLinkError::TimedOut),
                 Ok(Some(verified_current)),
             ])));
 
             let result = session.set_current_audio_mode(3, false).await.unwrap();
             assert_eq!(result, BossCurrentAudioModeWriteResult::Updated(3));
+        });
+    }
+
+    #[test]
+    fn latency_profile_current_audio_mode_recovery_packet_budget() {
+        block_on(async {
+            let verified_current = BmapPacket::new(
+                BmapFunctionBlock::AudioModes,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::AudioModes,
+                    raw_value: BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Status,
+                vec![0x03],
+            );
+            let link = MockLink::new(vec![Err(crate::BossLinkError::TimedOut), Ok(Some(verified_current))]);
+            let session = BossSession::new(PacketSession::new(link.clone()));
+
+            let result = session.set_current_audio_mode(3, false).await.unwrap();
+
+            assert_eq!(result, BossCurrentAudioModeWriteResult::Updated(3));
+            assert_eq!(link.sent_packets().len(), 2);
+            assert_eq!(link.next_packet_call_count(), 2);
         });
     }
 
@@ -1252,17 +1278,6 @@ mod tests {
     fn boss_session_set_current_audio_mode_returns_verification_inconclusive_when_target_is_not_observed(
     ) {
         block_on(async {
-            let initial_current = BmapPacket::new(
-                BmapFunctionBlock::AudioModes,
-                BmapFunction::Unknown {
-                    block: BmapFunctionBlock::AudioModes,
-                    raw_value: BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
-                },
-                0,
-                0,
-                BmapOperator::Status,
-                vec![0x01],
-            );
             let observed_current = BmapPacket::new(
                 BmapFunctionBlock::AudioModes,
                 BmapFunction::Unknown {
@@ -1275,7 +1290,6 @@ mod tests {
                 vec![0x02],
             );
             let session = BossSession::new(PacketSession::new(MockLink::new(vec![
-                Ok(Some(initial_current)),
                 Err(crate::BossLinkError::TimedOut),
                 Ok(Some(observed_current.clone())),
                 Ok(Some(observed_current.clone())),
@@ -1288,6 +1302,40 @@ mod tests {
                 result,
                 BossCurrentAudioModeWriteResult::VerificationInconclusive { target_index: 3 }
             );
+        });
+    }
+
+    #[test]
+    fn latency_profile_current_audio_mode_inconclusive_packet_budget() {
+        block_on(async {
+            let observed_current = BmapPacket::new(
+                BmapFunctionBlock::AudioModes,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::AudioModes,
+                    raw_value: BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Status,
+                vec![0x02],
+            );
+            let link = MockLink::new(vec![
+                Err(crate::BossLinkError::TimedOut),
+                Ok(Some(observed_current.clone())),
+                Ok(Some(observed_current.clone())),
+                Ok(Some(observed_current.clone())),
+                Ok(Some(observed_current)),
+            ]);
+            let session = BossSession::new(PacketSession::new(link.clone()));
+
+            let result = session.set_current_audio_mode(3, false).await.unwrap();
+
+            assert_eq!(
+                result,
+                BossCurrentAudioModeWriteResult::VerificationInconclusive { target_index: 3 }
+            );
+            assert_eq!(link.sent_packets().len(), 5);
+            assert_eq!(link.next_packet_call_count(), 5);
         });
     }
 
@@ -1352,6 +1400,64 @@ mod tests {
                     anc_toggle_enabled: false,
                 })
             );
+        });
+    }
+
+    #[test]
+    fn latency_profile_audio_mode_settings_recovery_packet_budget() {
+        block_on(async {
+            let current_packet = BmapPacket::new(
+                BmapFunctionBlock::AudioModes,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::AudioModes,
+                    raw_value: BossAudioModesCodec::SETTINGS_CONFIG_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Status,
+                vec![0x05, 0x01, 0x02, 0x00, 0x00],
+            );
+            let busy_packet = BmapPacket::new(
+                BmapFunctionBlock::AudioModes,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::AudioModes,
+                    raw_value: BossAudioModesCodec::SETTINGS_CONFIG_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Error,
+                vec![BmapErrorCode::Busy as u8],
+            );
+            let verified_packet = BmapPacket::new(
+                BmapFunctionBlock::AudioModes,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::AudioModes,
+                    raw_value: BossAudioModesCodec::SETTINGS_CONFIG_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Status,
+                vec![0x07, 0x01, 0x02, 0x01, 0x00],
+            );
+            let link = MockLink::new(vec![
+                Ok(Some(current_packet)),
+                Ok(Some(busy_packet)),
+                Ok(Some(verified_packet)),
+            ]);
+            let session = BossSession::new(PacketSession::new(link.clone()));
+
+            let result = session
+                .set_audio_mode_settings(BossAudioModeSettingsConfigPatch {
+                    cnc_level: Some(7),
+                    wind_block_enabled: Some(true),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+
+            assert!(matches!(result, BossAudioModeSettingsWriteResult::Updated(_)));
+            assert_eq!(link.sent_packets().len(), 3);
+            assert_eq!(link.next_packet_call_count(), 3);
         });
     }
 
@@ -1497,6 +1603,68 @@ mod tests {
                 }
                 other => panic!("unexpected result: {other:?}"),
             }
+        });
+    }
+
+    #[test]
+    fn latency_profile_equalizer_recovery_packet_budget() {
+        block_on(async {
+            let current_packet = BmapPacket::new(
+                BmapFunctionBlock::Settings,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::Settings,
+                    raw_value: BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Status,
+                vec![
+                    0xF6, 0x0A, 0x00, 0x00, 0xF6, 0x0A, 0x00, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
+            );
+            let busy_packet = BmapPacket::new(
+                BmapFunctionBlock::Settings,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::Settings,
+                    raw_value: BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Error,
+                vec![BmapErrorCode::Busy as u8],
+            );
+            let verified_packet = BmapPacket::new(
+                BmapFunctionBlock::Settings,
+                BmapFunction::Unknown {
+                    block: BmapFunctionBlock::Settings,
+                    raw_value: BossSettingsCodec::RANGE_CONTROL_FUNCTION_RAW,
+                },
+                0,
+                0,
+                BmapOperator::Status,
+                vec![
+                    0xF6, 0x0A, 0x03, 0x00, 0xF6, 0x0A, 0xFD, 0x01, 0xF6, 0x0A, 0x00, 0x02,
+                ],
+            );
+            let link = MockLink::new(vec![
+                Ok(Some(current_packet)),
+                Ok(Some(busy_packet)),
+                Ok(Some(verified_packet)),
+            ]);
+            let session = BossSession::new(PacketSession::new(link.clone()));
+
+            let result = session
+                .set_equalizer_verified(BossEqualizerSettingsPatch {
+                    bass: Some(3),
+                    mid: Some(-3),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+
+            assert!(matches!(result, BossEqualizerWriteResult::Updated(_)));
+            assert_eq!(link.sent_packets().len(), 3);
+            assert_eq!(link.next_packet_call_count(), 3);
         });
     }
 

@@ -73,11 +73,11 @@ final class BossAppViewModelLifecycleTests: XCTestCase {
         viewModel.refresh()
         await waitUntil { viewModel.loadState == .ready }
         await waitUntil { viewModel.currentAudioModeIndex == 0 }
-        await waitUntil { viewModel.lastResultMessage == "Mode changed on device; controls refreshed" }
+        await waitUntil { viewModel.lastResultMessage == "Mode changed on device" }
 
         XCTAssertEqual(viewModel.selectedAudioModeIndex, 0)
         XCTAssertEqual(viewModel.resolvedSelectedAudioModeIndex, 0)
-        XCTAssertEqual(viewModel.lastResultMessage, "Mode changed on device; controls refreshed")
+        XCTAssertEqual(viewModel.lastResultMessage, "Mode changed on device")
         XCTAssertFalse(viewModel.hasDetachedSettingsDraft)
     }
 

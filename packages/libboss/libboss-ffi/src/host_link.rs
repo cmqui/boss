@@ -7,6 +7,7 @@ use libboss_session::{
     BossDeviceSettingsReport, BossLink, BossLinkError, BossSession, BossSessionError,
 };
 
+use crate::update_broker::{BrokerPacketLink, BrokerSubscriber};
 use crate::{
     conversions::session_error_to_ffi, invalid_argument_error, write_error, BossBuffer,
     BossFfiError, BossFfiLinkStatus, BossFfiSessionCallbacks, BossFfiUpdateStreamKind,
@@ -105,11 +106,12 @@ impl BossLink for FfiLink {
 }
 
 pub struct BossFfiSessionHandle {
-    pub(crate) session: BossSession<FfiLink>,
+    pub(crate) session: BossSession<BrokerPacketLink>,
 }
 
 pub struct BossFfiUpdateStreamHandle {
-    pub(crate) link: FfiLink,
+    pub(crate) link: BrokerPacketLink,
+    pub(crate) subscriber: BrokerSubscriber,
     pub(crate) kind: BossFfiUpdateStreamKind,
     pub(crate) device_settings_report: Option<BossDeviceSettingsReport>,
     pub(crate) audio_mode_catalog: Option<Vec<BossAudioModeConfig>>,
@@ -141,27 +143,6 @@ pub(crate) fn with_session<T>(
 ) -> Option<T> {
     let Some(handle) = (unsafe { handle.as_ref() }) else {
         write_error(out_error, invalid_argument_error("session handle was null"));
-        return None;
-    };
-    match f(handle) {
-        Ok(value) => Some(value),
-        Err(error) => {
-            write_error(out_error, session_error_to_ffi(error));
-            None
-        }
-    }
-}
-
-pub(crate) fn with_update_stream<T>(
-    handle: *mut BossFfiUpdateStreamHandle,
-    out_error: *mut BossFfiError,
-    f: impl FnOnce(&BossFfiUpdateStreamHandle) -> Result<T, BossSessionError>,
-) -> Option<T> {
-    let Some(handle) = (unsafe { handle.as_ref() }) else {
-        write_error(
-            out_error,
-            invalid_argument_error("update stream handle was null"),
-        );
         return None;
     };
     match f(handle) {

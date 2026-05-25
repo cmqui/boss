@@ -7,6 +7,7 @@ protocol BossAppSessioning: AnyObject, Sendable {
     func refreshModeWorkspaceSnapshot() async throws -> BossAppleModeWorkspaceSnapshot
     func modeWorkspaceUpdates(interval: Duration) -> AsyncThrowingStream<BossAppleModeWorkspaceSnapshot, Error>
     func currentAudioMode() async throws -> Int
+    func pollCurrentAudioMode() async throws -> Int?
     func currentAudioModeUpdateStream() async -> AsyncThrowingStream<Int, Error>
     func audioModeSettingsUpdateStream() async -> AsyncThrowingStream<BossAppleAudioModeSettingsConfig, Error>
     func equalizerUpdateStream() async -> AsyncThrowingStream<BossAppleEqualizerSettings, Error>

@@ -4,6 +4,7 @@
 
 .env*
 .build/
+.cache/
 .swiftpm/
 .swift-cache/
 **/.swiftpm/

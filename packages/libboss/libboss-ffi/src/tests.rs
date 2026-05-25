@@ -88,10 +88,10 @@ fn current_audio_mode_packet(operator: BmapOperator, mode_index: u8) -> Vec<u8> 
 #[test]
 fn ffi_session_set_current_audio_mode_returns_updated_result() {
     let context = Box::new(HostContext {
-        incoming_packets: Mutex::new(VecDeque::from(vec![
-            current_audio_mode_packet(BmapOperator::Status, 0x01),
-            current_audio_mode_packet(BmapOperator::Result, 0x03),
-        ])),
+        incoming_packets: Mutex::new(VecDeque::from(vec![current_audio_mode_packet(
+            BmapOperator::Result,
+            0x03,
+        )])),
         sent_packets: Mutex::new(Vec::new()),
     });
     let handle = boss_session_create(
@@ -143,13 +143,121 @@ fn ffi_current_audio_mode_update_stream_accepts_result_packets() {
     let mut mode_index = 0;
     assert!(boss_update_stream_next_current_audio_mode(
         handle,
-        1_000,
+        2_000,
         &mut mode_index,
         ptr::null_mut(),
     ));
     assert_eq!(mode_index, 3);
 
     boss_update_stream_free(handle);
+}
+
+#[test]
+fn ffi_raw_and_typed_update_streams_share_packets_without_starvation() {
+    let context = Box::new(HostContext {
+        incoming_packets: Mutex::new(VecDeque::from(vec![current_audio_mode_packet(
+            BmapOperator::Result,
+            0x04,
+        )])),
+        sent_packets: Mutex::new(Vec::new()),
+    });
+    let context = Box::into_raw(context);
+    let callbacks = BossFfiSessionCallbacks {
+        context: context as *mut c_void,
+        transport_kind: 1,
+        send_packet_bytes: Some(test_send_packet_bytes),
+        next_packet_bytes: Some(test_next_packet_bytes),
+        release_context: None,
+    };
+
+    let raw_handle = boss_update_stream_create(
+        callbacks,
+        BossFfiUpdateStreamKind::RawPacket,
+        ptr::null_mut(),
+    );
+    let current_mode_handle = boss_update_stream_create(
+        callbacks,
+        BossFfiUpdateStreamKind::CurrentAudioMode,
+        ptr::null_mut(),
+    );
+
+    let mut raw_packet = BossFfiBmapPacket::default();
+    assert!(boss_update_stream_next_raw_packet(
+        raw_handle,
+        1_000,
+        &mut raw_packet,
+        ptr::null_mut(),
+    ));
+    assert_eq!(raw_packet.function_block_raw, BmapFunctionBlock::AudioModes.raw_value());
+    assert_eq!(
+        raw_packet.function_raw,
+        libboss_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW
+    );
+    boss_packet_free(raw_packet);
+
+    let mut mode_index = 0;
+    assert!(boss_update_stream_next_current_audio_mode(
+        current_mode_handle,
+        1_000,
+        &mut mode_index,
+        ptr::null_mut(),
+    ));
+    assert_eq!(mode_index, 4);
+
+    boss_update_stream_free(current_mode_handle);
+    boss_update_stream_free(raw_handle);
+    unsafe {
+        drop(Box::from_raw(context));
+    }
+}
+
+#[test]
+fn ffi_session_and_update_stream_share_response_packets() {
+    let context = Box::new(HostContext {
+        incoming_packets: Mutex::new(VecDeque::from(vec![current_audio_mode_packet(
+            BmapOperator::Status,
+            0x05,
+        )])),
+        sent_packets: Mutex::new(Vec::new()),
+    });
+    let context = Box::into_raw(context);
+    let callbacks = BossFfiSessionCallbacks {
+        context: context as *mut c_void,
+        transport_kind: 1,
+        send_packet_bytes: Some(test_send_packet_bytes),
+        next_packet_bytes: Some(test_next_packet_bytes),
+        release_context: None,
+    };
+
+    let session_handle = boss_session_create(callbacks, ptr::null_mut());
+    let stream_handle = boss_update_stream_create(
+        callbacks,
+        BossFfiUpdateStreamKind::CurrentAudioMode,
+        ptr::null_mut(),
+    );
+
+    let mut mode_index = 0;
+    assert!(boss_session_current_audio_mode(
+        session_handle,
+        &mut mode_index,
+        ptr::null_mut(),
+    ));
+    assert_eq!(mode_index, 5);
+
+    mode_index = 0;
+    assert!(boss_update_stream_next_current_audio_mode(
+        stream_handle,
+        1_000,
+        &mut mode_index,
+        ptr::null_mut(),
+    ));
+    assert_eq!(mode_index, 5);
+
+    boss_update_stream_free(stream_handle);
+    boss_session_free(session_handle);
+    unsafe {
+        drop(Box::from_raw(context));
+    }
 }
 
 #[test]

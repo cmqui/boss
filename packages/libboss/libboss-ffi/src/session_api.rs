@@ -9,6 +9,7 @@ use crate::conversions::*;
 use crate::host_link::{
     ffi_link_from_callbacks, with_session, BossFfiSessionHandle,
 };
+use crate::update_broker::broker_packet_link_from_callbacks;
 use crate::{
     buffer_from_i32_slice, buffer_from_struct_slice, buffer_from_vec, invalid_argument_error,
     write_error, BossBuffer, BossFfiAudioModeConfig, BossFfiAudioModeSettingsConfig,
@@ -24,7 +25,7 @@ pub extern "C" fn boss_session_create(
     callbacks: BossFfiSessionCallbacks,
     out_error: *mut BossFfiError,
 ) -> *mut BossFfiSessionHandle {
-    let Some(link) = ffi_link_from_callbacks(callbacks, out_error) else {
+    let Some(link) = broker_packet_link_from_callbacks(callbacks, out_error) else {
         return std::ptr::null_mut();
     };
     let handle = BossFfiSessionHandle {
@@ -275,12 +276,22 @@ pub extern "C" fn boss_session_current_audio_mode(
     out_mode_index: *mut i32,
     out_error: *mut BossFfiError,
 ) -> bool {
+    boss_session_current_audio_mode_with_timeout(handle, 5_000, out_mode_index, out_error)
+}
+
+#[no_mangle]
+pub extern "C" fn boss_session_current_audio_mode_with_timeout(
+    handle: *mut BossFfiSessionHandle,
+    timeout_millis: u64,
+    out_mode_index: *mut i32,
+    out_error: *mut BossFfiError,
+) -> bool {
     if out_mode_index.is_null() {
         write_error(out_error, invalid_argument_error("out_mode_index was null"));
         return false;
     }
     let Some(result) = with_session(handle, out_error, |handle| {
-        block_on(handle.session.current_audio_mode(5_000))
+        block_on(handle.session.current_audio_mode(timeout_millis))
     }) else {
         return false;
     };

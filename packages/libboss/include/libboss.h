@@ -59,6 +59,7 @@ typedef enum BossFfiUpdateStreamKind {
     BOSS_FFI_UPDATE_STREAM_KIND_EQUALIZER = 2,
     BOSS_FFI_UPDATE_STREAM_KIND_DEVICE_SETTINGS = 3,
     BOSS_FFI_UPDATE_STREAM_KIND_AUDIO_MODE_CATALOG = 4,
+    BOSS_FFI_UPDATE_STREAM_KIND_RAW_PACKET = 5,
 } BossFfiUpdateStreamKind;
 
 typedef struct BossFfiSessionCallbacks {
@@ -353,6 +354,13 @@ bool boss_update_stream_next_audio_mode_catalog(
     BossFfiError *out_error
 );
 
+bool boss_update_stream_next_raw_packet(
+    BossFfiUpdateStreamHandle *handle,
+    uint64_t timeout_millis,
+    BossFfiBmapPacket *out_packet,
+    BossFfiError *out_error
+);
+
 bool boss_bootstrap_session(
     BossFfiSessionCallbacks callbacks,
     BossFfiBootstrappedDevice *out_device,
@@ -398,6 +406,13 @@ bool boss_session_enabled_setting(
 
 bool boss_session_current_audio_mode(
     BossFfiSessionHandle *handle,
+    int32_t *out_mode_index,
+    BossFfiError *out_error
+);
+
+bool boss_session_current_audio_mode_with_timeout(
+    BossFfiSessionHandle *handle,
+    uint64_t timeout_millis,
     int32_t *out_mode_index,
     BossFfiError *out_error
 );

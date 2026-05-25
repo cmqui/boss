@@ -38,7 +38,7 @@ public struct BossAppleBmapTraceEvent: Equatable, Sendable {
 }
 
 private final class BossAppleBmapTraceLinkHolder: @unchecked Sendable {
-    var link: BossAppleLink?
+    var transport: AppleBleBossTransport?
 }
 
 public extension BossAppleSession {
@@ -57,25 +57,16 @@ public extension BossAppleSession {
                         ),
                         characteristicPreference: connection.characteristicPreference
                     )
-                    let link = BossAppleLink(transport: transport)
-                    holder.link = link
-                    let runtime = try traceRequireRustRuntime()
+                    holder.transport = transport
+                    let rustBridge = try traceRequireRustBridge()
+                    let stream = rustBridge.rawPacketUpdateStream(on: transport)
 
-                    // Open a BMAP session on the same traced link by issuing the standard
-                    // version query used during bootstrap.
-                    try await link.send(
-                        packet: BossAppleBmapPacket(
-                            functionBlock: .productInfo,
-                            function: .productInfoBmapVersion,
-                            deviceID: 0,
-                            port: 0,
-                            operator: .get,
-                            payload: Data()
-                        )
-                    )
+                    Task {
+                        _ = try? await rustBridge.bootstrap(on: transport)
+                    }
 
-                    for try await packet in link.packets {
-                        let packetData = try BossRustCodecBridge.encode(packet, runtime: runtime)
+                    for try await packet in stream {
+                        let packetData = try BossRustCodecBridge.encode(packet, runtime: rustBridge.runtime)
                         continuation.yield(
                             BossAppleBmapTraceEvent(
                                 functionBlockRaw: packet.functionBlock.rawValue,
@@ -99,18 +90,18 @@ public extension BossAppleSession {
                     continuation.finish(throwing: error)
                 }
 
-                if let link = holder.link {
-                    await link.close()
-                    holder.link = nil
+                if let transport = holder.transport {
+                    await transport.close()
+                    holder.transport = nil
                 }
             }
 
             continuation.onTermination = { _ in
                 task.cancel()
                 Task {
-                    if let link = holder.link {
-                        await link.close()
-                        holder.link = nil
+                    if let transport = holder.transport {
+                        await transport.close()
+                        holder.transport = nil
                     }
                 }
             }
@@ -122,9 +113,9 @@ private func traceHex(_ data: Data) -> String {
     data.map { String(format: "%02X", $0) }.joined()
 }
 
-private func traceRequireRustRuntime() throws -> BossRustFfiRuntime {
-    guard let runtime = BossRustFfiRuntime.shared else {
+private func traceRequireRustBridge() throws -> BossRustSessionBridge {
+    guard let bridge = BossRustSessionBridge.shared else {
         throw BossAppleControlError.unsupportedOperation("Rust runtime is required for packet transport")
     }
-    return runtime
+    return bridge
 }

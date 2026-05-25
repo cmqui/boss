@@ -150,6 +150,12 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         UnsafeMutablePointer<BossBuffer>?,
         UnsafeMutablePointer<BossFfiError>?
     ) -> Bool
+    typealias UpdateStreamRawPacketNextFn = @convention(c) (
+        UnsafeMutableRawPointer?,
+        UInt64,
+        UnsafeMutablePointer<BossFfiBmapPacket>?,
+        UnsafeMutablePointer<BossFfiError>?
+    ) -> Bool
     typealias SetCurrentAudioModeFn = @convention(c) (
         UnsafeMutableRawPointer?,
         Int32,
@@ -184,6 +190,12 @@ final class BossRustFfiRuntime: @unchecked Sendable {
     ) -> Bool
     typealias CurrentAudioModeFn = @convention(c) (
         UnsafeMutableRawPointer?,
+        UnsafeMutablePointer<Int32>?,
+        UnsafeMutablePointer<BossFfiError>?
+    ) -> Bool
+    typealias CurrentAudioModeWithTimeoutFn = @convention(c) (
+        UnsafeMutableRawPointer?,
+        UInt64,
         UnsafeMutablePointer<Int32>?,
         UnsafeMutablePointer<BossFfiError>?
     ) -> Bool
@@ -315,12 +327,14 @@ final class BossRustFfiRuntime: @unchecked Sendable {
     let bossUpdateStreamNextEqualizer: UpdateStreamEqualizerNextFn
     let bossUpdateStreamNextDeviceSettings: UpdateStreamDeviceSettingsNextFn
     let bossUpdateStreamNextAudioModeCatalog: UpdateStreamAudioModeCatalogNextFn
+    let bossUpdateStreamNextRawPacket: UpdateStreamRawPacketNextFn
     let bossSessionSetCurrentAudioMode: SetCurrentAudioModeFn
     let bossSessionSetAudioModeSettings: SetAudioModeSettingsFn
     let bossSessionSetEqualizer: SetEqualizerFn
     let bossSessionSetEnabledSetting: SetEnabledSettingFn
     let bossSessionEnabledSetting: EnabledSettingFn
     let bossSessionCurrentAudioMode: CurrentAudioModeFn
+    let bossSessionCurrentAudioModeWithTimeout: CurrentAudioModeWithTimeoutFn
     let bossSessionSupportedAudioModePrompts: SupportedAudioModePromptsFn
     let bossSessionAudioModeConfigs: AudioModeConfigsFn
     let bossSessionAudioModeCapabilities: AudioModeCapabilitiesFn
@@ -368,12 +382,14 @@ final class BossRustFfiRuntime: @unchecked Sendable {
             let bossUpdateStreamNextEqualizer = load("boss_update_stream_next_equalizer", as: UpdateStreamEqualizerNextFn.self),
             let bossUpdateStreamNextDeviceSettings = load("boss_update_stream_next_device_settings", as: UpdateStreamDeviceSettingsNextFn.self),
             let bossUpdateStreamNextAudioModeCatalog = load("boss_update_stream_next_audio_mode_catalog", as: UpdateStreamAudioModeCatalogNextFn.self),
+            let bossUpdateStreamNextRawPacket = load("boss_update_stream_next_raw_packet", as: UpdateStreamRawPacketNextFn.self),
             let bossSessionSetCurrentAudioMode = load("boss_session_set_current_audio_mode", as: SetCurrentAudioModeFn.self),
             let bossSessionSetAudioModeSettings = load("boss_session_set_audio_mode_settings", as: SetAudioModeSettingsFn.self),
             let bossSessionSetEqualizer = load("boss_session_set_equalizer", as: SetEqualizerFn.self),
             let bossSessionSetEnabledSetting = load("boss_session_set_enabled_setting", as: SetEnabledSettingFn.self),
             let bossSessionEnabledSetting = load("boss_session_enabled_setting", as: EnabledSettingFn.self),
             let bossSessionCurrentAudioMode = load("boss_session_current_audio_mode", as: CurrentAudioModeFn.self),
+            let bossSessionCurrentAudioModeWithTimeout = load("boss_session_current_audio_mode_with_timeout", as: CurrentAudioModeWithTimeoutFn.self),
             let bossSessionSupportedAudioModePrompts = load("boss_session_supported_audio_mode_prompts", as: SupportedAudioModePromptsFn.self),
             let bossSessionAudioModeConfigs = load("boss_session_audio_mode_configs", as: AudioModeConfigsFn.self),
             let bossSessionAudioModeCapabilities = load("boss_session_audio_mode_capabilities", as: AudioModeCapabilitiesFn.self),
@@ -416,12 +432,14 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         self.bossUpdateStreamNextEqualizer = bossUpdateStreamNextEqualizer
         self.bossUpdateStreamNextDeviceSettings = bossUpdateStreamNextDeviceSettings
         self.bossUpdateStreamNextAudioModeCatalog = bossUpdateStreamNextAudioModeCatalog
+        self.bossUpdateStreamNextRawPacket = bossUpdateStreamNextRawPacket
         self.bossSessionSetCurrentAudioMode = bossSessionSetCurrentAudioMode
         self.bossSessionSetAudioModeSettings = bossSessionSetAudioModeSettings
         self.bossSessionSetEqualizer = bossSessionSetEqualizer
         self.bossSessionSetEnabledSetting = bossSessionSetEnabledSetting
         self.bossSessionEnabledSetting = bossSessionEnabledSetting
         self.bossSessionCurrentAudioMode = bossSessionCurrentAudioMode
+        self.bossSessionCurrentAudioModeWithTimeout = bossSessionCurrentAudioModeWithTimeout
         self.bossSessionSupportedAudioModePrompts = bossSessionSupportedAudioModePrompts
         self.bossSessionAudioModeConfigs = bossSessionAudioModeConfigs
         self.bossSessionAudioModeCapabilities = bossSessionAudioModeCapabilities
@@ -492,6 +510,9 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         self.bossUpdateStreamNextAudioModeCatalog = { handle, timeoutMillis, outCatalog, outError in
             boss_update_stream_next_audio_mode_catalog(handle.map(OpaquePointer.init), timeoutMillis, outCatalog, outError)
         }
+        self.bossUpdateStreamNextRawPacket = { handle, timeoutMillis, outPacket, outError in
+            boss_update_stream_next_raw_packet(handle.map(OpaquePointer.init), timeoutMillis, outPacket, outError)
+        }
         self.bossSessionSetCurrentAudioMode = { handle, targetIndex, playVoicePrompt, outResult, outError in
             boss_session_set_current_audio_mode(handle.map(OpaquePointer.init), targetIndex, playVoicePrompt, outResult, outError)
         }
@@ -509,6 +530,14 @@ final class BossRustFfiRuntime: @unchecked Sendable {
         }
         self.bossSessionCurrentAudioMode = { handle, outModeIndex, outError in
             boss_session_current_audio_mode(handle.map(OpaquePointer.init), outModeIndex, outError)
+        }
+        self.bossSessionCurrentAudioModeWithTimeout = { handle, timeoutMillis, outModeIndex, outError in
+            boss_session_current_audio_mode_with_timeout(
+                handle.map(OpaquePointer.init),
+                timeoutMillis,
+                outModeIndex,
+                outError
+            )
         }
         self.bossSessionSupportedAudioModePrompts = { handle, outPrompts, outError in
             boss_session_supported_audio_mode_prompts(handle.map(OpaquePointer.init), outPrompts, outError)

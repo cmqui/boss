@@ -17,6 +17,7 @@ pub struct MockLink {
     transport_kind: BossTransportKind,
     packets: Arc<Mutex<VecDeque<Result<Option<BmapPacket>, BossLinkError>>>>,
     sent_packets: Arc<Mutex<Vec<BmapPacket>>>,
+    next_packet_call_count: Arc<Mutex<usize>>,
 }
 
 #[cfg(test)]
@@ -26,11 +27,16 @@ impl MockLink {
             transport_kind: BossTransportKind::Stream,
             packets: Arc::new(Mutex::new(VecDeque::from(packets))),
             sent_packets: Arc::new(Mutex::new(Vec::new())),
+            next_packet_call_count: Arc::new(Mutex::new(0)),
         }
     }
 
     pub fn sent_packets(&self) -> Vec<BmapPacket> {
         self.sent_packets.lock().unwrap().clone()
+    }
+
+    pub fn next_packet_call_count(&self) -> usize {
+        *self.next_packet_call_count.lock().unwrap()
     }
 }
 
@@ -47,6 +53,7 @@ impl BossLink for MockLink {
     }
 
     async fn next_packet(&self, _timeout_millis: u64) -> Result<Option<BmapPacket>, BossLinkError> {
+        *self.next_packet_call_count.lock().unwrap() += 1;
         self.packets.lock().unwrap().pop_front().unwrap_or(Ok(None))
     }
 }

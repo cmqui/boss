@@ -222,7 +222,7 @@ extension BossAppViewModel {
         Task {
             do {
                 if self.appScreen == .workspace {
-                    await self.stopBackgroundLoad()
+                    self.cancelBackgroundLoad()
                 }
                 try await operation()
                 loadState = .ready
@@ -248,7 +248,10 @@ extension BossAppViewModel {
         do {
             var lastObservedModeIndex: Int?
             while !Task.isCancelled {
-                let modeIndex = try await session.currentAudioMode()
+                guard let modeIndex = try await session.pollCurrentAudioMode() else {
+                    try await Task.sleep(for: await MainActor.run { self.backgroundCurrentModePollingInterval })
+                    continue
+                }
                 let shouldResync = await MainActor.run { () -> Bool in
                     guard self.appScreen == .workspace else {
                         return false
@@ -270,8 +273,8 @@ extension BossAppViewModel {
                         self.selectedAudioModeIndex = modeIndex
                     }
 
-                    if !self.hasDetachedSettingsDraft,
-                       let updatedMode = self.audioModes.first(where: { $0.modeIndex == modeIndex }) {
+                    let updatedMode = self.audioModes.first(where: { $0.modeIndex == modeIndex })
+                    if !self.hasDetachedSettingsDraft, let updatedMode {
                         self.applySettingsSnapshot(updatedMode.settings)
                     }
 
@@ -279,7 +282,11 @@ extension BossAppViewModel {
 
                     if self.hasDetachedSettingsDraft || self.hasDetachedEqualizerDraft {
                         self.lastResultMessage = "Mode changed on device; local edits were preserved"
-                        return true
+                        return false
+                    }
+                    if updatedMode != nil {
+                        self.lastResultMessage = "Mode changed on device"
+                        return false
                     }
                     self.lastResultMessage = "Mode changed on device; refreshing controls"
                     return true

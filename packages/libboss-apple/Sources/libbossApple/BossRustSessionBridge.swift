@@ -4,7 +4,7 @@ import Dispatch
 import Foundation
 
 final class BossRustSessionBridge: @unchecked Sendable {
-    fileprivate let runtime: BossRustFfiRuntime
+    let runtime: BossRustFfiRuntime
 
     fileprivate init(runtime: BossRustFfiRuntime) {
         self.runtime = runtime
@@ -129,6 +129,20 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
+    func rawPacketUpdateStream(on transport: AppleBleBossTransport) -> AsyncThrowingStream<BossAppleBmapPacket, Error> {
+        updateStream(on: transport, kind: BOSS_FFI_UPDATE_STREAM_KIND_RAW_PACKET) { handle in
+            var packet = BossFfiBmapPacket()
+            var operationError = self.emptyError()
+            let success = self.runtime.bossUpdateStreamNextRawPacket(handle, 60_000, &packet, &operationError)
+            guard success else {
+                defer { self.runtime.bossErrorFree(operationError) }
+                throw self.map(error: operationError)
+            }
+            defer { self.runtime.bossPacketFreeIfAvailable(packet) }
+            return Self.swiftPacket(from: packet)
+        }
+    }
+
     private func updateStream<Element: Sendable>(
         on transport: AppleBleBossTransport,
         kind: BossFfiUpdateStreamKind,
@@ -177,6 +191,20 @@ final class BossRustSessionBridge: @unchecked Sendable {
         }
     }
 
+    private static func swiftPacket(from packet: BossFfiBmapPacket) -> BossAppleBmapPacket {
+        let functionBlock = BossAppleBmapFunctionBlock(rawValue: packet.function_block_raw)
+        let function = BossAppleBmapFunction(block: functionBlock, rawValue: packet.function_raw)
+        let payload = readData(packet.payload)
+        return BossAppleBmapPacket(
+            functionBlock: functionBlock,
+            function: function,
+            deviceID: Int(packet.device_id),
+            port: Int(packet.port),
+            operator: BossAppleBmapOperator(rawValue: packet.operator_raw),
+            payload: payload
+        )
+    }
+
     private func directOptionalSetting<Value>(
         _ read: () throws -> Value
     ) throws -> Value? {
@@ -191,11 +219,20 @@ final class BossRustSessionBridge: @unchecked Sendable {
     }
 
     func currentAudioMode(on transport: AppleBleBossTransport) async throws -> Int {
+        try await currentAudioMode(on: transport, timeoutMillis: 5_000)
+    }
+
+    func currentAudioMode(on transport: AppleBleBossTransport, timeoutMillis: UInt64) async throws -> Int {
         BossRustLogger.log("using Rust bridge for currentAudioMode")
         return try withSessionHandle(on: transport) { handle in
             var modeIndex: Int32 = 0
             var operationError = emptyError()
-            let success = runtime.bossSessionCurrentAudioMode(handle, &modeIndex, &operationError)
+            let success = runtime.bossSessionCurrentAudioModeWithTimeout(
+                handle,
+                timeoutMillis,
+                &modeIndex,
+                &operationError
+            )
             guard success else {
                 defer { runtime.bossErrorFree(operationError) }
                 throw map(error: operationError)

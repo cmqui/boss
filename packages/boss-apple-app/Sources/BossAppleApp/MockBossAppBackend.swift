@@ -446,6 +446,10 @@ final class MockBossAppSession: @unchecked Sendable, BossAppSessioning {
         return await store.modeWorkspaceSnapshot().currentAudioModeIndex
     }
 
+    func pollCurrentAudioMode() async throws -> Int? {
+        try await currentAudioMode()
+    }
+
     func currentAudioModeUpdateStream() async -> AsyncThrowingStream<Int, Error> {
         try? await store.validateConnection(connection)
         let currentIndex = await store.modeWorkspaceSnapshot().currentAudioModeIndex

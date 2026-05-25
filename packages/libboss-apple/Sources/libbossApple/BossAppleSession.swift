@@ -77,6 +77,7 @@ public actor BossAppleSession {
     private var connectedLink: ConnectedLink?
     private var cachedBootstrappedDevice: BossAppleBootstrappedDevice?
     private var lastKnownCurrentAudioModeIndex: Int?
+    private var nextTraceOperationID = 1
 
     public init(connection: BossAppleConnectionOptions = BossAppleConnectionOptions()) {
         self.connection = connection
@@ -338,6 +339,19 @@ public actor BossAppleSession {
 
     public func currentAudioMode() async throws -> Int {
         normalizeCurrentAudioModeIndex(try await readCurrentAudioMode())
+    }
+
+    public func pollCurrentAudioMode() async throws -> Int? {
+        do {
+            return normalizeCurrentAudioModeIndex(try await readCurrentAudioMode(timeoutMillis: 250))
+        } catch let error as BossAppleControlError {
+            switch error {
+            case .responseTimedOut, .responseStreamEnded:
+                return nil
+            default:
+                throw error
+            }
+        }
     }
 
     public func audioModeSettings() async throws -> BossAppleAudioModeSettingsConfig {
@@ -689,12 +703,16 @@ public actor BossAppleSession {
     }
 
     private func readCurrentAudioMode() async throws -> Int {
+        try await readCurrentAudioMode(timeoutMillis: 5_000)
+    }
+
+    private func readCurrentAudioMode(timeoutMillis: UInt64) async throws -> Int {
         if let override = operationOverrides?.currentAudioMode {
             return try await override()
         }
         let rustBridge = try requireRustBridge()
         return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
-            try await rustBridge.currentAudioMode(on: transport)
+            try await rustBridge.currentAudioMode(on: transport, timeoutMillis: timeoutMillis)
         }
     }
 
@@ -777,17 +795,40 @@ public actor BossAppleSession {
         operation: @escaping (Resource) async throws -> T
     ) async throws -> T {
         let preferences = normalizedPreferences(preferredPreferences, preferActiveLink: preferActiveLink)
+        let operationID = nextTraceOperationID
+        nextTraceOperationID += 1
+        let startedAt = DispatchTime.now().uptimeNanoseconds
+        trace(
+            "op=\(operationID) start prefs=\(preferences.map(\.rawValue).joined(separator: ",")) preferActiveLink=\(preferActiveLink)"
+        )
         var lastError: Error?
 
         for preference in preferences {
             for attempt in 0..<2 {
                 do {
+                    trace("op=\(operationID) acquire preference=\(preference.rawValue) attempt=\(attempt)")
                     let resource = try await acquire(preference, attempt)
-                    return try await operation(resource)
+                    trace("op=\(operationID) acquired preference=\(preference.rawValue) attempt=\(attempt)")
+                    let value = try await operation(resource)
+                    let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - startedAt) / 1_000_000
+                    trace(
+                        String(
+                            format: "op=%d success preference=%@ attempt=%d elapsedMs=%.2f",
+                            operationID,
+                            preference.rawValue,
+                            attempt,
+                            elapsedMillis
+                        )
+                    )
+                    return value
                 } catch {
                     lastError = error
 
-                    switch retryResolution(for: error, preference: preference, attempt: attempt) {
+                    let resolution = retryResolution(for: error, preference: preference, attempt: attempt)
+                    trace(
+                        "op=\(operationID) failure preference=\(preference.rawValue) attempt=\(attempt) resolution=\(describe(resolution)) error=\(String(describing: error))"
+                    )
+                    switch resolution {
                     case .nextPreference:
                         await invalidateLink(for: preference)
                         break
@@ -801,6 +842,15 @@ public actor BossAppleSession {
             }
         }
 
+        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - startedAt) / 1_000_000
+        trace(
+            String(
+                format: "op=%d exhausted elapsedMs=%.2f lastError=%@",
+                operationID,
+                elapsedMillis,
+                String(describing: lastError ?? AppleBleBossTransportError.transportClosed)
+            )
+        )
         throw lastError ?? AppleBleBossTransportError.transportClosed
     }
 
@@ -829,13 +879,18 @@ public actor BossAppleSession {
         forceReconnect: Bool
     ) async throws -> ConnectedLink {
         if forceReconnect {
+            trace("ensureConnected forceReconnect preference=\(preference.rawValue)")
             await closeCurrentLink()
         } else if let connectedLink, connectedLink.preference == preference {
+            trace("ensureConnected reuse preference=\(preference.rawValue)")
             return connectedLink
         } else if connectedLink != nil {
+            let previousPreference = connectedLink?.preference.rawValue ?? "nil"
+            trace("ensureConnected replaceActive old=\(previousPreference) new=\(preference.rawValue)")
             await closeCurrentLink()
         }
 
+        trace("ensureConnected connect preference=\(preference.rawValue)")
         let transport = try await AppleBleBossTransport.connect(
             filter: AppleBossScanFilter(
                 peripheralIdentifier: connection.identifier,
@@ -849,6 +904,7 @@ public actor BossAppleSession {
             preference: preference
         )
         connectedLink = connected
+        trace("ensureConnected connected preference=\(preference.rawValue)")
         return connected
     }
 
@@ -856,6 +912,7 @@ public actor BossAppleSession {
         guard connectedLink?.preference == preference else {
             return
         }
+        trace("invalidateLink preference=\(preference.rawValue)")
         await closeCurrentLink()
     }
 
@@ -863,6 +920,7 @@ public actor BossAppleSession {
         guard let connectedLink else {
             return
         }
+        trace("closeCurrentLink preference=\(connectedLink.preference.rawValue)")
         self.connectedLink = nil
         await connectedLink.transport.close()
     }
@@ -1081,6 +1139,21 @@ public actor BossAppleSession {
         return rustBridge
     }
 
+    private func trace(_ message: String) {
+        BossAppleSessionLogger.log(message)
+    }
+
+    private func describe(_ resolution: RetryResolution) -> String {
+        switch resolution {
+        case .nextPreference:
+            return "nextPreference"
+        case .reconnectCurrentPreference:
+            return "reconnectCurrentPreference"
+        case .rethrow:
+            return "rethrow"
+        }
+    }
+
     nonisolated static func rustRequiredStream<Element>() -> AsyncThrowingStream<Element, Error> {
         AsyncThrowingStream { continuation in
             continuation.finish(
@@ -1089,5 +1162,27 @@ public actor BossAppleSession {
                 )
             )
         }
+    }
+}
+
+enum BossAppleSessionLogger {
+    private static let originUptimeNanos = DispatchTime.now().uptimeNanoseconds
+
+    static var isEnabled: Bool {
+        let value = ProcessInfo.processInfo.environment["LIBBOSS_APPLE_SESSION_LOG"]?.lowercased()
+        return value == "1" || value == "true" || value == "yes"
+    }
+
+    static func log(_ message: String) {
+        guard isEnabled else {
+            return
+        }
+        let elapsedMillis = Double(elapsedUptimeNanoseconds()) / 1_000_000
+        fputs(String(format: "[libboss-apple][session][t+%.2fms] %@\n", elapsedMillis, message), stderr)
+    }
+
+    private static func elapsedUptimeNanoseconds() -> UInt64 {
+        let current = DispatchTime.now().uptimeNanoseconds
+        return current >= originUptimeNanos ? current - originUptimeNanos : 0
     }
 }

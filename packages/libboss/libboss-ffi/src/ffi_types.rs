@@ -59,6 +59,7 @@ pub enum BossFfiUpdateStreamKind {
     Equalizer = 2,
     DeviceSettings = 3,
     AudioModeCatalog = 4,
+    RawPacket = 5,
 }
 
 #[repr(C)]

@@ -348,12 +348,6 @@ impl<L: BossLink> BossSession<L> {
         target_index: i32,
         play_voice_prompt: bool,
     ) -> Result<BossCurrentAudioModeWriteResult, BossSessionError> {
-        if let Some(current_index) = self.current_audio_mode_if_available(2_000).await? {
-            if current_index == target_index {
-                return Ok(BossCurrentAudioModeWriteResult::Unchanged(current_index));
-            }
-        }
-
         match self
             .packet_session
             .start_current_audio_mode_change(target_index, play_voice_prompt, 5_000)
@@ -683,22 +677,6 @@ impl<L: BossLink> BossSession<L> {
                         source: None,
                         unavailable_reason: Some(reason),
                     })
-                } else {
-                    Err(error)
-                }
-            }
-        }
-    }
-
-    async fn current_audio_mode_if_available(
-        &self,
-        timeout_millis: u64,
-    ) -> Result<Option<i32>, BossSessionError> {
-        match self.packet_session.current_audio_mode(timeout_millis).await {
-            Ok(value) => Ok(Some(value)),
-            Err(error) => {
-                if Self::should_fallback_for_audio_mode_write(&error) {
-                    Ok(None)
                 } else {
                     Err(error)
                 }

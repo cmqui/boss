@@ -9,6 +9,7 @@ mod packets;
 mod session_api;
 #[cfg(test)]
 mod tests;
+mod update_broker;
 mod update_stream;
 
 pub use ble::*;

@@ -374,7 +374,7 @@ enum BossRustCodecBridge {
     }
 }
 
-private extension BossRustFfiRuntime {
+extension BossRustFfiRuntime {
     func bossPacketFreeIfAvailable(_ packet: BossFfiBmapPacket) {
         guard let fn = loadCodecSymbol("boss_packet_free", as: BossRustCodecBridge.PacketFreeFn.self) else {
             bossBufferFree(packet.payload)

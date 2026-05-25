@@ -24,8 +24,8 @@ extension BossAppViewModel {
                 resultMessage = "Mode command sent; verification was inconclusive"
             }
 
-            try await self.reloadModeWorkspace(using: session)
-            self.lastResultMessage = "\(resultMessage); settings refreshed"
+            self.syncSelectedAudioModeToCurrentModeIfNeeded()
+            self.lastResultMessage = resultMessage
         }
     }
 
@@ -169,8 +169,6 @@ extension BossAppViewModel {
                 self.applyEqualizerSnapshot(settings)
                 self.lastResultMessage = "EQ verification was inconclusive"
             }
-
-            try await self.reloadModeWorkspace(using: session)
         }
     }
 

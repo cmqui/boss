@@ -1,31 +1,26 @@
 use futures::executor::block_on;
 use libboss_core::{BmapFunctionBlock, BmapPacket, BossAudioModesCodec, BossSettingsCodec};
-use libboss_session::{BossLink, BossSession, BossSessionError, PacketSession};
+use libboss_session::{BossSession, BossSessionError, PacketSession};
 
 use crate::conversions::*;
 use crate::host_link::{
-    with_update_stream, with_update_stream_mut, BossFfiUpdateStreamHandle, FfiLink,
+    with_update_stream_mut, BossFfiUpdateStreamHandle,
 };
+use crate::update_broker::{broker_stream_parts_from_callbacks, BrokerPacketLink};
 use crate::{
     buffer_from_struct_slice, invalid_argument_error, write_error, BossBuffer,
-    BossFfiAudioModeConfig, BossFfiAudioModeSettingsConfig, BossFfiDeviceSettingsReport,
-    BossFfiEqualizerSettings, BossFfiError, BossFfiUpdateStreamKind,
+    BossFfiAudioModeConfig, BossFfiAudioModeSettingsConfig, BossFfiBmapPacket,
+    BossFfiDeviceSettingsReport, BossFfiEqualizerSettings, BossFfiError,
+    BossFfiUpdateStreamKind,
 };
 
-async fn next_stream_packet(
-    handle: &BossFfiUpdateStreamHandle,
+fn next_stream_packet(
+    handle: &mut BossFfiUpdateStreamHandle,
     timeout_millis: u64,
 ) -> Result<BmapPacket, BossSessionError> {
-    loop {
-        let Some(packet) = handle
-            .link
-            .next_packet(timeout_millis)
-            .await
-            .map_err(ffi_link_error_to_session_error)?
-        else {
-            return Err(BossSessionError::ResponseStreamEnded);
-        };
-        let matches = match handle.kind {
+    handle
+        .subscriber
+        .next_matching(timeout_millis, |packet| match handle.kind {
             BossFfiUpdateStreamKind::CurrentAudioMode => {
                 packet.function_block == BmapFunctionBlock::AudioModes
                     && packet.function.raw_value() == BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW
@@ -53,11 +48,10 @@ async fn next_stream_packet(
                 packet.function_block == BmapFunctionBlock::AudioModes
                     && packet.operator == libboss_core::BmapOperator::Status
             }
-        };
-        if matches {
-            return Ok(packet);
-        }
-    }
+            BossFfiUpdateStreamKind::RawPacket => true,
+        })
+        .map_err(ffi_link_error_to_session_error)?
+        .ok_or(BossSessionError::ResponseStreamEnded)
 }
 
 #[no_mangle]
@@ -66,11 +60,12 @@ pub extern "C" fn boss_update_stream_create(
     kind: BossFfiUpdateStreamKind,
     out_error: *mut BossFfiError,
 ) -> *mut BossFfiUpdateStreamHandle {
-    let Some(link) = crate::host_link::ffi_link_from_callbacks(callbacks, out_error) else {
+    let Some((link, subscriber)) = broker_stream_parts_from_callbacks(callbacks, out_error) else {
         return std::ptr::null_mut();
     };
     Box::into_raw(Box::new(BossFfiUpdateStreamHandle {
         link,
+        subscriber,
         kind,
         device_settings_report: None,
         audio_mode_catalog: None,
@@ -98,16 +93,14 @@ pub extern "C" fn boss_update_stream_next_current_audio_mode(
         write_error(out_error, invalid_argument_error("out_mode_index was null"));
         return false;
     }
-    let Some(result) = with_update_stream(handle, out_error, |handle| {
+    let Some(result) = with_update_stream_mut(handle, out_error, |handle| {
         if handle.kind != BossFfiUpdateStreamKind::CurrentAudioMode {
             return Err(BossSessionError::UnsupportedOperation(
                 "update stream kind did not match current audio mode".into(),
             ));
         }
-        block_on(async {
-            let packet = next_stream_packet(handle, timeout_millis).await?;
-            BossAudioModesCodec::parse_current_mode(&packet).map_err(Into::into)
-        })
+        let packet = next_stream_packet(handle, timeout_millis)?;
+        BossAudioModesCodec::parse_current_mode(&packet).map_err(Into::into)
     }) else {
         return false;
     };
@@ -128,16 +121,14 @@ pub extern "C" fn boss_update_stream_next_audio_mode_settings(
         write_error(out_error, invalid_argument_error("out_config was null"));
         return false;
     }
-    let Some(result) = with_update_stream(handle, out_error, |handle| {
+    let Some(result) = with_update_stream_mut(handle, out_error, |handle| {
         if handle.kind != BossFfiUpdateStreamKind::AudioModeSettings {
             return Err(BossSessionError::UnsupportedOperation(
                 "update stream kind did not match audio mode settings".into(),
             ));
         }
-        block_on(async {
-            let packet = next_stream_packet(handle, timeout_millis).await?;
-            BossAudioModesCodec::parse_settings_config(&packet).map_err(Into::into)
-        })
+        let packet = next_stream_packet(handle, timeout_millis)?;
+        BossAudioModesCodec::parse_settings_config(&packet).map_err(Into::into)
     }) else {
         return false;
     };
@@ -158,16 +149,14 @@ pub extern "C" fn boss_update_stream_next_equalizer(
         write_error(out_error, invalid_argument_error("out_settings was null"));
         return false;
     }
-    let Some(result) = with_update_stream(handle, out_error, |handle| {
+    let Some(result) = with_update_stream_mut(handle, out_error, |handle| {
         if handle.kind != BossFfiUpdateStreamKind::Equalizer {
             return Err(BossSessionError::UnsupportedOperation(
                 "update stream kind did not match equalizer".into(),
             ));
         }
-        block_on(async {
-            let packet = next_stream_packet(handle, timeout_millis).await?;
-            BossSettingsCodec::parse_equalizer(&packet).map_err(Into::into)
-        })
+        let packet = next_stream_packet(handle, timeout_millis)?;
+        BossSettingsCodec::parse_equalizer(&packet).map_err(Into::into)
     }) else {
         return false;
     };
@@ -202,8 +191,8 @@ pub extern "C" fn boss_update_stream_next_device_settings(
                 return Ok(initial);
             }
             loop {
-                let packet = next_stream_packet(handle, timeout_millis).await?;
-                if let Some(updated) = BossSession::<FfiLink>::reduce_device_settings_report(
+                let packet = next_stream_packet(handle, timeout_millis)?;
+                if let Some(updated) = BossSession::<BrokerPacketLink>::reduce_device_settings_report(
                     handle
                         .device_settings_report
                         .as_ref()
@@ -249,8 +238,8 @@ pub extern "C" fn boss_update_stream_next_audio_mode_catalog(
                 return Ok(initial);
             }
             loop {
-                let packet = next_stream_packet(handle, timeout_millis).await?;
-                if let Some(updated) = BossSession::<FfiLink>::reduce_audio_mode_catalog(
+                let packet = next_stream_packet(handle, timeout_millis)?;
+                if let Some(updated) = BossSession::<BrokerPacketLink>::reduce_audio_mode_catalog(
                     handle.audio_mode_catalog.as_ref().expect("state initialized"),
                     &packet,
                 )? {
@@ -268,6 +257,33 @@ pub extern "C" fn boss_update_stream_next_audio_mode_catalog(
         .collect();
     unsafe {
         *out_catalog = buffer_from_struct_slice(&configs);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn boss_update_stream_next_raw_packet(
+    handle: *mut BossFfiUpdateStreamHandle,
+    timeout_millis: u64,
+    out_packet: *mut BossFfiBmapPacket,
+    out_error: *mut BossFfiError,
+) -> bool {
+    if out_packet.is_null() {
+        write_error(out_error, invalid_argument_error("out_packet was null"));
+        return false;
+    }
+    let Some(packet) = with_update_stream_mut(handle, out_error, |handle| {
+        if handle.kind != BossFfiUpdateStreamKind::RawPacket {
+            return Err(BossSessionError::UnsupportedOperation(
+                "update stream kind did not match raw packet".into(),
+            ));
+        }
+        next_stream_packet(handle, timeout_millis)
+    }) else {
+        return false;
+    };
+    unsafe {
+        *out_packet = ffi_packet_from_core(packet);
     }
     true
 }

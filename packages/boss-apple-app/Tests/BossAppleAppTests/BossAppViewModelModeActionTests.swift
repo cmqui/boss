@@ -5,7 +5,7 @@ import libbossApple
 
 @MainActor
 final class BossAppViewModelModeActionTests: XCTestCase {
-    func testSelectAudioModeUpdatesCurrentModeAndRefreshesWorkspace() async throws {
+    func testSelectAudioModeUpdatesCurrentModeWithoutBlockingOnWorkspaceRefresh() async throws {
         let session = FakeBossAppSession()
         session.workspaceSnapshot = .fixture()
         session.refreshModeWorkspaceSnapshotResult = .fixture(currentAudioModeIndex: 2, settings: .fixture(cncLevel: 4))
@@ -16,7 +16,7 @@ final class BossAppViewModelModeActionTests: XCTestCase {
         await waitUntil { viewModel.loadState == .ready }
 
         viewModel.selectAudioMode(2)
-        await waitUntil { viewModel.lastResultMessage == "Mode updated; settings refreshed" }
+        await waitUntil { viewModel.lastResultMessage == "Mode updated" }
 
         XCTAssertEqual(session.setCurrentAudioModeCalls, [2])
         XCTAssertEqual(viewModel.currentAudioModeIndex, 2)

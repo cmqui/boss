@@ -70,6 +70,10 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
         return refreshModeWorkspaceSnapshotResult.currentAudioModeIndex
     }
 
+    func pollCurrentAudioMode() async throws -> Int? {
+        try await currentAudioMode()
+    }
+
     func currentAudioModeUpdateStream() async -> AsyncThrowingStream<Int, Error> {
         let values = currentAudioModeUpdateValues ?? modeWorkspaceUpdateSnapshots.map(\.currentAudioModeIndex)
         return makeStream(values, keepOpen: keepModeWorkspaceUpdateStreamOpen)
