@@ -73,11 +73,34 @@ final class BossAppViewModelLifecycleTests: XCTestCase {
         viewModel.refresh()
         await waitUntil { viewModel.loadState == .ready }
         await waitUntil { viewModel.currentAudioModeIndex == 0 }
+        await waitUntil { viewModel.lastResultMessage == "Mode changed on device; controls refreshed" }
 
         XCTAssertEqual(viewModel.selectedAudioModeIndex, 0)
         XCTAssertEqual(viewModel.resolvedSelectedAudioModeIndex, 0)
         XCTAssertEqual(viewModel.lastResultMessage, "Mode changed on device; controls refreshed")
         XCTAssertFalse(viewModel.hasDetachedSettingsDraft)
+    }
+
+    func testWorkspaceOperationRestartsBackgroundUpdatesAfterCancellingExistingStream() async throws {
+        let session = FakeBossAppSession()
+        session.workspaceSnapshot = .fixture()
+        session.refreshModeWorkspaceSnapshotResult = .fixture(currentAudioModeIndex: 2, settings: .fixture(cncLevel: 4))
+        session.currentAudioModeWriteResult = .updated(2)
+        session.keepModeWorkspaceUpdateStreamOpen = true
+
+        let viewModel = BossAppViewModel(sessionFactory: { _ in session })
+        viewModel.backgroundCurrentModePollingInterval = .seconds(60)
+
+        viewModel.refresh()
+        await waitUntil { viewModel.loadState == .ready }
+        await waitUntil { session.currentAudioModeReadCount == 1 }
+
+        viewModel.selectAudioMode(2)
+        await waitUntil { viewModel.lastResultMessage == "Mode updated; settings refreshed" }
+        await waitUntil { session.currentAudioModeReadCount == 2 }
+
+        XCTAssertEqual(viewModel.currentAudioModeIndex, 2)
+        XCTAssertEqual(viewModel.selectedAudioModeIndex, 2)
     }
 }
 

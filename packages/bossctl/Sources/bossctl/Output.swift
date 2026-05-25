@@ -11,6 +11,14 @@ struct BossctlStandardOutputWriter: BossctlOutputWriting {
     }
 }
 
+final class BossctlBufferingOutputWriter: BossctlOutputWriting {
+    private(set) var lines: [String] = []
+
+    func writeLine(_ line: String) {
+        lines.append(line)
+    }
+}
+
 extension BossctlCLI {
     static func printWearDetectionFallbackPaths(
         for patch: BossAppleOnHeadDetectionPatch,
@@ -203,9 +211,22 @@ extension BossctlCLI {
         }
     }
 
+    static func printBmapTraceEvent(
+        _ event: BossAppleBmapTraceEvent,
+        output: BossctlOutputWriting = BossctlStandardOutputWriter()
+    ) {
+        output.writeLine(
+            "packet=\(event.packetHex) | block=\(event.functionBlockName)(\(hexByte(event.functionBlockRaw))) | function=\(event.functionName)(\(hexByte(event.functionRaw))) | operator=\(event.operatorName)(\(hexByte(event.operatorRaw))) | device=\(event.deviceID) | port=\(event.port) | payload=\(event.payloadHex)"
+        )
+    }
+
     static func formatOptionalBool(_ value: Bool?) -> String {
         guard let value else { return "unsupported" }
         return value ? "enabled" : "disabled"
+    }
+
+    static func hexByte(_ value: UInt8) -> String {
+        String(format: "0x%02X", value)
     }
 
     static func bmapErrorCode(from payloadHex: String) -> BossAppleBmapErrorCode? {

@@ -340,6 +340,54 @@ final class BossAppViewModelModeActionTests: XCTestCase {
         XCTAssertTrue(viewModel.selectableAudioModes.contains(where: { $0.modeIndex == 7 && $0.name == "Home" }))
         XCTAssertFalse(viewModel.hasDetachedSettingsDraft)
     }
+
+    func testSelectableAudioModesHidesUnnamedCustomModesUnlessCurrent() async throws {
+        let session = FakeBossAppSession()
+        session.workspaceSnapshot = .fixture(
+            currentAudioModeIndex: 6,
+            audioModes: [
+                BossAppleAudioModeConfig.fixture(
+                    modeIndex: 0,
+                    name: "Quiet",
+                    prompt: .quiet,
+                    settings: .fixture(cncLevel: 0)
+                ),
+                BossAppleAudioModeConfig.fixture(
+                    modeIndex: 6,
+                    name: "Comfort",
+                    prompt: .comfort,
+                    settings: .fixture(cncLevel: 5),
+                    userConfigurable: true,
+                    userConfigured: true
+                ),
+                BossAppleAudioModeConfig.fixture(
+                    modeIndex: 7,
+                    name: "None",
+                    prompt: .none,
+                    settings: .fixture(cncLevel: 4),
+                    userConfigurable: true,
+                    userConfigured: true
+                ),
+                BossAppleAudioModeConfig.fixture(
+                    modeIndex: 8,
+                    name: "",
+                    prompt: .none,
+                    settings: .fixture(cncLevel: 3),
+                    userConfigurable: true,
+                    userConfigured: false
+                ),
+            ]
+        )
+
+        let viewModel = BossAppViewModel(sessionFactory: { _ in session })
+        viewModel.refresh()
+        await waitUntil { viewModel.loadState == .ready }
+
+        XCTAssertTrue(viewModel.selectableAudioModes.contains(where: { $0.modeIndex == 0 }))
+        XCTAssertTrue(viewModel.selectableAudioModes.contains(where: { $0.modeIndex == 6 }))
+        XCTAssertFalse(viewModel.selectableAudioModes.contains(where: { $0.modeIndex == 7 }))
+        XCTAssertFalse(viewModel.selectableAudioModes.contains(where: { $0.modeIndex == 8 }))
+    }
 }
 
 private extension BossAppViewModelModeActionTests {

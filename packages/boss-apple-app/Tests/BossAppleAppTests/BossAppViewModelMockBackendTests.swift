@@ -34,7 +34,12 @@ final class BossAppViewModelMockBackendTests: XCTestCase {
 
         viewModel.returnToDeviceSelection()
         await waitUntil { viewModel.appScreen == .waitingForDevice }
-        await waitUntil { viewModel.appScreen == .workspace && viewModel.loadState == .ready }
+        viewModel.refresh()
+        await waitUntil {
+            viewModel.appScreen == .workspace
+                && viewModel.loadState == .ready
+                && viewModel.currentAudioModeIndex == 3
+        }
 
         XCTAssertEqual(viewModel.currentAudioModeIndex, 3)
         XCTAssertEqual(viewModel.bassLevel, 7)

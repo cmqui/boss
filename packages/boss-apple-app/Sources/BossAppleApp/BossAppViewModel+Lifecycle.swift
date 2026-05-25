@@ -123,6 +123,19 @@ extension BossAppViewModel {
 
     func startBackgroundLoad(using session: any BossAppSessioning) {
         cancelBackgroundLoad()
+        liveUpdateTasks = [
+            Task { [weak self] in
+                guard let self else { return }
+                await self.pollCurrentAudioMode(session: session)
+            },
+        ]
+    }
+
+    func startFallbackBackgroundPolling(using session: any BossAppSessioning) {
+        guard workspaceUpdateTask == nil else {
+            return
+        }
+
         workspaceUpdateTask = Task { [weak self] in
             guard let self else {
                 return
@@ -130,44 +143,16 @@ extension BossAppViewModel {
 
             do {
                 let updates = session.modeWorkspaceUpdates(interval: .seconds(5))
-                var pollCount = 0
                 for try await snapshot in updates {
                     guard !Task.isCancelled else {
                         break
                     }
 
                     await MainActor.run {
-                        guard self.appScreen == .workspace else {
+                        guard self.appScreen == .workspace, !self.isBusy else {
                             return
                         }
-
-                        let modeChanged = self.currentAudioModeIndex != snapshot.currentAudioModeIndex
-                        self.currentAudioModeIndex = snapshot.currentAudioModeIndex
-                        self.syncSelectedAudioModeToCurrentModeIfNeeded()
-                        Self.log(self.debugSummary(
-                            "Mode workspace poll update",
-                            selectedModeIndex: self.selectedAudioModeIndex,
-                            currentModeIndex: self.currentAudioModeIndex,
-                            liveSettings: snapshot.settings
-                        ))
-
-                        if !self.hasDetachedSettingsDraft {
-                            self.applyDisplayedModeSettings(liveConfig: snapshot.settings)
-                        }
-                        if !self.hasDetachedEqualizerDraft {
-                            self.applyEqualizerSnapshot(snapshot.equalizer)
-                        }
-                        self.applyDeviceSettings(snapshot.deviceSettings.settings)
-
-                        if modeChanged {
-                            self.lastResultMessage = "Mode changed on device; controls refreshed"
-                        }
-                    }
-
-                    pollCount += 1
-                    if pollCount >= Self.audioModeCatalogPollInterval {
-                        pollCount = 0
-                        try await self.refreshAudioModeCatalog(using: session)
+                        self.applyStreamingWorkspaceSnapshot(snapshot, source: "Mode workspace poll update")
                     }
                 }
             } catch {
@@ -181,27 +166,27 @@ extension BossAppViewModel {
         }
     }
 
-    func refreshAudioModeCatalog(using session: any BossAppSessioning) async throws {
-        let modes = try await session.audioModeConfigs()
-        await MainActor.run {
-            guard self.appScreen == .workspace else {
-                return
-            }
-            let selectedMode = self.selectedModeConfig
-            Self.log(self.debugSummary(
-                "Audio mode catalog poll update",
-                selectedModeIndex: self.selectedAudioModeIndex,
-                currentModeIndex: self.currentAudioModeIndex,
-                mode: selectedMode,
-                draftSettings: selectedMode?.settings
-            ) + " catalogCount=\(modes.count)")
-            self.applyAudioModes(modes)
-        }
-    }
-
     func cancelBackgroundLoad() {
+        liveUpdateTasks.forEach { $0.cancel() }
+        liveUpdateTasks.removeAll()
         workspaceUpdateTask?.cancel()
         workspaceUpdateTask = nil
+    }
+
+    func stopBackgroundLoad() async {
+        let liveTasks = liveUpdateTasks
+        liveUpdateTasks = []
+        liveTasks.forEach { $0.cancel() }
+        for task in liveTasks {
+            await task.value
+        }
+
+        let pollingTask = workspaceUpdateTask
+        workspaceUpdateTask = nil
+        pollingTask?.cancel()
+        if let pollingTask {
+            await pollingTask.value
+        }
     }
 
     func loadSupportedPrompts(using session: any BossAppSessioning) async -> [BossAppleAudioModePrompt] {
@@ -236,6 +221,9 @@ extension BossAppViewModel {
 
         Task {
             do {
+                if self.appScreen == .workspace {
+                    await self.stopBackgroundLoad()
+                }
                 try await operation()
                 loadState = .ready
                 Self.log("Completed: \(label)")
@@ -244,6 +232,148 @@ extension BossAppViewModel {
                 loadState = .failed(description)
                 Self.log("Failed: \(label) | \(description)")
             }
+
+            if self.appScreen == .workspace,
+               self.liveUpdateTasks.isEmpty,
+               self.workspaceUpdateTask == nil,
+               let session = self.session {
+                self.startBackgroundLoad(using: session)
+            }
+        }
+    }
+
+    private func pollCurrentAudioMode(
+        session: any BossAppSessioning
+    ) async {
+        do {
+            var lastObservedModeIndex: Int?
+            while !Task.isCancelled {
+                let modeIndex = try await session.currentAudioMode()
+                let shouldResync = await MainActor.run { () -> Bool in
+                    guard self.appScreen == .workspace else {
+                        return false
+                    }
+
+                    if lastObservedModeIndex == nil {
+                        lastObservedModeIndex = modeIndex
+                        return false
+                    }
+
+                    let modeChanged = self.currentAudioModeIndex != modeIndex
+                    lastObservedModeIndex = modeIndex
+                    guard modeChanged else {
+                        return false
+                    }
+
+                    self.currentAudioModeIndex = modeIndex
+                    if !self.hasDetachedSettingsDraft {
+                        self.selectedAudioModeIndex = modeIndex
+                    }
+
+                    if !self.hasDetachedSettingsDraft,
+                       let updatedMode = self.audioModes.first(where: { $0.modeIndex == modeIndex }) {
+                        self.applySettingsSnapshot(updatedMode.settings)
+                    }
+
+                    Self.log("Current mode poll update | selected=\(self.selectedAudioModeIndex.map(String.init) ?? "nil") | current=\(modeIndex)")
+
+                    if self.hasDetachedSettingsDraft || self.hasDetachedEqualizerDraft {
+                        self.lastResultMessage = "Mode changed on device; local edits were preserved"
+                        return true
+                    }
+                    self.lastResultMessage = "Mode changed on device; refreshing controls"
+                    return true
+                }
+
+                if shouldResync {
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        await self.resyncWorkspaceAfterBackgroundModeChange(using: session)
+                    }
+                    return
+                }
+
+                try await Task.sleep(for: await MainActor.run { self.backgroundCurrentModePollingInterval })
+            }
+        } catch {
+            await handleLiveUpdateFailure(error, session: session, source: "current audio mode")
+        }
+    }
+
+    @MainActor
+    private func resyncWorkspaceAfterBackgroundModeChange(
+        using session: any BossAppSessioning
+    ) async {
+        guard appScreen == .workspace, !isBusy else {
+            return
+        }
+
+        await stopBackgroundLoad()
+        guard appScreen == .workspace else {
+            return
+        }
+
+        do {
+            try await reloadModeWorkspace(using: session)
+            applyAudioModes(try await session.audioModeConfigs())
+            lastResultMessage = "Mode changed on device; controls refreshed"
+        } catch {
+            lastResultMessage = "Mode changed on device, but refresh failed: \(Self.describe(error))"
+        }
+
+        guard appScreen == .workspace,
+              liveUpdateTasks.isEmpty,
+              workspaceUpdateTask == nil,
+              self.session != nil else {
+            return
+        }
+        startBackgroundLoad(using: session)
+    }
+
+    private func handleLiveUpdateFailure(
+        _ error: Error,
+        session: any BossAppSessioning,
+        source: String
+    ) async {
+        guard !Task.isCancelled else {
+            return
+        }
+
+        await MainActor.run {
+            guard self.appScreen == .workspace, !self.isBusy else {
+                return
+            }
+            self.lastResultMessage = "Live \(source) updates paused: \(Self.describe(error))"
+            self.liveUpdateTasks.forEach { $0.cancel() }
+            self.liveUpdateTasks.removeAll()
+            self.startFallbackBackgroundPolling(using: session)
+        }
+    }
+
+    private func applyStreamingWorkspaceSnapshot(
+        _ snapshot: BossAppleModeWorkspaceSnapshot,
+        source: String
+    ) {
+        let modeChanged = currentAudioModeIndex != snapshot.currentAudioModeIndex
+        currentAudioModeIndex = snapshot.currentAudioModeIndex
+        syncSelectedAudioModeToCurrentModeIfNeeded()
+        Self.log(debugSummary(
+            source,
+            selectedModeIndex: selectedAudioModeIndex,
+            currentModeIndex: currentAudioModeIndex,
+            liveSettings: snapshot.settings
+        ))
+
+        if !hasDetachedSettingsDraft {
+            applyDisplayedModeSettings(liveConfig: snapshot.settings)
+        }
+        if !hasDetachedEqualizerDraft {
+            applyEqualizerSnapshot(snapshot.equalizer)
+        }
+        applyDeviceSettings(snapshot.deviceSettings.settings)
+
+        if modeChanged {
+            lastResultMessage = "Mode changed on device; controls refreshed"
         }
     }
 

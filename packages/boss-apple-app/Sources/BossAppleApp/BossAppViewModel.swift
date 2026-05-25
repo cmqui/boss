@@ -56,7 +56,7 @@ public final class BossAppViewModel: ObservableObject {
     var hasStartedInitialRefresh = false
     var discoveryTask: Task<Void, Never>?
     var workspaceUpdateTask: Task<Void, Never>?
-    static let audioModeCatalogPollInterval = 6
+    var liveUpdateTasks: [Task<Void, Never>] = []
     var session: (any BossAppSessioning)?
     var selectedDeviceIdentifier: UUID?
     var isManualDeviceSelection = false
@@ -66,6 +66,7 @@ public final class BossAppViewModel: ObservableObject {
     let runtimeConfiguration: BossAppRuntimeConfiguration
     let cncTotalSteps = 11
     var cncDisplayMaximum: Int { cncTotalSteps - 1 }
+    var backgroundCurrentModePollingInterval: Duration = .milliseconds(750)
 
     public convenience init(configuration: BossAppRuntimeConfiguration = .current()) {
         self.init(

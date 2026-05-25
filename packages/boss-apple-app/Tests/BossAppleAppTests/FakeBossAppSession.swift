@@ -9,6 +9,11 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
     var refreshModeWorkspaceSnapshotResult: BossAppleModeWorkspaceSnapshot = .fixture()
     var audioModeConfigsResult: [BossAppleAudioModeConfig]?
     var modeWorkspaceUpdateSnapshots: [BossAppleModeWorkspaceSnapshot] = []
+    var currentAudioModeUpdateValues: [Int]?
+    var audioModeSettingsUpdateValues: [BossAppleAudioModeSettingsConfig]?
+    var equalizerUpdateValues: [BossAppleEqualizerSettings]?
+    var deviceSettingsUpdateValues: [BossAppleDeviceSettingsReport]?
+    var audioModeCatalogUpdateValues: [[BossAppleAudioModeConfig]]?
     var supportedPrompts: [BossAppleAudioModePrompt] = [.quiet]
     var firmwareVersionInfo = BossAppleFirmwareVersionInfo(version: "1.0.0", port: 0)
     var currentAudioModeWriteResult: BossAppleCurrentAudioModeWriteResult = .unchanged(1)
@@ -17,6 +22,10 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
     var saveCustomAudioModeError: Error?
     var savedCustomAudioModeResult: BossAppleAudioModeConfig?
     var saveCustomAudioModeCalls: [SavedCustomModeCall] = []
+    var keepModeWorkspaceUpdateStreamOpen = false
+    var modeWorkspaceUpdatesStartCount = 0
+    var modeWorkspaceUpdatesTerminationCount = 0
+    var currentAudioModeReadCount = 0
     var closeCallCount = 0
     var setCurrentAudioModeCalls: [Int] = []
     var audioModeSettingsPatches: [BossAppleAudioModeSettingsConfigPatch] = []
@@ -38,11 +47,53 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
 
     func modeWorkspaceUpdates(interval: Duration) -> AsyncThrowingStream<BossAppleModeWorkspaceSnapshot, Error> {
         AsyncThrowingStream { continuation in
+            modeWorkspaceUpdatesStartCount += 1
             for snapshot in modeWorkspaceUpdateSnapshots {
                 continuation.yield(snapshot)
             }
-            continuation.finish()
+            if !keepModeWorkspaceUpdateStreamOpen {
+                continuation.finish()
+            }
+            continuation.onTermination = { [weak self] _ in
+                self?.modeWorkspaceUpdatesTerminationCount += 1
+            }
         }
+    }
+
+    func currentAudioMode() async throws -> Int {
+        defer { currentAudioModeReadCount += 1 }
+        let values = currentAudioModeUpdateValues ?? modeWorkspaceUpdateSnapshots.map(\.currentAudioModeIndex)
+        if !values.isEmpty {
+            let index = min(currentAudioModeReadCount, values.count - 1)
+            return values[index]
+        }
+        return refreshModeWorkspaceSnapshotResult.currentAudioModeIndex
+    }
+
+    func currentAudioModeUpdateStream() async -> AsyncThrowingStream<Int, Error> {
+        let values = currentAudioModeUpdateValues ?? modeWorkspaceUpdateSnapshots.map(\.currentAudioModeIndex)
+        return makeStream(values, keepOpen: keepModeWorkspaceUpdateStreamOpen)
+    }
+
+    func audioModeSettingsUpdateStream() async -> AsyncThrowingStream<BossAppleAudioModeSettingsConfig, Error> {
+        let values = audioModeSettingsUpdateValues ?? modeWorkspaceUpdateSnapshots.map(\.settings)
+        return makeStream(values, keepOpen: keepModeWorkspaceUpdateStreamOpen)
+    }
+
+    func equalizerUpdateStream() async -> AsyncThrowingStream<BossAppleEqualizerSettings, Error> {
+        let values = equalizerUpdateValues
+            ?? modeWorkspaceUpdateSnapshots.compactMap(\.equalizer)
+        return makeStream(values, keepOpen: keepModeWorkspaceUpdateStreamOpen)
+    }
+
+    func deviceSettingsUpdateStream() async -> AsyncThrowingStream<BossAppleDeviceSettingsReport, Error> {
+        let values = deviceSettingsUpdateValues ?? modeWorkspaceUpdateSnapshots.map(\.deviceSettings)
+        return makeStream(values, keepOpen: keepModeWorkspaceUpdateStreamOpen)
+    }
+
+    func audioModeCatalogUpdateStream() async -> AsyncThrowingStream<[BossAppleAudioModeConfig], Error> {
+        let values = audioModeCatalogUpdateValues ?? [audioModeConfigsResult ?? workspaceSnapshot.audioModes]
+        return makeStream(values, keepOpen: keepModeWorkspaceUpdateStreamOpen)
     }
 
     func supportedAudioModePrompts() async throws -> [BossAppleAudioModePrompt] {
@@ -113,6 +164,26 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
             userConfigurable: true,
             userConfigured: true
         )
+    }
+
+    private func makeStream<Element: Sendable>(
+        _ values: [Element],
+        keepOpen: Bool,
+        onStart: (@Sendable () -> Void)? = nil,
+        onTermination: (@Sendable () -> Void)? = nil
+    ) -> AsyncThrowingStream<Element, Error> {
+        AsyncThrowingStream { continuation in
+            onStart?()
+            for value in values {
+                continuation.yield(value)
+            }
+            if !keepOpen {
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                onTermination?()
+            }
+        }
     }
 }
 

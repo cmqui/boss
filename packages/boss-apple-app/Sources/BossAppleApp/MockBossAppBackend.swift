@@ -441,6 +441,58 @@ final class MockBossAppSession: @unchecked Sendable, BossAppSessioning {
         }
     }
 
+    func currentAudioMode() async throws -> Int {
+        try await store.validateConnection(connection)
+        return await store.modeWorkspaceSnapshot().currentAudioModeIndex
+    }
+
+    func currentAudioModeUpdateStream() async -> AsyncThrowingStream<Int, Error> {
+        try? await store.validateConnection(connection)
+        let currentIndex = await store.modeWorkspaceSnapshot().currentAudioModeIndex
+        return AsyncThrowingStream { continuation in
+            continuation.yield(currentIndex)
+            continuation.finish()
+        }
+    }
+
+    func audioModeSettingsUpdateStream() async -> AsyncThrowingStream<BossAppleAudioModeSettingsConfig, Error> {
+        try? await store.validateConnection(connection)
+        let settings = await store.modeWorkspaceSnapshot().settings
+        return AsyncThrowingStream { continuation in
+            continuation.yield(settings)
+            continuation.finish()
+        }
+    }
+
+    func equalizerUpdateStream() async -> AsyncThrowingStream<BossAppleEqualizerSettings, Error> {
+        try? await store.validateConnection(connection)
+        let equalizer = await store.modeWorkspaceSnapshot().equalizer
+        return AsyncThrowingStream { continuation in
+            if let equalizer {
+                continuation.yield(equalizer)
+            }
+            continuation.finish()
+        }
+    }
+
+    func deviceSettingsUpdateStream() async -> AsyncThrowingStream<BossAppleDeviceSettingsReport, Error> {
+        try? await store.validateConnection(connection)
+        let report = await store.modeWorkspaceSnapshot().deviceSettings
+        return AsyncThrowingStream { continuation in
+            continuation.yield(report)
+            continuation.finish()
+        }
+    }
+
+    func audioModeCatalogUpdateStream() async -> AsyncThrowingStream<[BossAppleAudioModeConfig], Error> {
+        try? await store.validateConnection(connection)
+        let modes = await store.configs()
+        return AsyncThrowingStream { continuation in
+            continuation.yield(modes)
+            continuation.finish()
+        }
+    }
+
     func supportedAudioModePrompts() async throws -> [BossAppleAudioModePrompt] {
         try await store.validateConnection(connection)
         return await store.prompts()

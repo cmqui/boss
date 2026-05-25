@@ -21,6 +21,9 @@ struct BossctlCLI {
 
     private static func run(_ command: Command) async throws {
         switch command {
+        case .version:
+            print("bossctl \(BossctlVersion.current)")
+
         case .bootstrap(let options):
             let description = bootstrapAttemptDescription(for: options)
             print("Bootstrapping \(description)...")
@@ -198,6 +201,19 @@ struct BossctlCLI {
                     : deleted.name
                 print("Deleted audio mode \(targetIndex): \(displayName)")
             }
+
+        case .stream(let command):
+            switch command.action {
+            case .probe(let options):
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                try await runStreamProbe(options, session: session)
+            }
+
+        case .bmap(let command):
+            switch command.action {
+            case .trace(let durationSeconds):
+                try await runBmapTrace(durationSeconds: durationSeconds, connection: command.connection.appleConnectionOptions())
+            }
         }
     }
 
@@ -209,5 +225,154 @@ struct BossctlCLI {
             return "device matching \"\(nameContains)\""
         }
         return "nearby Bose device"
+    }
+
+    private static func runStreamProbe(
+        _ options: StreamProbeOptions,
+        session: BossAppleSession
+    ) async throws {
+        let targets = options.target == .all ? StreamProbeTarget.individualTargets : [options.target]
+        print("Starting stream probe for \(options.target.displayName)")
+        print("Duration: \(options.durationSeconds)s")
+        print("Press Ctrl-C to stop early")
+
+        var tasks: [Task<Void, Never>] = []
+        for target in targets {
+            tasks.append(await makeStreamProbeTask(target: target, session: session))
+        }
+
+        do {
+            try await Task.sleep(for: .seconds(options.durationSeconds))
+        } catch is CancellationError {
+        }
+
+        tasks.forEach { $0.cancel() }
+        for task in tasks {
+            await task.value
+        }
+        await session.close()
+        print("Stream probe complete")
+    }
+
+    private static func makeStreamProbeTask(
+        target: StreamProbeTarget,
+        session: BossAppleSession
+    ) async -> Task<Void, Never> {
+        switch target {
+        case .all:
+            return Task {}
+        case .currentAudioMode:
+            return probeStream(
+                label: target.displayName,
+                stream: await session.currentAudioModeUpdateStream()
+            ) { "modeIndex=\($0)" }
+        case .audioModeSettings:
+            return probeStream(
+                label: target.displayName,
+                stream: await session.audioModeSettingsUpdateStream()
+            ) { describe($0) }
+        case .equalizer:
+            return probeStream(
+                label: target.displayName,
+                stream: await session.equalizerUpdateStream()
+            ) { renderEqualizer($0) }
+        case .deviceSettings:
+            return probeStream(
+                label: target.displayName,
+                stream: await session.deviceSettingsUpdateStream()
+            ) { renderDeviceSettingsReport($0) }
+        case .audioModeCatalog:
+            return probeStream(
+                label: target.displayName,
+                stream: await session.audioModeCatalogUpdateStream()
+            ) { renderAudioModeCatalog($0) }
+        }
+    }
+
+    private static func runBmapTrace(
+        durationSeconds: Int,
+        connection: BossAppleConnectionOptions
+    ) async throws {
+        print("Starting incoming BMAP trace")
+        print("Duration: \(durationSeconds)s")
+        print("Press hardware controls or use the Bose app during the trace window")
+
+        let stream = BossAppleSession.bmapTraceStream(connection: connection)
+        let task = Task {
+            do {
+                for try await event in stream {
+                    printBmapTraceEvent(event)
+                }
+            } catch is CancellationError {
+            } catch {
+                fputs("BMAP trace error: \(error)\n", stderr)
+            }
+        }
+
+        do {
+            try await Task.sleep(for: .seconds(durationSeconds))
+        } catch is CancellationError {
+        }
+
+        task.cancel()
+        await task.value
+        print("BMAP trace complete")
+    }
+
+    private static func probeStream<Element: Sendable>(
+        label: String,
+        stream: AsyncThrowingStream<Element, Error>,
+        formatter: @escaping @Sendable (Element) -> String
+    ) -> Task<Void, Never> {
+        Task {
+            do {
+                for try await value in stream {
+                    guard !Task.isCancelled else {
+                        return
+                    }
+                    print("[\(label)] \(formatter(value))")
+                }
+                if !Task.isCancelled {
+                    print("[\(label)] stream ended")
+                }
+            } catch is CancellationError {
+            } catch {
+                if !Task.isCancelled {
+                    print("[\(label)] error: \(error)")
+                }
+            }
+        }
+    }
+
+    private static func renderEqualizer(_ settings: BossAppleEqualizerSettings) -> String {
+        settings.ranges
+            .map { "\($0.band.displayName)=\($0.currentLevel)" }
+            .joined(separator: ",")
+    }
+
+    private static func renderDeviceSettingsReport(_ report: BossAppleDeviceSettingsReport) -> String {
+        let output = BossctlBufferingOutputWriter()
+        printDeviceSettingsReport(report, output: output)
+        return output.lines.joined(separator: " | ")
+    }
+
+    private static func renderAudioModeCatalog(_ modes: [BossAppleAudioModeConfig]) -> String {
+        modes.map { mode in
+            let trimmedName = mode.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = trimmedName.isEmpty ? "<empty>" : trimmedName
+            let flags = [
+                mode.favorite ? "favorite" : nil,
+                mode.userConfigurable ? "user-configurable" : nil,
+                mode.userConfigured ? "user-configured" : nil,
+            ]
+            .compactMap { $0 }
+            .joined(separator: ",")
+
+            if flags.isEmpty {
+                return "\(mode.modeIndex)=\(name)"
+            }
+            return "\(mode.modeIndex)=\(name) [\(flags)]"
+        }
+        .joined(separator: "; ")
     }
 }

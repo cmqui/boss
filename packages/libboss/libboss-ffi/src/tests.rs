@@ -71,32 +71,26 @@ fn read_bytes(buffer: &BossBuffer) -> Vec<u8> {
     unsafe { std::slice::from_raw_parts(buffer.data, buffer.len).to_vec() }
 }
 
+fn current_audio_mode_packet(operator: BmapOperator, mode_index: u8) -> Vec<u8> {
+    packet_bytes(BmapPacket::new(
+        BmapFunctionBlock::AudioModes,
+        BmapFunction::Unknown {
+            block: BmapFunctionBlock::AudioModes,
+            raw_value: libboss_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
+        },
+        0,
+        0,
+        operator,
+        vec![mode_index],
+    ))
+}
+
 #[test]
 fn ffi_session_set_current_audio_mode_returns_updated_result() {
     let context = Box::new(HostContext {
         incoming_packets: Mutex::new(VecDeque::from(vec![
-            packet_bytes(BmapPacket::new(
-                BmapFunctionBlock::AudioModes,
-                BmapFunction::Unknown {
-                    block: BmapFunctionBlock::AudioModes,
-                    raw_value: libboss_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
-                },
-                0,
-                0,
-                BmapOperator::Status,
-                vec![0x01],
-            )),
-            packet_bytes(BmapPacket::new(
-                BmapFunctionBlock::AudioModes,
-                BmapFunction::Unknown {
-                    block: BmapFunctionBlock::AudioModes,
-                    raw_value: libboss_core::BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW,
-                },
-                0,
-                0,
-                BmapOperator::Result,
-                vec![0x03],
-            )),
+            current_audio_mode_packet(BmapOperator::Status, 0x01),
+            current_audio_mode_packet(BmapOperator::Result, 0x03),
         ])),
         sent_packets: Mutex::new(Vec::new()),
     });
@@ -123,6 +117,39 @@ fn ffi_session_set_current_audio_mode_returns_updated_result() {
     assert_eq!(result.mode_index, 3);
 
     boss_session_free(handle);
+}
+
+#[test]
+fn ffi_current_audio_mode_update_stream_accepts_result_packets() {
+    let context = Box::new(HostContext {
+        incoming_packets: Mutex::new(VecDeque::from(vec![current_audio_mode_packet(
+            BmapOperator::Result,
+            0x03,
+        )])),
+        sent_packets: Mutex::new(Vec::new()),
+    });
+    let handle = boss_update_stream_create(
+        BossFfiSessionCallbacks {
+            context: Box::into_raw(context) as *mut c_void,
+            transport_kind: 1,
+            send_packet_bytes: Some(test_send_packet_bytes),
+            next_packet_bytes: Some(test_next_packet_bytes),
+            release_context: Some(test_release_context),
+        },
+        BossFfiUpdateStreamKind::CurrentAudioMode,
+        ptr::null_mut(),
+    );
+
+    let mut mode_index = 0;
+    assert!(boss_update_stream_next_current_audio_mode(
+        handle,
+        1_000,
+        &mut mode_index,
+        ptr::null_mut(),
+    ));
+    assert_eq!(mode_index, 3);
+
+    boss_update_stream_free(handle);
 }
 
 #[test]

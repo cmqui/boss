@@ -4,6 +4,13 @@ import libbossApple
 @testable import bossctl
 
 final class CommandParsingTests: XCTestCase {
+    func testVersionFlagParsesVersionCommand() throws {
+        let command = try Command.parse(arguments: ["-v"])
+        guard case .version = command else {
+            return XCTFail("Expected version command")
+        }
+    }
+
     func testBootstrapHappyPathParsesConnectionOptions() throws {
         let command = try Command.parse(arguments: [
             "bootstrap",
@@ -154,5 +161,55 @@ final class CommandParsingTests: XCTestCase {
         ])) { error in
             XCTAssertEqual((error as? UsageError)?.message, "Invalid volume control value for --mode: swipe")
         }
+    }
+
+    func testStreamProbeParsesTargetAndDuration() throws {
+        let command = try Command.parse(arguments: [
+            "stream",
+            "probe",
+            "device-settings",
+            "--duration", "45",
+            "--name", "Bose",
+        ])
+
+        guard case .stream(let stream) = command else {
+            return XCTFail("Expected stream command")
+        }
+
+        XCTAssertEqual(stream.connection.nameContains, "Bose")
+        guard case .probe(let options) = stream.action else {
+            return XCTFail("Expected stream probe action")
+        }
+        XCTAssertEqual(options.target, .deviceSettings)
+        XCTAssertEqual(options.durationSeconds, 45)
+    }
+
+    func testStreamProbeRejectsUnknownTarget() {
+        XCTAssertThrowsError(try Command.parse(arguments: [
+            "stream",
+            "probe",
+            "settings",
+        ])) { error in
+            XCTAssertEqual((error as? UsageError)?.message, "Unknown stream probe target: settings")
+        }
+    }
+
+    func testBmapTraceParsesDurationAndConnection() throws {
+        let command = try Command.parse(arguments: [
+            "bmap",
+            "trace",
+            "--duration", "20",
+            "--identifier", "40824082-0000-4000-8000-000000000002",
+        ])
+
+        guard case .bmap(let bmap) = command else {
+            return XCTFail("Expected bmap command")
+        }
+
+        XCTAssertEqual(bmap.connection.identifier?.uuidString, "40824082-0000-4000-8000-000000000002")
+        guard case .trace(let durationSeconds) = bmap.action else {
+            return XCTFail("Expected trace action")
+        }
+        XCTAssertEqual(durationSeconds, 20)
     }
 }

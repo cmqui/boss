@@ -29,7 +29,10 @@ async fn next_stream_packet(
             BossFfiUpdateStreamKind::CurrentAudioMode => {
                 packet.function_block == BmapFunctionBlock::AudioModes
                     && packet.function.raw_value() == BossAudioModesCodec::CURRENT_MODE_FUNCTION_RAW
-                    && packet.operator == libboss_core::BmapOperator::Status
+                    && matches!(
+                        packet.operator,
+                        libboss_core::BmapOperator::Status | libboss_core::BmapOperator::Result
+                    )
             }
             BossFfiUpdateStreamKind::AudioModeSettings => {
                 packet.function_block == BmapFunctionBlock::AudioModes

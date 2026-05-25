@@ -2,9 +2,12 @@ import Foundation
 import libbossApple
 
 enum Command {
+    case version
     case bootstrap(ConnectionOptions)
     case settings(SettingsCommand)
     case audioMode(AudioModeCommand)
+    case stream(StreamCommand)
+    case bmap(BmapCommand)
 
     static func parse<S: Sequence>(arguments: S) throws -> Command where S.Element == String {
         var args = Array(arguments)
@@ -14,12 +17,18 @@ enum Command {
 
         let head = args.removeFirst()
         switch head {
+        case "-v", "--version", "version":
+            return .version
         case "bootstrap":
             return .bootstrap(try ConnectionOptions.parse(arguments: args))
         case "settings":
             return .settings(try SettingsCommand.parse(arguments: args))
         case "audio-mode":
             return .audioMode(try AudioModeCommand.parse(arguments: args))
+        case "stream":
+            return .stream(try StreamCommand.parse(arguments: args))
+        case "bmap":
+            return .bmap(try BmapCommand.parse(arguments: args))
         case "--help", "-h", "help":
             throw UsageError(Command.usage, isHelp: true)
         default:
@@ -29,6 +38,9 @@ enum Command {
 
     static let usage = """
     Usage:
+      bossctl -h | --help
+      bossctl -v | --version
+      bossctl version
       bossctl bootstrap [connection options]
       bossctl settings get all [connection options]
       bossctl settings get standby-timer|auto-aware|on-head-detection|auto-play-pause|auto-answer|equalizer [connection options]
@@ -53,11 +65,17 @@ enum Command {
       bossctl audio-mode favorite (--index <n> | --mode <name>) [connection options]
       bossctl audio-mode unfavorite (--index <n> | --mode <name>) [connection options]
       bossctl audio-mode delete (--index <n> | --mode <name>) [connection options]
+      bossctl stream probe all|current-audio-mode|audio-mode-settings|equalizer|device-settings|audio-mode-catalog [--duration <seconds>] [connection options]
+      bossctl bmap trace [--duration <seconds>] [connection options]
 
     Connection options:
       --name <substring>
       --identifier <uuid>
       --timeout <seconds>
       --characteristic automatic|unsecure|secure
+
+    Commands added during the Rust migration:
+      bossctl stream probe ...
+      bossctl bmap trace ...
     """
 }

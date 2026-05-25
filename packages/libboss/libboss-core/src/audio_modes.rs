@@ -561,7 +561,12 @@ impl BossAudioModesCodec {
     }
 
     pub fn parse_current_mode(packet: &BmapPacket) -> Result<i32, BossAudioModesCodecError> {
-        Self::require_status(packet)?;
+        if !matches!(packet.operator, BmapOperator::Status | BmapOperator::Result) {
+            return Err(BossAudioModesCodecError::UnexpectedOperator {
+                expected: BmapOperator::Status,
+                actual: packet.operator,
+            });
+        }
         let Some(first) = packet.payload.first().copied() else {
             return Err(BossAudioModesCodecError::InvalidPayload(
                 "Expected at least one payload byte for current audio mode".into(),
