@@ -16,6 +16,14 @@ The macOS app supports both Rust FFI modes:
 
 The Xcode project runs `scripts/build-libboss-ffi.sh` before each build to compile Rust. Dynamic builds also copy the dylib into `Boss.app/Contents/Frameworks`. Install [Rust](https://rustup.rs) so `cargo` is available (`~/.cargo/bin`); Xcode does not load your shell profile by default.
 
+From the repo root, build the macOS app with `MACOS_LINKAGE=dynamic|static` and `MACOS_ARCH=arm64|x86_64`; both default to the current local development setup (`dynamic` on the current host architecture):
+
+```sh
+make boss-macos
+make boss-macos MACOS_LINKAGE=static
+make boss-macos MACOS_ARCH=x86_64
+```
+
 If you run outside Xcode without embedding the dylib, point at a built copy explicitly:
 
 ```sh
@@ -31,12 +39,6 @@ swift run Boss
 ```
 
 The packaged `boss-ui` cask also checks the standard Homebrew `opt/libboss` locations directly, so the app bundle does not need a launcher wrapper just to locate the shared runtime.
-
-Build a release `.app` bundle:
-
-```sh
-./scripts/build-release-app.sh
-```
 
 The GUI currently uses `BossAppleController` from `libbossApple` and provides a small scaffold for:
 

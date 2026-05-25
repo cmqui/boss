@@ -54,6 +54,15 @@ Status:
   - `make homebrew-stage-release`
   - `make homebrew-archive-release RELEASE_VERSION=<version>`
   - `make homebrew-archive-release-notarized RELEASE_VERSION=<version>`
+- release staging and archive commands now share one component selector:
+  - `make homebrew-stage-release-component HOMEBREW_COMPONENT=runtime MACOS_ARCH=arm64`
+  - `make homebrew-stage-release-component HOMEBREW_COMPONENT=runtime MACOS_ARCH=x86_64`
+  - `make homebrew-stage-release-component HOMEBREW_COMPONENT=bossctl MACOS_ARCH=arm64`
+  - `make homebrew-stage-release-component HOMEBREW_COMPONENT=boss-ui`
+  - `make homebrew-archive-component HOMEBREW_COMPONENT=runtime MACOS_ARCH=arm64 RELEASE_VERSION=<version>`
+  - `make homebrew-archive-component HOMEBREW_COMPONENT=runtime MACOS_ARCH=x86_64 RELEASE_VERSION=<version>`
+  - `make homebrew-archive-component HOMEBREW_COMPONENT=bossctl MACOS_ARCH=x86_64 RELEASE_VERSION=<version>`
+  - `make homebrew-archive-component HOMEBREW_COMPONENT=boss-ui RELEASE_VERSION=<version>`
 - the staged `Boss.app` removes its embedded `libboss_ffi.dylib` and keeps a normal app executable; the shared runtime is resolved through the standard Homebrew `opt/libboss` locations or the explicit env var override
 - the release-oriented staging flow now produces:
   - `packaging/homebrew/staging/libboss/arm64/lib/libboss_ffi.dylib`

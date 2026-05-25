@@ -34,10 +34,3 @@ macOS app:
 cd packages/boss-macos
 swift run Boss
 ```
-
-Release app bundle:
-
-```sh
-cd packages/boss-macos
-./scripts/build-release-app.sh
-```

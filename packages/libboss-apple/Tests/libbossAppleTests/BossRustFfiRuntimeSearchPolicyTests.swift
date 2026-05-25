@@ -72,6 +72,7 @@ final class BossRustFfiRuntimeSearchPolicyTests: XCTestCase {
 
     func testRepositoryChannelIsMarkedDevelopmentOnly() {
         XCTAssertTrue(BossRustFfiRuntimeChannel.repositoryDebugFallback.isDevelopmentOnly)
+        XCTAssertFalse(BossRustFfiRuntimeChannel.processLinked.isDevelopmentOnly)
         XCTAssertFalse(BossRustFfiRuntimeChannel.explicitDylib.isDevelopmentOnly)
         XCTAssertFalse(BossRustFfiRuntimeChannel.explicitHomebrewPrefix.isDevelopmentOnly)
     }

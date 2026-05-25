@@ -64,6 +64,7 @@ enum BossRustFfiRuntimeSearchPolicy {
 }
 
 enum BossRustFfiRuntimeChannel: String, Sendable {
+    case processLinked = "process-linked"
     case linkedStatic = "linked-static"
     case explicitDylib = "explicit-dylib"
     case explicitHomebrewPrefix = "homebrew-shared-runtime"
@@ -622,6 +623,13 @@ final class BossRustFfiRuntime: @unchecked Sendable {
     }
 
     static let shared: BossRustFfiRuntime? = {
+        if let processHandle = dlopen(nil, RTLD_NOW | RTLD_LOCAL) {
+            if let runtime = BossRustFfiRuntime(processHandle, ownsHandle: false) {
+                BossRustLogger.log("using libboss ffi via \(BossRustFfiRuntimeChannel.processLinked.rawValue)")
+                return runtime
+            }
+            dlclose(processHandle)
+        }
         #if LIBBOSS_STATIC_LINKED
         BossRustLogger.log("using libboss ffi via \(BossRustFfiRuntimeChannel.linkedStatic.rawValue)")
         return BossRustFfiRuntime(linked: ())
