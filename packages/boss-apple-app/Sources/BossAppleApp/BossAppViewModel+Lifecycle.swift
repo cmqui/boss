@@ -123,10 +123,12 @@ extension BossAppViewModel {
 
     func startBackgroundLoad(using session: any BossAppSessioning) {
         cancelBackgroundLoad()
+        backgroundLoadGeneration &+= 1
+        let generation = backgroundLoadGeneration
         liveUpdateTasks = [
             Task { [weak self] in
                 guard let self else { return }
-                await self.pollCurrentAudioMode(session: session)
+                await self.pollCurrentAudioMode(session: session, generation: generation)
             },
         ]
     }
@@ -135,6 +137,7 @@ extension BossAppViewModel {
         guard workspaceUpdateTask == nil else {
             return
         }
+        let generation = backgroundLoadGeneration
 
         workspaceUpdateTask = Task { [weak self] in
             guard let self else {
@@ -149,7 +152,9 @@ extension BossAppViewModel {
                     }
 
                     await MainActor.run {
-                        guard self.appScreen == .workspace, !self.isBusy else {
+                        guard self.appScreen == .workspace,
+                              !self.isBusy,
+                              self.backgroundLoadGeneration == generation else {
                             return
                         }
                         self.applyStreamingWorkspaceSnapshot(snapshot, source: "Mode workspace poll update")
@@ -157,7 +162,9 @@ extension BossAppViewModel {
                 }
             } catch {
                 await MainActor.run {
-                    guard self.appScreen == .workspace, !self.isBusy else {
+                    guard self.appScreen == .workspace,
+                          !self.isBusy,
+                          self.backgroundLoadGeneration == generation else {
                         return
                     }
                     self.lastResultMessage = "Live updates paused: \(Self.describe(error))"
@@ -167,6 +174,7 @@ extension BossAppViewModel {
     }
 
     func cancelBackgroundLoad() {
+        backgroundLoadGeneration &+= 1
         liveUpdateTasks.forEach { $0.cancel() }
         liveUpdateTasks.removeAll()
         workspaceUpdateTask?.cancel()
@@ -243,7 +251,8 @@ extension BossAppViewModel {
     }
 
     private func pollCurrentAudioMode(
-        session: any BossAppSessioning
+        session: any BossAppSessioning,
+        generation: UInt64
     ) async {
         do {
             var lastObservedModeIndex: Int?
@@ -253,7 +262,9 @@ extension BossAppViewModel {
                     continue
                 }
                 let shouldResync = await MainActor.run { () -> Bool in
-                    guard self.appScreen == .workspace else {
+                    guard self.appScreen == .workspace,
+                          !self.isBusy,
+                          self.backgroundLoadGeneration == generation else {
                         return false
                     }
 
@@ -295,6 +306,7 @@ extension BossAppViewModel {
                 if shouldResync {
                     Task { @MainActor [weak self] in
                         guard let self else { return }
+                        guard self.backgroundLoadGeneration == generation else { return }
                         await self.resyncWorkspaceAfterBackgroundModeChange(using: session)
                     }
                     return

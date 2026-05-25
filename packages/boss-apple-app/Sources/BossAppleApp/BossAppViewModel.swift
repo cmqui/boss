@@ -57,6 +57,7 @@ public final class BossAppViewModel: ObservableObject {
     var discoveryTask: Task<Void, Never>?
     var workspaceUpdateTask: Task<Void, Never>?
     var liveUpdateTasks: [Task<Void, Never>] = []
+    var backgroundLoadGeneration: UInt64 = 0
     var session: (any BossAppSessioning)?
     var selectedDeviceIdentifier: UUID?
     var isManualDeviceSelection = false
