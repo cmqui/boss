@@ -67,20 +67,7 @@ public extension BossAppleSession {
 
                     for try await packet in stream {
                         let packetData = try BossRustCodecBridge.encode(packet, runtime: rustBridge.runtime)
-                        continuation.yield(
-                            BossAppleBmapTraceEvent(
-                                functionBlockRaw: packet.functionBlock.rawValue,
-                                functionBlockName: packet.functionBlock.displayName,
-                                functionRaw: packet.function.rawValue,
-                                functionName: packet.function.name,
-                                deviceID: packet.deviceID,
-                                port: packet.port,
-                                operatorRaw: packet.operator.rawValue,
-                                operatorName: packet.operator.displayName,
-                                payloadHex: traceHex(packet.payload),
-                                packetHex: traceHex(packetData)
-                            )
-                        )
+                        continuation.yield(makeBmapTraceEvent(packet: packet, packetData: packetData))
                     }
 
                     continuation.finish()
@@ -107,6 +94,24 @@ public extension BossAppleSession {
             }
         }
     }
+}
+
+func makeBmapTraceEvent(
+    packet: BossAppleBmapPacket,
+    packetData: Data
+) -> BossAppleBmapTraceEvent {
+    BossAppleBmapTraceEvent(
+        functionBlockRaw: packet.functionBlock.rawValue,
+        functionBlockName: packet.functionBlock.displayName,
+        functionRaw: packet.function.rawValue,
+        functionName: packet.function.name,
+        deviceID: packet.deviceID,
+        port: packet.port,
+        operatorRaw: packet.operator.rawValue,
+        operatorName: packet.operator.displayName,
+        payloadHex: traceHex(packet.payload),
+        packetHex: traceHex(packetData)
+    )
 }
 
 private func traceHex(_ data: Data) -> String {

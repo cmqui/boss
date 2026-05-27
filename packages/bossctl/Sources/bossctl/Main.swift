@@ -213,6 +213,9 @@ struct BossctlCLI {
             switch command.action {
             case .trace(let durationSeconds):
                 try await runBmapTrace(durationSeconds: durationSeconds, connection: command.connection.appleConnectionOptions())
+            case .debugCurrentMode(let durationSeconds):
+                let session = BossAppleSession(connection: command.connection.appleConnectionOptions())
+                try await runCurrentModeDebug(durationSeconds: durationSeconds, session: session)
             }
         }
     }
@@ -319,6 +322,73 @@ struct BossctlCLI {
         print("BMAP trace complete")
     }
 
+    private static func runCurrentModeDebug(
+        durationSeconds: Int,
+        session: BossAppleSession
+    ) async throws {
+        print("Starting current-mode debug")
+        print("Duration: \(durationSeconds)s")
+        print("Watching typed current-mode updates and raw packets on the same session/transport")
+        print("Press hardware controls during the window")
+
+        let startedAt = ContinuousClock.now
+        let rawStream = await session.rawPacketTraceUpdateStream()
+        let typedStream = await session.currentAudioModeUpdateStream()
+
+        let rawTask = Task<Void, Never> {
+            do {
+                for try await event in rawStream {
+                    guard !Task.isCancelled else {
+                        return
+                    }
+                    let output = BossctlBufferingOutputWriter()
+                    printBmapTraceEvent(event, output: output)
+                    let line = output.lines.joined(separator: " ")
+                    print("[raw +\(elapsedMillis(since: startedAt))ms] \(line)")
+                }
+                if !Task.isCancelled {
+                    print("[raw] stream ended")
+                }
+            } catch is CancellationError {
+            } catch {
+                if !Task.isCancelled {
+                    print("[raw] error: \(error)")
+                }
+            }
+        }
+
+        let typedTask = Task<Void, Never> {
+            do {
+                for try await modeIndex in typedStream {
+                    guard !Task.isCancelled else {
+                        return
+                    }
+                    print("[typed +\(elapsedMillis(since: startedAt))ms] modeIndex=\(modeIndex)")
+                }
+                if !Task.isCancelled {
+                    print("[typed] stream ended")
+                }
+            } catch is CancellationError {
+            } catch {
+                if !Task.isCancelled {
+                    print("[typed] error: \(error)")
+                }
+            }
+        }
+
+        do {
+            try await Task.sleep(for: .seconds(durationSeconds))
+        } catch is CancellationError {
+        }
+
+        rawTask.cancel()
+        typedTask.cancel()
+        await rawTask.value
+        await typedTask.value
+        await session.close()
+        print("Current-mode debug complete")
+    }
+
     private static func probeStream<Element: Sendable>(
         label: String,
         stream: AsyncThrowingStream<Element, Error>,
@@ -374,5 +444,10 @@ struct BossctlCLI {
             return "\(mode.modeIndex)=\(name) [\(flags)]"
         }
         .joined(separator: "; ")
+    }
+    private static func elapsedMillis(since start: ContinuousClock.Instant) -> Int {
+        let duration = start.duration(to: .now).components
+        return Int(duration.seconds * 1_000)
+            + Int(duration.attoseconds / 1_000_000_000_000_000)
     }
 }

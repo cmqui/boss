@@ -67,6 +67,7 @@ enum Command {
       bossctl audio-mode delete (--index <n> | --mode <name>) [connection options]
       bossctl stream probe all|current-audio-mode|audio-mode-settings|equalizer|device-settings|audio-mode-catalog [--duration <seconds>] [connection options]
       bossctl bmap trace [--duration <seconds>] [connection options]
+      bossctl bmap debug-current-mode [--duration <seconds>] [connection options]
 
     Connection options:
       --name <substring>
@@ -77,5 +78,6 @@ enum Command {
     Commands added during the Rust migration:
       bossctl stream probe ...
       bossctl bmap trace ...
+      bossctl bmap debug-current-mode ...
     """
 }

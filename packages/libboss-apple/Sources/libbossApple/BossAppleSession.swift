@@ -39,6 +39,7 @@ struct BossAppleSessionOperationOverrides: Sendable {
     var bootstrap: (@Sendable () async throws -> BossAppleBootstrappedDevice)?
     var refreshModeWorkspaceSnapshot: (@Sendable () async throws -> BossAppleModeWorkspaceSnapshot)?
     var currentAudioModeUpdateStream: (@Sendable () -> AsyncThrowingStream<Int, Error>)?
+    var rawPacketTraceUpdateStream: (@Sendable () -> AsyncThrowingStream<BossAppleBmapTraceEvent, Error>)?
     var audioModeSettingsUpdateStream: (@Sendable () -> AsyncThrowingStream<BossAppleAudioModeSettingsConfig, Error>)?
     var equalizerUpdateStream: (@Sendable () -> AsyncThrowingStream<BossAppleEqualizerSettings, Error>)?
     var favoriteAudioModeIndices: (@Sendable () async throws -> [Int])?
@@ -223,6 +224,69 @@ public actor BossAppleSession {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+
+    public func rawPacketTraceUpdateStream() -> AsyncThrowingStream<BossAppleBmapTraceEvent, Error> {
+        if let override = operationOverrides?.rawPacketTraceUpdateStream {
+            return override()
+        }
+        guard let rustBridge = rustBridgeProvider() else {
+            return Self.rustRequiredStream()
+        }
+
+        let owner = self
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                while !Task.isCancelled {
+                    do {
+                        let transport = try await owner.withRustBleTransportRetrying(
+                            preferredPreferences: owner.appOperationPreferences()
+                        ) { transport in
+                            transport
+                        }
+
+                        for try await packet in rustBridge.rawPacketUpdateStream(on: transport) {
+                            guard !Task.isCancelled else {
+                                continuation.finish()
+                                return
+                            }
+                            let packetData = try BossRustCodecBridge.encode(packet, runtime: rustBridge.runtime)
+                            continuation.yield(
+                                makeBmapTraceEvent(
+                                    packet: packet,
+                                    packetData: packetData
+                                )
+                            )
+                        }
+
+                        if Task.isCancelled {
+                            continuation.finish()
+                            return
+                        }
+
+                        await owner.closeCurrentLink()
+                        try? await Task.sleep(for: .milliseconds(250))
+                    } catch is CancellationError {
+                        continuation.finish()
+                        return
+                    } catch {
+                        if await owner.shouldReconnectCurrentSession(for: error) {
+                            await owner.closeCurrentLink()
+                            try? await Task.sleep(for: .milliseconds(250))
+                            continue
+                        }
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                }
+
+                continuation.finish()
+            }
+
             continuation.onTermination = { _ in
                 task.cancel()
             }

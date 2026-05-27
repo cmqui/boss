@@ -212,4 +212,23 @@ final class CommandParsingTests: XCTestCase {
         }
         XCTAssertEqual(durationSeconds, 20)
     }
+
+    func testBmapDebugCurrentModeParsesDurationAndCharacteristic() throws {
+        let command = try Command.parse(arguments: [
+            "bmap",
+            "debug-current-mode",
+            "--duration", "15",
+            "--characteristic", "unsecure",
+        ])
+
+        guard case .bmap(let bmap) = command else {
+            return XCTFail("Expected bmap command")
+        }
+
+        XCTAssertEqual(bmap.connection.characteristicPreference, .unsecure)
+        guard case .debugCurrentMode(let durationSeconds) = bmap.action else {
+            return XCTFail("Expected debug-current-mode action")
+        }
+        XCTAssertEqual(durationSeconds, 15)
+    }
 }
