@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import libbossApple
 
 extension Bundle {
     static var bossResources: Bundle {
@@ -27,12 +28,16 @@ enum BossImageResource: String {
 enum BossDeviceImageResource {
     case wolverine(String)
 
-    init?(productName: String, variantName: String?) {
-        guard productName == "Bose QC Ultra 2 HP",
-              let assetName = Self.wolverineAssetName(for: variantName) else {
+    init?(productFamily: BossAppleProductFamily, variantName: String?) {
+        switch productFamily {
+        case .qcUltra2:
+            guard let assetName = Self.wolverineAssetName(for: variantName) else {
+                return nil
+            }
+            self = .wolverine(assetName)
+        case .qc45, .unknown:
             return nil
         }
-        self = .wolverine(assetName)
     }
 
     func nsImage(fileExtension: String = "png") -> NSImage? {

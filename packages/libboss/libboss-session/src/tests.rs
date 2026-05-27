@@ -173,11 +173,16 @@ mod tests {
                 Some("WolverineWhiteSmoke")
             );
             assert!(device
-                .supported_function_blocks
+                .protocol_support
+                .function_blocks
                 .contains(BmapFunctionBlock::Settings));
             assert_eq!(
-                device.transport_kind,
+                device.protocol_support.transport_kind,
                 libboss_core::BossTransportKind::Stream
+            );
+            assert_eq!(
+                device.capabilities.audio_modes.modes,
+                libboss_core::BossFeatureSupport::Unsupported
             );
             assert_eq!(link.sent_packets().len(), 3);
         });
@@ -289,6 +294,62 @@ mod tests {
                     timeout_milliseconds: 5,
                 })
             );
+        });
+    }
+
+    #[test]
+    fn bootstrap_session_falls_back_to_catalog_blocks_when_device_rejects_block_probe() {
+        block_on(async {
+            let link = MockLink::new(vec![
+                Ok(Some(BmapPacket::new(
+                    BmapFunctionBlock::ProductInfo,
+                    BmapFunction::ProductInfoBmapVersion,
+                    0,
+                    0,
+                    BmapOperator::Status,
+                    b"1.0.0".to_vec(),
+                ))),
+                Ok(Some(BmapPacket::new(
+                    BmapFunctionBlock::ProductInfo,
+                    BmapFunction::ProductInfoProductIdVariants,
+                    0,
+                    0,
+                    BmapOperator::Status,
+                    vec![0x40, 0x82, 0x01],
+                ))),
+                Ok(Some(BmapPacket::new(
+                    BmapFunctionBlock::ProductInfo,
+                    BmapFunction::ProductInfoAllFblocks,
+                    0,
+                    0,
+                    BmapOperator::Error,
+                    vec![BmapErrorCode::FuncNotSupp as u8],
+                ))),
+            ]);
+            let session = BootstrapSession::new(
+                link.clone(),
+                SessionConfiguration {
+                    first_version_timeout_millis: 50,
+                    retry_version_timeout_millis: 100,
+                    request_timeout_millis: 50,
+                    ..Default::default()
+                },
+            );
+
+            let device = session.bootstrap().await.unwrap();
+            assert!(device
+                .protocol_support
+                .function_blocks
+                .contains(BmapFunctionBlock::Settings));
+            assert!(device
+                .protocol_support
+                .function_blocks
+                .contains(BmapFunctionBlock::AudioModes));
+            assert_eq!(
+                device.capabilities.audio_modes.modes,
+                libboss_core::BossFeatureSupport::Supported
+            );
+            assert_eq!(link.sent_packets().len(), 3);
         });
     }
 

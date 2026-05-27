@@ -89,12 +89,15 @@ public final class AppleBossDeviceDiscovery: NSObject, @unchecked Sendable {
     }
 
     private func startDiscovery() {
-        let serviceUUID = CBUUID(nsuuid: AppleBoseUUIDs.service)
+        guard central.state == .poweredOn else {
+            return
+        }
+        let serviceUUID = Self.boseServiceUUID
         let connected = central.retrieveConnectedPeripherals(withServices: [serviceUUID])
         for peripheral in connected {
             addDevice(id: peripheral.identifier, name: peripheral.name, isConnected: true)
         }
-        central.scanForPeripherals(withServices: nil)
+        central.scanForPeripherals(withServices: [serviceUUID])
     }
 
     private func addDevice(id: UUID, name: String?, isConnected: Bool) {
@@ -147,6 +150,22 @@ public final class AppleBossDeviceDiscovery: NSObject, @unchecked Sendable {
             continuation.resume(throwing: error)
         }
     }
+
+    private static let boseServiceUUID = CBUUID(nsuuid: AppleBoseUUIDs.service)
+
+    static func advertisesBoseService(advertisementData: [String: Any]) -> Bool {
+        let candidateLists: [[CBUUID]?] = [
+            advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID],
+            advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID],
+            advertisementData[CBAdvertisementDataSolicitedServiceUUIDsKey] as? [CBUUID],
+        ]
+
+        return candidateLists
+            .compactMap { $0 }
+            .contains { uuids in
+                uuids.contains(boseServiceUUID)
+            }
+    }
 }
 
 extension AppleBossDeviceDiscovery: CBCentralManagerDelegate {
@@ -160,6 +179,9 @@ extension AppleBossDeviceDiscovery: CBCentralManagerDelegate {
         advertisementData: [String: Any],
         rssi RSSI: NSNumber
     ) {
+        guard Self.advertisesBoseService(advertisementData: advertisementData) else {
+            return
+        }
         let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         addDevice(id: peripheral.identifier, name: peripheral.name ?? advertisedName, isConnected: false)
     }

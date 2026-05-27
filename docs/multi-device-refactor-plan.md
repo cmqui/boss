@@ -372,6 +372,11 @@ Priority order:
 
 This is safer for QC45 and future devices without direct hardware access.
 
+Practical consequence from the first QC Ultra 2 pass:
+
+- bootstrap must not fail hard if a known product rejects an optional capability-discovery probe such as `ProductInfoAllFblocks`
+- workspace loading must degrade optional sections when follow-up reads return function/operator unsupported, rather than failing the whole connect flow
+
 ## Migration Phases
 
 ### Phase 1: Introduce Shared Capability Types
@@ -405,6 +410,7 @@ Acceptance criteria:
 - product lookup remains stable
 - capability derivation is covered by unit tests
 - no UI changes required yet
+- known-product bootstrap can fall back to catalog-implied protocol support when bounded probes are unsupported
 
 ### Phase 3: Split `BossSession` Internals By Feature Area
 
@@ -437,6 +443,7 @@ Acceptance criteria:
 
 - a device can connect and load partial state without audio mode support
 - unsupported feature paths return structured nil/unavailable states
+- unsupported optional feature reads do not abort the entire workspace load
 
 ### Phase 5: Refactor `BossAppSessioning` and App State
 

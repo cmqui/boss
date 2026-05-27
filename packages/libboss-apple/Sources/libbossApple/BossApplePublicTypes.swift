@@ -5,6 +5,18 @@ public enum BossAppleTransportKind: String, Equatable, Sendable {
     case stream
 }
 
+public enum BossAppleProductFamily: String, Equatable, Sendable {
+    case qcUltra2
+    case qc45
+    case unknown
+}
+
+public enum BossAppleProductCategory: String, Equatable, Sendable {
+    case headphones
+    case earbuds
+    case speaker
+}
+
 public struct BossAppleBmapVersionInfo: Equatable, Sendable {
     public let version: String
 
@@ -27,12 +39,23 @@ public struct BossAppleProductDefinition: Equatable, Sendable {
     public let id: UInt16
     public let codeName: String
     public let displayName: String
+    public let family: BossAppleProductFamily
+    public let category: BossAppleProductCategory
     public let variants: [UInt8: String]
 
-    public init(id: UInt16, codeName: String, displayName: String, variants: [UInt8: String]) {
+    public init(
+        id: UInt16,
+        codeName: String,
+        displayName: String,
+        family: BossAppleProductFamily,
+        category: BossAppleProductCategory,
+        variants: [UInt8: String]
+    ) {
         self.id = id
         self.codeName = codeName
         self.displayName = displayName
+        self.family = family
+        self.category = category
         self.variants = variants
     }
 }
@@ -234,34 +257,141 @@ public struct BossAppleFunctionBlockSet: Equatable, Sendable {
     }
 }
 
+public enum BossAppleFeatureSupport: Equatable, Sendable {
+    case supported
+    case unsupported
+    case unknown
+}
+
+public enum BossAppleFeatureAccess: Equatable, Sendable {
+    case readOnly
+    case readWrite
+    case unsupported
+    case unknown
+}
+
+public struct BossAppleProtocolSupport: Equatable, Sendable {
+    public let functionBlocks: BossAppleFunctionBlockSet
+    public let transportKind: BossAppleTransportKind
+    public let defaultDeviceID: Int
+    public let defaultPort: Int
+
+    public init(
+        functionBlocks: BossAppleFunctionBlockSet,
+        transportKind: BossAppleTransportKind,
+        defaultDeviceID: Int,
+        defaultPort: Int
+    ) {
+        self.functionBlocks = functionBlocks
+        self.transportKind = transportKind
+        self.defaultDeviceID = defaultDeviceID
+        self.defaultPort = defaultPort
+    }
+}
+
+public struct BossAppleSettingsCapabilities: Equatable, Sendable {
+    public let standbyTimer: BossAppleFeatureAccess
+    public let wearDetection: BossAppleFeatureAccess
+    public let autoAware: BossAppleFeatureAccess
+    public let autoPlayPause: BossAppleFeatureAccess
+    public let autoAnswer: BossAppleFeatureAccess
+    public let volumeControl: BossAppleFeatureAccess
+
+    public init(
+        standbyTimer: BossAppleFeatureAccess,
+        wearDetection: BossAppleFeatureAccess,
+        autoAware: BossAppleFeatureAccess,
+        autoPlayPause: BossAppleFeatureAccess,
+        autoAnswer: BossAppleFeatureAccess,
+        volumeControl: BossAppleFeatureAccess
+    ) {
+        self.standbyTimer = standbyTimer
+        self.wearDetection = wearDetection
+        self.autoAware = autoAware
+        self.autoPlayPause = autoPlayPause
+        self.autoAnswer = autoAnswer
+        self.volumeControl = volumeControl
+    }
+}
+
+public struct BossAppleAudioModeCapabilities: Equatable, Sendable {
+    public let modes: BossAppleFeatureSupport
+    public let currentMode: BossAppleFeatureAccess
+    public let settingsConfig: BossAppleFeatureAccess
+    public let favorites: BossAppleFeatureAccess
+    public let customProfiles: BossAppleFeatureAccess
+    public let supportedPrompts: BossAppleFeatureSupport
+
+    public init(
+        modes: BossAppleFeatureSupport,
+        currentMode: BossAppleFeatureAccess,
+        settingsConfig: BossAppleFeatureAccess,
+        favorites: BossAppleFeatureAccess,
+        customProfiles: BossAppleFeatureAccess,
+        supportedPrompts: BossAppleFeatureSupport
+    ) {
+        self.modes = modes
+        self.currentMode = currentMode
+        self.settingsConfig = settingsConfig
+        self.favorites = favorites
+        self.customProfiles = customProfiles
+        self.supportedPrompts = supportedPrompts
+    }
+}
+
+public struct BossAppleSoundCapabilities: Equatable, Sendable {
+    public let equalizer: BossAppleFeatureAccess
+
+    public init(equalizer: BossAppleFeatureAccess) {
+        self.equalizer = equalizer
+    }
+}
+
+public struct BossAppleDeviceCapabilities: Equatable, Sendable {
+    public let settings: BossAppleSettingsCapabilities
+    public let audioModes: BossAppleAudioModeCapabilities
+    public let sound: BossAppleSoundCapabilities
+
+    public init(
+        settings: BossAppleSettingsCapabilities,
+        audioModes: BossAppleAudioModeCapabilities,
+        sound: BossAppleSoundCapabilities
+    ) {
+        self.settings = settings
+        self.audioModes = audioModes
+        self.sound = sound
+    }
+}
+
 public struct BossAppleBootstrappedDevice: Equatable, Sendable {
     public let bmapVersion: BossAppleBmapVersionInfo
     public let productID: UInt16
     public let productName: String
     public let productVariant: BossAppleProductVariant
-    public let supportedFunctionBlocks: BossAppleFunctionBlockSet
-    public let transportKind: BossAppleTransportKind
-    public let defaultDeviceID: Int
-    public let defaultPort: Int
+    public let protocolSupport: BossAppleProtocolSupport
+    public let capabilities: BossAppleDeviceCapabilities
+
+    public var supportedFunctionBlocks: BossAppleFunctionBlockSet { protocolSupport.functionBlocks }
+    public var transportKind: BossAppleTransportKind { protocolSupport.transportKind }
+    public var defaultDeviceID: Int { protocolSupport.defaultDeviceID }
+    public var defaultPort: Int { protocolSupport.defaultPort }
+    public var productFamily: BossAppleProductFamily { productVariant.product?.family ?? .unknown }
+    public var productCategory: BossAppleProductCategory { productVariant.product?.category ?? .headphones }
 
     public init(
         bmapVersion: BossAppleBmapVersionInfo,
         productID: UInt16,
         productName: String,
         productVariant: BossAppleProductVariant,
-        supportedFunctionBlocks: BossAppleFunctionBlockSet,
-        transportKind: BossAppleTransportKind,
-        defaultDeviceID: Int,
-        defaultPort: Int
+        protocolSupport: BossAppleProtocolSupport,
+        capabilities: BossAppleDeviceCapabilities
     ) {
         self.bmapVersion = bmapVersion
         self.productID = productID
         self.productName = productName
         self.productVariant = productVariant
-        self.supportedFunctionBlocks = supportedFunctionBlocks
-        self.transportKind = transportKind
-        self.defaultDeviceID = defaultDeviceID
-        self.defaultPort = defaultPort
+        self.protocolSupport = protocolSupport
+        self.capabilities = capabilities
     }
 }
 
@@ -514,6 +644,8 @@ enum BossAppleProductCatalog {
         id: 0x4082,
         codeName: "Wolverine",
         displayName: "Bose QC Ultra 2 HP",
+        family: .qcUltra2,
+        category: .headphones,
         variants: [
             1: "WolverineBlack",
             2: "WolverineWhiteSmoke",

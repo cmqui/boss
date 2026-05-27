@@ -1,5 +1,37 @@
 import Foundation
 
+public struct BossAppleSettingsWorkspace: Sendable, Equatable {
+    public let deviceSettings: BossAppleDeviceSettingsReport
+    public let standbyTimer: BossAppleStandbyTimerValue?
+
+    public init(
+        deviceSettings: BossAppleDeviceSettingsReport,
+        standbyTimer: BossAppleStandbyTimerValue?
+    ) {
+        self.deviceSettings = deviceSettings
+        self.standbyTimer = standbyTimer
+    }
+}
+
+public struct BossAppleAudioModeWorkspace: Sendable, Equatable {
+    public let currentAudioModeIndex: Int
+    public let settings: BossAppleAudioModeSettingsConfig
+    public let audioModes: [BossAppleAudioModeConfig]
+    public let supportedPrompts: [BossAppleAudioModePrompt]
+
+    public init(
+        currentAudioModeIndex: Int,
+        settings: BossAppleAudioModeSettingsConfig,
+        audioModes: [BossAppleAudioModeConfig],
+        supportedPrompts: [BossAppleAudioModePrompt]
+    ) {
+        self.currentAudioModeIndex = currentAudioModeIndex
+        self.settings = settings
+        self.audioModes = audioModes
+        self.supportedPrompts = supportedPrompts
+    }
+}
+
 public struct BossAppleModeWorkspaceSnapshot: Sendable, Equatable {
     public let currentAudioModeIndex: Int
     public let settings: BossAppleAudioModeSettingsConfig
@@ -21,17 +53,23 @@ public struct BossAppleModeWorkspaceSnapshot: Sendable, Equatable {
 
 public struct BossAppleWorkspaceSnapshot: Sendable, Equatable {
     public let bootstrappedDevice: BossAppleBootstrappedDevice
-    public let modeWorkspace: BossAppleModeWorkspaceSnapshot
-    public let audioModes: [BossAppleAudioModeConfig]
+    public let capabilities: BossAppleDeviceCapabilities
+    public let settingsWorkspace: BossAppleSettingsWorkspace
+    public let audioModeWorkspace: BossAppleAudioModeWorkspace?
+    public let equalizer: BossAppleEqualizerSettings?
 
     public init(
         bootstrappedDevice: BossAppleBootstrappedDevice,
-        modeWorkspace: BossAppleModeWorkspaceSnapshot,
-        audioModes: [BossAppleAudioModeConfig]
+        capabilities: BossAppleDeviceCapabilities,
+        settingsWorkspace: BossAppleSettingsWorkspace,
+        audioModeWorkspace: BossAppleAudioModeWorkspace?,
+        equalizer: BossAppleEqualizerSettings?
     ) {
         self.bootstrappedDevice = bootstrappedDevice
-        self.modeWorkspace = modeWorkspace
-        self.audioModes = audioModes
+        self.capabilities = capabilities
+        self.settingsWorkspace = settingsWorkspace
+        self.audioModeWorkspace = audioModeWorkspace
+        self.equalizer = equalizer
     }
 }
 
@@ -55,10 +93,16 @@ struct BossAppleSessionOperationOverrides: Sendable {
     var currentAudioMode: (@Sendable () async throws -> Int)?
     var audioModeSettings: (@Sendable () async throws -> BossAppleAudioModeSettingsConfig)?
     var equalizer: (@Sendable () async throws -> BossAppleEqualizerSettings?)?
+    var standbyTimer: (@Sendable () async throws -> BossAppleStandbyTimerValue?)?
 }
 
 public actor BossAppleSession {
     private static let unknownCurrentAudioModeIndex = 255
+
+    private struct AudioModeWorkspaceBundle {
+        let workspace: BossAppleAudioModeWorkspace
+        let snapshot: BossAppleModeWorkspaceSnapshot
+    }
 
     private struct ConnectedLink {
         let transport: AppleBleBossTransport
@@ -135,12 +179,23 @@ public actor BossAppleSession {
 
     public func loadWorkspaceSnapshot() async throws -> BossAppleWorkspaceSnapshot {
         let bootstrappedDevice = try await bootstrap()
-        let modeWorkspace = try await refreshModeWorkspaceSnapshot()
-        let audioModes = try await audioModeConfigs()
+        let audioModeBundle = try await loadAudioModeWorkspaceIfSupported(
+            capabilities: bootstrappedDevice.capabilities
+        )
+        let settingsWorkspace = try await loadSettingsWorkspace(
+            deviceSettings: audioModeBundle?.snapshot.deviceSettings
+        )
+        let equalizer = if let audioModeBundle {
+            audioModeBundle.snapshot.equalizer
+        } else {
+            try await loadEqualizerIfSupported(capabilities: bootstrappedDevice.capabilities)
+        }
         return BossAppleWorkspaceSnapshot(
             bootstrappedDevice: bootstrappedDevice,
-            modeWorkspace: modeWorkspace,
-            audioModes: audioModes
+            capabilities: bootstrappedDevice.capabilities,
+            settingsWorkspace: settingsWorkspace,
+            audioModeWorkspace: audioModeBundle?.workspace,
+            equalizer: equalizer
         )
     }
 
@@ -153,6 +208,91 @@ public actor BossAppleSession {
             try await rustBridge.refreshModeWorkspaceSnapshot(on: transport)
         }
         return normalize(snapshot)
+    }
+
+    private func loadSettingsWorkspace(
+        deviceSettings: BossAppleDeviceSettingsReport? = nil
+    ) async throws -> BossAppleSettingsWorkspace {
+        let resolvedDeviceSettings = if let deviceSettings {
+            deviceSettings
+        } else {
+            try await deviceSettingsReport()
+        }
+        return BossAppleSettingsWorkspace(
+            deviceSettings: resolvedDeviceSettings,
+            standbyTimer: try await standbyTimer()
+        )
+    }
+
+    private func loadAudioModeWorkspaceIfSupported(
+        capabilities: BossAppleDeviceCapabilities
+    ) async throws -> AudioModeWorkspaceBundle? {
+        guard capabilities.audioModes.modes == BossAppleFeatureSupport.supported,
+              capabilities.audioModes.currentMode != BossAppleFeatureAccess.unsupported,
+              capabilities.audioModes.settingsConfig != BossAppleFeatureAccess.unsupported else {
+            return nil
+        }
+        do {
+            let modeWorkspace = try await refreshModeWorkspaceSnapshot()
+            return AudioModeWorkspaceBundle(
+                workspace: BossAppleAudioModeWorkspace(
+                    currentAudioModeIndex: modeWorkspace.currentAudioModeIndex,
+                    settings: modeWorkspace.settings,
+                    audioModes: try await audioModeConfigs(),
+                    supportedPrompts: try await supportedAudioModePromptsIfSupported(capabilities: capabilities)
+                ),
+                snapshot: modeWorkspace
+            )
+        } catch {
+            if isUnsupportedFeatureError(error) {
+                return nil
+            }
+            throw error
+        }
+    }
+
+    private func loadEqualizerIfSupported(
+        capabilities: BossAppleDeviceCapabilities
+    ) async throws -> BossAppleEqualizerSettings? {
+        guard capabilities.sound.equalizer != BossAppleFeatureAccess.unsupported else {
+            return nil
+        }
+        do {
+            return try await equalizer()
+        } catch {
+            if isUnsupportedFeatureError(error) {
+                return nil
+            }
+            throw error
+        }
+    }
+
+    private func supportedAudioModePromptsIfSupported(
+        capabilities: BossAppleDeviceCapabilities
+    ) async throws -> [BossAppleAudioModePrompt] {
+        guard capabilities.audioModes.supportedPrompts != BossAppleFeatureSupport.unsupported else {
+            return []
+        }
+        do {
+            return try await supportedAudioModePrompts()
+        } catch {
+            if isUnsupportedFeatureError(error) {
+                return []
+            }
+            throw error
+        }
+    }
+
+    private func isUnsupportedFeatureError(_ error: Error) -> Bool {
+        guard let reason = BossAppleController.unavailableSettingReason(error) else {
+            return false
+        }
+        switch reason {
+        case .functionUnsupported, .operatorUnsupported:
+            return true
+        default:
+            return false
+        }
     }
 
     func settingsSnapshot() async throws -> BossAppleSettingsSnapshot {
@@ -356,9 +496,24 @@ public actor BossAppleSession {
     }
 
     public func standbyTimer() async throws -> BossAppleStandbyTimerValue? {
+        if let override = operationOverrides?.standbyTimer {
+            return try await override()
+        }
         let rustBridge = try requireRustBridge()
-        return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
-            try await rustBridge.standbyTimer(on: transport)
+        do {
+            return try await withRustBleTransportRetrying(preferredPreferences: appOperationPreferences()) { transport in
+                try await rustBridge.standbyTimer(on: transport)
+            }
+        } catch {
+            if let reason = BossAppleController.unavailableSettingReason(error) {
+                switch reason {
+                case .functionUnsupported, .operatorUnsupported:
+                    return nil
+                default:
+                    break
+                }
+            }
+            throw error
         }
     }
 

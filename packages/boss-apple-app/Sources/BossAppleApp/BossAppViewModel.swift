@@ -29,6 +29,8 @@ public final class BossAppViewModel: ObservableObject {
     @Published public internal(set) var equalizer: BossAppleEqualizerSettings?
     @Published public internal(set) var deviceName = "Bose Device"
     @Published public internal(set) var deviceVariantName: String?
+    @Published public internal(set) var deviceProductFamily: BossAppleProductFamily?
+    @Published public internal(set) var deviceCapabilities: BossAppleDeviceCapabilities?
     @Published public internal(set) var firmwareVersion: String?
     @Published public internal(set) var wearDetectionEnabled: Bool?
     @Published public internal(set) var autoAwareEnabled: Bool?

@@ -142,6 +142,8 @@ extension BossAppViewModel {
         equalizer = nil
         deviceName = "Bose Device"
         deviceVariantName = nil
+        deviceProductFamily = nil
+        deviceCapabilities = nil
         firmwareVersion = nil
         wearDetectionEnabled = nil
         autoAwareEnabled = nil

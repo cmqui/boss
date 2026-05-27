@@ -203,6 +203,33 @@ extension BossRustSessionBridge {
             Data(rawBuffer.prefix(ffi.function_blocks_len))
         }
         let product = BossAppleProductCatalog.product(for: ffi.product_id)
+        let protocolSupport = BossAppleProtocolSupport(
+            functionBlocks: BossAppleFunctionBlockSet(bytes: functionBlockBytes),
+            transportKind: ffi.transport_kind == 0 ? .ble : .stream,
+            defaultDeviceID: Int(ffi.default_device_id),
+            defaultPort: Int(ffi.default_port)
+        )
+        let capabilities = BossAppleDeviceCapabilities(
+            settings: BossAppleSettingsCapabilities(
+                standbyTimer: swiftFeatureAccess(raw: ffi.standby_timer_access),
+                wearDetection: swiftFeatureAccess(raw: ffi.wear_detection_access),
+                autoAware: swiftFeatureAccess(raw: ffi.auto_aware_access),
+                autoPlayPause: swiftFeatureAccess(raw: ffi.auto_play_pause_access),
+                autoAnswer: swiftFeatureAccess(raw: ffi.auto_answer_access),
+                volumeControl: swiftFeatureAccess(raw: ffi.volume_control_access)
+            ),
+            audioModes: BossAppleAudioModeCapabilities(
+                modes: swiftFeatureSupport(raw: ffi.audio_modes_support),
+                currentMode: swiftFeatureAccess(raw: ffi.current_audio_mode_access),
+                settingsConfig: swiftFeatureAccess(raw: ffi.audio_mode_settings_access),
+                favorites: swiftFeatureAccess(raw: ffi.audio_mode_favorites_access),
+                customProfiles: swiftFeatureAccess(raw: ffi.audio_mode_custom_profiles_access),
+                supportedPrompts: swiftFeatureSupport(raw: ffi.audio_mode_supported_prompts_support)
+            ),
+            sound: BossAppleSoundCapabilities(
+                equalizer: swiftFeatureAccess(raw: ffi.equalizer_access)
+            )
+        )
         return BossAppleBootstrappedDevice(
             bmapVersion: BossAppleBmapVersionInfo(version: bmapVersion),
             productID: ffi.product_id,
@@ -213,11 +240,26 @@ extension BossRustSessionBridge {
                 product: product,
                 variantName: product?.variants[ffi.variant]
             ),
-            supportedFunctionBlocks: BossAppleFunctionBlockSet(bytes: functionBlockBytes),
-            transportKind: ffi.transport_kind == 0 ? .ble : .stream,
-            defaultDeviceID: Int(ffi.default_device_id),
-            defaultPort: Int(ffi.default_port)
+            protocolSupport: protocolSupport,
+            capabilities: capabilities
         )
+    }
+
+    static func swiftFeatureSupport(raw: UInt8) -> BossAppleFeatureSupport {
+        switch raw {
+        case 0: return .supported
+        case 1: return .unsupported
+        default: return .unknown
+        }
+    }
+
+    static func swiftFeatureAccess(raw: UInt8) -> BossAppleFeatureAccess {
+        switch raw {
+        case 0: return .readOnly
+        case 1: return .readWrite
+        case 2: return .unsupported
+        default: return .unknown
+        }
     }
 
     static func swiftDeviceSettingsReport(from ffi: BossFfiDeviceSettingsReport) -> BossAppleDeviceSettingsReport {

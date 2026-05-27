@@ -46,6 +46,77 @@ final class BossAppViewModelLifecycleTests: XCTestCase {
         XCTAssertEqual(session.closeCallCount, 1)
     }
 
+    func testRefreshLoadsSettingsOnlyWorkspaceWithoutAudioModes() async throws {
+        let session = FakeBossAppSession()
+        let bootstrapped = session.workspaceSnapshot.bootstrappedDevice
+        session.workspaceSnapshot = BossAppleWorkspaceSnapshot(
+            bootstrappedDevice: BossAppleBootstrappedDevice(
+                bmapVersion: bootstrapped.bmapVersion,
+                productID: bootstrapped.productID,
+                productName: bootstrapped.productName,
+                productVariant: bootstrapped.productVariant,
+                protocolSupport: bootstrapped.protocolSupport,
+                capabilities: BossAppleDeviceCapabilities(
+                    settings: .init(
+                        standbyTimer: .readWrite,
+                        wearDetection: .readWrite,
+                        autoAware: .readWrite,
+                        autoPlayPause: .readWrite,
+                        autoAnswer: .readWrite,
+                        volumeControl: .readWrite
+                    ),
+                    audioModes: .init(
+                        modes: .unsupported,
+                        currentMode: .unsupported,
+                        settingsConfig: .unsupported,
+                        favorites: .unsupported,
+                        customProfiles: .unsupported,
+                        supportedPrompts: .unsupported
+                    ),
+                    sound: .init(equalizer: .unsupported)
+                )
+            ),
+            capabilities: BossAppleDeviceCapabilities(
+                settings: .init(
+                    standbyTimer: .readWrite,
+                    wearDetection: .readWrite,
+                    autoAware: .readWrite,
+                    autoPlayPause: .readWrite,
+                    autoAnswer: .readWrite,
+                    volumeControl: .readWrite
+                ),
+                audioModes: .init(
+                    modes: .unsupported,
+                    currentMode: .unsupported,
+                    settingsConfig: .unsupported,
+                    favorites: .unsupported,
+                    customProfiles: .unsupported,
+                    supportedPrompts: .unsupported
+                ),
+                sound: .init(equalizer: .unsupported)
+            ),
+            settingsWorkspace: BossAppleSettingsWorkspace(
+                deviceSettings: BossAppleModeWorkspaceSnapshot.fixture().deviceSettings,
+                standbyTimer: nil
+            ),
+            audioModeWorkspace: nil,
+            equalizer: nil
+        )
+
+        let viewModel = BossAppViewModel(sessionFactory: { _ in session })
+
+        viewModel.refresh()
+        await waitUntil { viewModel.loadState == .ready }
+
+        XCTAssertEqual(viewModel.appScreen, .workspace)
+        XCTAssertNil(viewModel.currentAudioModeIndex)
+        XCTAssertTrue(viewModel.audioModes.isEmpty)
+        XCTAssertNil(viewModel.settings)
+        XCTAssertNil(viewModel.equalizer)
+        XCTAssertTrue(viewModel.supportedPrompts.isEmpty)
+        XCTAssertEqual(viewModel.lastResultMessage, "Loaded device settings")
+    }
+
     func testBackgroundHardwareModeChangeReselectsCurrentModeWhenNotEditingDraft() async throws {
         let session = FakeBossAppSession()
         let deviceModes = [

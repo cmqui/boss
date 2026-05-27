@@ -1,4 +1,5 @@
 pub mod audio_modes;
+pub mod capabilities;
 pub mod commands;
 pub mod errors;
 pub mod product;
@@ -7,6 +8,7 @@ pub mod settings;
 pub mod transport;
 
 pub use audio_modes::*;
+pub use capabilities::*;
 pub use commands::*;
 pub use errors::*;
 pub use product::*;

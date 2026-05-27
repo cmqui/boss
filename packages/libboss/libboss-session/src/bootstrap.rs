@@ -1,4 +1,7 @@
-use libboss_core::{product_for_id, ProductInfoCommands, ProductInfoParser};
+use libboss_core::{
+    product_for_id, implied_function_blocks_for_product, BmapErrorCode, BossDeviceCapabilities,
+    BossProtocolSupport, ProductInfoCommands, ProductInfoParser,
+};
 
 use crate::{
     BootstrapSessionError, BootstrapTimeoutError, BootstrappedDevice, BossLink, BossSessionError,
@@ -83,29 +86,45 @@ impl<L: BossLink> BootstrapSession<L> {
                 )
             })?;
         let product_variant = ProductInfoParser::parse_product_id_variant(&product_packet)?;
+        let catalog_product = product_variant.product;
 
         let block_request = ProductInfoCommands::all_function_blocks_get(
             self.configuration.default_device_id,
             self.configuration.default_port,
         );
-        let blocks_packet = self
+        let function_blocks = match self
             .packet_session
-            .response_packet_for_function(
-                &block_request,
-                &block_request.function,
-                self.configuration.request_timeout_millis,
-            )
+            .response_packet(&block_request, self.configuration.request_timeout_millis)
             .await
-            .map_err(|error| {
-                BootstrapSessionError::from_session_error_with_timeout(
+        {
+            Ok(blocks_packet) => ProductInfoParser::parse_function_blocks(&blocks_packet)?,
+            Err(BossSessionError::BmapErrorResponse(response))
+                if matches!(
+                    response.code(),
+                    Some(BmapErrorCode::FblockNotSupp | BmapErrorCode::FuncNotSupp)
+                ) =>
+            {
+                implied_function_blocks_for_product(catalog_product).ok_or_else(|| {
+                    BootstrapSessionError::Session(BossSessionError::BmapErrorResponse(response))
+                })?
+            }
+            Err(error) => {
+                return Err(BootstrapSessionError::from_session_error_with_timeout(
                     error,
                     BootstrapTimeoutError::Packet {
                         function: block_request.function.name(),
                         timeout_milliseconds: self.configuration.request_timeout_millis,
                     },
-                )
-            })?;
-        let function_blocks = ProductInfoParser::parse_function_blocks(&blocks_packet)?;
+                ))
+            }
+        };
+        let protocol_support = BossProtocolSupport {
+            function_blocks,
+            transport_kind: self.packet_session.transport_kind(),
+            default_device_id: self.configuration.default_device_id,
+            default_port: self.configuration.default_port,
+        };
+        let capabilities = BossDeviceCapabilities::resolve(catalog_product, &protocol_support);
 
         Ok(BootstrappedDevice {
             bmap_version: version_info,
@@ -114,10 +133,8 @@ impl<L: BossLink> BootstrapSession<L> {
                 .map(|product| product.display_name.to_string())
                 .unwrap_or_else(|| "Unknown Bose Product".into()),
             product_variant,
-            supported_function_blocks: function_blocks,
-            transport_kind: self.packet_session.transport_kind(),
-            default_device_id: self.configuration.default_device_id,
-            default_port: self.configuration.default_port,
+            protocol_support,
+            capabilities,
         })
     }
 }

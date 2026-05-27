@@ -89,9 +89,13 @@ extension BossAppleController {
         if case BossAppleControlError.responseTimedOut = error {
             return true
         }
-        if case BossAppleControlError.bmapErrorResponse(_, let payloadHex) = error,
-           bmapErrorCode(from: payloadHex) == .insecureTransport {
-            return true
+        if case BossAppleControlError.bmapErrorResponse(_, let payloadHex) = error {
+            switch bmapErrorCode(from: payloadHex) {
+            case .insecureTransport?, .fblockNotSupp?, .funcNotSupp?:
+                return true
+            default:
+                break
+            }
         }
         return false
     }

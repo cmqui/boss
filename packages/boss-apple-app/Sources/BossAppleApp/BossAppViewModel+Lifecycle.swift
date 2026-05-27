@@ -93,37 +93,47 @@ extension BossAppViewModel {
 
     func reloadAllState(using session: any BossAppSessioning) async throws {
         async let workspaceSnapshot = session.loadWorkspaceSnapshot()
-        async let promptsTask = loadSupportedPrompts(using: session)
         async let firmwareVersionTask = loadFirmwareVersion(using: session)
 
         let workspace = try await workspaceSnapshot
-        let prompts = await promptsTask
         let firmwareVersion = await firmwareVersionTask
 
-        currentAudioModeIndex = workspace.modeWorkspace.currentAudioModeIndex
-        selectedAudioModeIndex = workspace.modeWorkspace.currentAudioModeIndex
+        currentAudioModeIndex = workspace.audioModeWorkspace?.currentAudioModeIndex
+        selectedAudioModeIndex = workspace.audioModeWorkspace?.currentAudioModeIndex
         deviceName = workspace.bootstrappedDevice.productName
         deviceVariantName = workspace.bootstrappedDevice.productVariant.variantName
+        deviceProductFamily = workspace.bootstrappedDevice.productFamily
+        deviceCapabilities = workspace.capabilities
         self.firmwareVersion = firmwareVersion
-        applyAudioModes(workspace.audioModes)
-        applyDisplayedModeSettings(liveConfig: workspace.modeWorkspace.settings)
-        applyEqualizerSnapshot(workspace.modeWorkspace.equalizer)
-        applyDeviceSettings(workspace.modeWorkspace.deviceSettings.settings)
-        supportedPrompts = prompts
+        applyAudioModes(workspace.audioModeWorkspace?.audioModes ?? [])
+        if let audioModeWorkspace = workspace.audioModeWorkspace {
+            applyDisplayedModeSettings(liveConfig: audioModeWorkspace.settings)
+            supportedPrompts = await loadSupportedPrompts(using: session)
+        } else {
+            settings = nil
+            supportedPrompts = []
+        }
+        applyEqualizerSnapshot(workspace.equalizer)
+        applyDeviceSettings(workspace.settingsWorkspace.deviceSettings.settings)
         hasDetachedSettingsDraft = false
         hasDetachedEqualizerDraft = false
-        lastResultMessage = "Loaded \(audioModes.count) audio modes"
+        lastResultMessage = workspace.audioModeWorkspace == nil
+            ? "Loaded device settings"
+            : "Loaded \(audioModes.count) audio modes"
         Self.log(debugSummary(
             "Reloaded all workspace state",
             selectedModeIndex: selectedAudioModeIndex,
             currentModeIndex: currentAudioModeIndex,
             draftSettings: settings,
-            liveSettings: workspace.modeWorkspace.settings
+            liveSettings: workspace.audioModeWorkspace?.settings
         ))
     }
 
     func startBackgroundLoad(using session: any BossAppSessioning) {
         cancelBackgroundLoad()
+        guard deviceCapabilities?.audioModes.modes == .supported else {
+            return
+        }
         backgroundLoadGeneration &+= 1
         let generation = backgroundLoadGeneration
         liveUpdateTasks = [

@@ -1,7 +1,36 @@
+import CoreBluetooth
 import XCTest
 @testable import libbossApple
 
 final class AppleBleBossTransportTests: XCTestCase {
+    func testTransportRecognizesBoseServiceInPrimaryAdvertisementList() {
+        let advertisementData: [String: Any] = [
+            CBAdvertisementDataServiceUUIDsKey: [
+                CBUUID(nsuuid: AppleBoseUUIDs.service),
+            ],
+        ]
+
+        XCTAssertTrue(AppleBleBossTransport.advertisesBoseService(advertisementData: advertisementData))
+    }
+
+    func testTransportRecognizesBoseServiceInOverflowAdvertisementList() {
+        let advertisementData: [String: Any] = [
+            CBAdvertisementDataOverflowServiceUUIDsKey: [
+                CBUUID(nsuuid: AppleBoseUUIDs.service),
+            ],
+        ]
+
+        XCTAssertTrue(AppleBleBossTransport.advertisesBoseService(advertisementData: advertisementData))
+    }
+
+    func testTransportRejectsNameOnlyAdvertisement() {
+        let advertisementData: [String: Any] = [
+            CBAdvertisementDataLocalNameKey: "LE-Bose QC45",
+        ]
+
+        XCTAssertFalse(AppleBleBossTransport.advertisesBoseService(advertisementData: advertisementData))
+    }
+
     func testCharacteristicPreferenceRawValues() {
         XCTAssertEqual(AppleBossCharacteristicPreference.automatic.rawValue, "automatic")
         XCTAssertEqual(AppleBossCharacteristicPreference.unsecure.rawValue, "unsecure")

@@ -634,7 +634,7 @@ private struct SidebarDeviceHeader: View {
             HStack(alignment: .center, spacing: 0) {
                 BossHeadphonesMark(
                     size: 52,
-                    deviceName: viewModel.deviceName,
+                    productFamily: viewModel.deviceProductFamily,
                     variantName: viewModel.deviceVariantName,
                 ).rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
 
@@ -681,14 +681,14 @@ private struct SidebarDeviceHeader: View {
 
 private struct BossHeadphonesMark: View {
     let size: CGFloat
-    var deviceName: String? = nil
+    var productFamily: BossAppleProductFamily? = nil
     var variantName: String? = nil
 
     var body: some View {
         let image =
-            if let deviceName,
+            if let productFamily,
                 let deviceImage = BossDeviceImageResource(
-                    productName: deviceName,
+                    productFamily: productFamily,
                     variantName: variantName
                 )?.nsImage()
             {
@@ -702,7 +702,7 @@ private struct BossHeadphonesMark: View {
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .frame(width: deviceName == nil ? size : size * 1.85, height: size)
+                .frame(width: productFamily == nil ? size : size * 1.85, height: size)
                 .accessibilityHidden(true)
         }
     }

@@ -27,6 +27,8 @@ actor MockBossAppDeviceStore {
             id: 0x4082,
             codeName: "Wolverine",
             displayName: "Bose QC Ultra 2 HP",
+            family: .qcUltra2,
+            category: .headphones,
             variants: [
                 1: "WolverineBlack",
                 2: "WolverineWhiteSmoke",
@@ -46,10 +48,13 @@ actor MockBossAppDeviceStore {
                 product: product,
                 variantName: product.variants[1]
             ),
-            supportedFunctionBlocks: BossAppleFunctionBlockSet(bits: [1, 2, 7, 18, 31]),
-            transportKind: .stream,
-            defaultDeviceID: 0,
-            defaultPort: 0
+            protocolSupport: BossAppleProtocolSupport(
+                functionBlocks: BossAppleFunctionBlockSet(bits: [1, 2, 7, 18, 31]),
+                transportKind: .stream,
+                defaultDeviceID: 0,
+                defaultPort: 0
+            ),
+            capabilities: Self.capabilities()
         )
         supportedPrompts = [.quiet, .aware, .immersion, .commute, .focus, .workout, .home]
         currentAudioModeIndex = 1
@@ -99,8 +104,18 @@ actor MockBossAppDeviceStore {
     func workspaceSnapshot() -> BossAppleWorkspaceSnapshot {
         BossAppleWorkspaceSnapshot(
             bootstrappedDevice: bootstrappedDevice,
-            modeWorkspace: modeWorkspaceSnapshot(),
-            audioModes: audioModes
+            capabilities: bootstrappedDevice.capabilities,
+            settingsWorkspace: BossAppleSettingsWorkspace(
+                deviceSettings: deviceSettingsReport(),
+                standbyTimer: nil
+            ),
+            audioModeWorkspace: BossAppleAudioModeWorkspace(
+                currentAudioModeIndex: currentAudioModeIndex,
+                settings: currentMode.settings,
+                audioModes: audioModes,
+                supportedPrompts: supportedPrompts
+            ),
+            equalizer: equalizer
         )
     }
 
@@ -377,6 +392,28 @@ actor MockBossAppDeviceStore {
                 BossAppleEqualizerRangeLevel(band: .mid, currentLevel: mid, minLevel: -10, maxLevel: 10),
                 BossAppleEqualizerRangeLevel(band: .treble, currentLevel: treble, minLevel: -10, maxLevel: 10),
             ]
+        )
+    }
+
+    private static func capabilities() -> BossAppleDeviceCapabilities {
+        BossAppleDeviceCapabilities(
+            settings: BossAppleSettingsCapabilities(
+                standbyTimer: .readWrite,
+                wearDetection: .readWrite,
+                autoAware: .readWrite,
+                autoPlayPause: .readWrite,
+                autoAnswer: .readWrite,
+                volumeControl: .readWrite
+            ),
+            audioModes: BossAppleAudioModeCapabilities(
+                modes: .supported,
+                currentMode: .readWrite,
+                settingsConfig: .readWrite,
+                favorites: .readWrite,
+                customProfiles: .readWrite,
+                supportedPrompts: .supported
+            ),
+            sound: BossAppleSoundCapabilities(equalizer: .readWrite)
         )
     }
 }

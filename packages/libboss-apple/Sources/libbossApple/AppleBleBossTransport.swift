@@ -113,6 +113,7 @@ public final class AppleBleBossTransport: NSObject, @unchecked Sendable {
     private var rustPacketBridge: BossRustBleTransportBridge?
     private let debugLoggingEnabled = ProcessInfo.processInfo.environment["LIBBOSS_APPLE_DEBUG"] == "1"
     private let packetLoggingEnabled = ProcessInfo.processInfo.environment["LIBBOSS_APPLE_DEBUG_PACKETS"] == "1"
+    private static let boseServiceUUID = CBUUID(nsuuid: AppleBoseUUIDs.service)
 
     func sharedRustPacketBridge(runtime: BossRustFfiRuntime) -> BossRustBleTransportBridge {
         stateQueue.sync {
@@ -280,8 +281,12 @@ public final class AppleBleBossTransport: NSObject, @unchecked Sendable {
         guard startContinuation != nil, activePeripheral == nil else {
             return
         }
+        guard central.state == .poweredOn else {
+            debug("skipping scan because bluetooth state is \(central.state.rawValue)")
+            return
+        }
         debug("starting scan")
-        central.scanForPeripherals(withServices: nil)
+        central.scanForPeripherals(withServices: [Self.boseServiceUUID])
     }
 
     private func attemptKnownPeripheralRecoveryOrScan() {
@@ -298,8 +303,12 @@ public final class AppleBleBossTransport: NSObject, @unchecked Sendable {
             }
         }
 
-        let serviceUUID = CBUUID(nsuuid: AppleBoseUUIDs.service)
-        let connected = central.retrieveConnectedPeripherals(withServices: [serviceUUID])
+        guard central.state == .poweredOn else {
+            debug("skipping peripheral recovery because bluetooth state is \(central.state.rawValue)")
+            return
+        }
+
+        let connected = central.retrieveConnectedPeripherals(withServices: [Self.boseServiceUUID])
         if let peripheral = connected.first(where: { candidate in
             !rejectedPeripheralIdentifiers.contains(candidate.identifier) &&
             filter.matches(candidate, advertisementName: nil)
@@ -370,6 +379,20 @@ public final class AppleBleBossTransport: NSObject, @unchecked Sendable {
         return nil
     }
 
+    static func advertisesBoseService(advertisementData: [String: Any]) -> Bool {
+        let candidateLists: [[CBUUID]?] = [
+            advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID],
+            advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID],
+            advertisementData[CBAdvertisementDataSolicitedServiceUUIDsKey] as? [CBUUID],
+        ]
+
+        return candidateLists
+            .compactMap { $0 }
+            .contains { uuids in
+                uuids.contains(boseServiceUUID)
+            }
+    }
+
     private func awaitWriteWithoutResponseCapacityIfNeeded(for peripheral: CBPeripheral) async {
         let needsWait = stateQueue.sync {
             !peripheral.canSendWriteWithoutResponse
@@ -405,6 +428,12 @@ extension AppleBleBossTransport: CBCentralManagerDelegate {
             return
         }
         guard !rejectedPeripheralIdentifiers.contains(peripheral.identifier) else {
+            return
+        }
+        guard Self.advertisesBoseService(advertisementData: advertisementData) else {
+            debug(
+                "ignoring peripheral \(peripheral.identifier.uuidString) because it does not advertise Bose service"
+            )
             return
         }
 

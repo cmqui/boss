@@ -96,7 +96,7 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
     }
 
     func audioModeCatalogUpdateStream() async -> AsyncThrowingStream<[BossAppleAudioModeConfig], Error> {
-        let values = audioModeCatalogUpdateValues ?? [audioModeConfigsResult ?? workspaceSnapshot.audioModes]
+        let values = audioModeCatalogUpdateValues ?? [audioModeConfigsResult ?? workspaceSnapshot.audioModeWorkspace?.audioModes ?? []]
         return makeStream(values, keepOpen: keepModeWorkspaceUpdateStreamOpen)
     }
 
@@ -105,7 +105,7 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
     }
 
     func audioModeConfigs() async throws -> [BossAppleAudioModeConfig] {
-        audioModeConfigsResult ?? workspaceSnapshot.audioModes
+        audioModeConfigsResult ?? workspaceSnapshot.audioModeWorkspace?.audioModes ?? []
     }
 
     func firmwareVersion(port: Int, deviceID: Int) async throws -> BossAppleFirmwareVersionInfo {
@@ -142,7 +142,7 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
     func unfavoriteAudioMode(index: Int) async throws -> [Int] { [] }
 
     func deleteCustomAudioMode(slot: Int) async throws -> BossAppleAudioModeConfig {
-        workspaceSnapshot.audioModes.first { $0.modeIndex == slot } ?? .fixture(modeIndex: slot)
+        workspaceSnapshot.audioModeWorkspace?.audioModes.first { $0.modeIndex == slot } ?? .fixture(modeIndex: slot)
     }
 
     func saveCustomAudioMode(
@@ -213,13 +213,50 @@ extension BossAppleWorkspaceSnapshot {
                 productID: 0x1234,
                 productName: "QuietComfort Ultra",
                 productVariant: BossAppleProductVariant(productID: 0x1234, variant: 0x02, product: nil, variantName: "Black"),
-                supportedFunctionBlocks: BossAppleFunctionBlockSet(bits: [1, 31]),
-                transportKind: .ble,
-                defaultDeviceID: 0,
-                defaultPort: 0
+                protocolSupport: BossAppleProtocolSupport(
+                    functionBlocks: BossAppleFunctionBlockSet(bits: [1, 31]),
+                    transportKind: .ble,
+                    defaultDeviceID: 0,
+                    defaultPort: 0
+                ),
+                capabilities: .fixture()
             ),
-            modeWorkspace: .fixture(currentAudioModeIndex: currentAudioModeIndex, settings: settings),
-            audioModes: audioModes
+            capabilities: .fixture(),
+            settingsWorkspace: BossAppleSettingsWorkspace(
+                deviceSettings: BossAppleModeWorkspaceSnapshot.fixture().deviceSettings,
+                standbyTimer: nil
+            ),
+            audioModeWorkspace: BossAppleAudioModeWorkspace(
+                currentAudioModeIndex: currentAudioModeIndex,
+                settings: settings,
+                audioModes: audioModes,
+                supportedPrompts: [.quiet, .aware]
+            ),
+            equalizer: .fixture()
+        )
+    }
+}
+
+extension BossAppleDeviceCapabilities {
+    static func fixture() -> BossAppleDeviceCapabilities {
+        BossAppleDeviceCapabilities(
+            settings: BossAppleSettingsCapabilities(
+                standbyTimer: .readWrite,
+                wearDetection: .readWrite,
+                autoAware: .readWrite,
+                autoPlayPause: .readWrite,
+                autoAnswer: .readWrite,
+                volumeControl: .readWrite
+            ),
+            audioModes: BossAppleAudioModeCapabilities(
+                modes: .supported,
+                currentMode: .readWrite,
+                settingsConfig: .readWrite,
+                favorites: .readWrite,
+                customProfiles: .readWrite,
+                supportedPrompts: .supported
+            ),
+            sound: BossAppleSoundCapabilities(equalizer: .readWrite)
         )
     }
 }

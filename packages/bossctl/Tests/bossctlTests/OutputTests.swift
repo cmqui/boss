@@ -17,14 +17,37 @@ final class OutputTests: XCTestCase {
                     id: 0x1234,
                     codeName: "qc-ultra",
                     displayName: "QuietComfort Ultra",
+                    family: .qcUltra2,
+                    category: .headphones,
                     variants: [0x02: "Black"]
                 ),
                 variantName: "Black"
             ),
-            supportedFunctionBlocks: BossAppleFunctionBlockSet(bits: [1, 31]),
-            transportKind: .ble,
-            defaultDeviceID: 1,
-            defaultPort: 2
+            protocolSupport: BossAppleProtocolSupport(
+                functionBlocks: BossAppleFunctionBlockSet(bits: [1, 31]),
+                transportKind: .ble,
+                defaultDeviceID: 1,
+                defaultPort: 2
+            ),
+            capabilities: BossAppleDeviceCapabilities(
+                settings: BossAppleSettingsCapabilities(
+                    standbyTimer: .readWrite,
+                    wearDetection: .readWrite,
+                    autoAware: .readWrite,
+                    autoPlayPause: .readWrite,
+                    autoAnswer: .readWrite,
+                    volumeControl: .readWrite
+                ),
+                audioModes: BossAppleAudioModeCapabilities(
+                    modes: .supported,
+                    currentMode: .readWrite,
+                    settingsConfig: .readWrite,
+                    favorites: .readWrite,
+                    customProfiles: .readWrite,
+                    supportedPrompts: .supported
+                ),
+                sound: BossAppleSoundCapabilities(equalizer: .readWrite)
+            )
         )
 
         BossctlCLI.printBootstrap(device, output: writer)

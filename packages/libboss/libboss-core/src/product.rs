@@ -73,11 +73,27 @@ pub struct FirmwareVersionInfo {
     pub port: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BossProductFamily {
+    QCUltra2,
+    QC45,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BossProductCategory {
+    Headphones,
+    Earbuds,
+    Speaker,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProductDefinition {
     pub id: u16,
     pub code_name: &'static str,
     pub display_name: &'static str,
+    pub family: BossProductFamily,
+    pub category: BossProductCategory,
     pub variants: &'static [(u8, &'static str)],
 }
 
@@ -85,6 +101,8 @@ pub const WOLVERINE_PRODUCT: ProductDefinition = ProductDefinition {
     id: 0x4082,
     code_name: "Wolverine",
     display_name: "Bose QC Ultra 2 HP",
+    family: BossProductFamily::QCUltra2,
+    category: BossProductCategory::Headphones,
     variants: &[
         (1, "WolverineBlack"),
         (2, "WolverineWhiteSmoke"),
@@ -97,6 +115,17 @@ pub const WOLVERINE_PRODUCT: ProductDefinition = ProductDefinition {
 pub fn product_for_id(id: u16) -> Option<&'static ProductDefinition> {
     match id {
         0x4082 => Some(&WOLVERINE_PRODUCT),
+        _ => None,
+    }
+}
+
+pub fn implied_function_blocks_for_product(
+    product: Option<&'static ProductDefinition>,
+) -> Option<FunctionBlockSet> {
+    match product.map(|product| product.family) {
+        Some(BossProductFamily::QCUltra2) => Some(FunctionBlockSet::from_bytes(&[
+            0x80, 0x00, 0x00, 0x02,
+        ])),
         _ => None,
     }
 }

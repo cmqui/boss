@@ -1,9 +1,9 @@
 use libboss_core::{
     BmapFunction, BmapPacket, BossAudioModeConfig, BossAudioModePrompt,
     BossAudioModeSettingsConfig, BossAudioModeSettingsConfigPatch, BossAudioModesCapabilities,
-    BossEqualizerBand, BossEqualizerSettings, BossEqualizerSettingsPatch, BossOnHeadDetectionValue,
-    BossStandbyTimerValue, BossTransportKind, BossVolumeControlStatus, BossVolumeControlValue,
-    FirmwareVersionInfo,
+    BossEqualizerBand, BossEqualizerSettings, BossEqualizerSettingsPatch, BossFeatureAccess,
+    BossFeatureSupport, BossOnHeadDetectionValue, BossStandbyTimerValue, BossTransportKind,
+    BossVolumeControlStatus, BossVolumeControlValue, FirmwareVersionInfo,
 };
 use libboss_session::{
     BootstrapSessionError, BootstrappedDevice, BossDeviceSettingsReport, BossLinkError,
@@ -394,7 +394,7 @@ pub(crate) fn ffi_bootstrapped_device_from_core(
 ) -> BossFfiBootstrappedDevice {
     let (bmap_version_len, bmap_version_bytes) = fixed_bytes::<64>(&device.bmap_version.version);
     let (product_name_len, product_name_bytes) = fixed_bytes::<64>(&device.product_name);
-    let function_blocks = device.supported_function_blocks.encoded();
+    let function_blocks = device.protocol_support.function_blocks.encoded();
     let function_blocks_len = function_blocks.len().min(32);
     let mut function_blocks_bytes = [0u8; 32];
     function_blocks_bytes[..function_blocks_len]
@@ -408,11 +408,47 @@ pub(crate) fn ffi_bootstrapped_device_from_core(
         product_name_bytes,
         function_blocks_len,
         function_blocks_bytes,
-        transport_kind: match device.transport_kind {
+        transport_kind: match device.protocol_support.transport_kind {
             BossTransportKind::Ble => 0,
             BossTransportKind::Stream => 1,
         },
-        default_device_id: device.default_device_id,
-        default_port: device.default_port,
+        default_device_id: device.protocol_support.default_device_id,
+        default_port: device.protocol_support.default_port,
+        standby_timer_access: ffi_feature_access(device.capabilities.settings.standby_timer),
+        wear_detection_access: ffi_feature_access(device.capabilities.settings.wear_detection),
+        auto_aware_access: ffi_feature_access(device.capabilities.settings.auto_aware),
+        auto_play_pause_access: ffi_feature_access(device.capabilities.settings.auto_play_pause),
+        auto_answer_access: ffi_feature_access(device.capabilities.settings.auto_answer),
+        volume_control_access: ffi_feature_access(device.capabilities.settings.volume_control),
+        audio_modes_support: ffi_feature_support(device.capabilities.audio_modes.modes),
+        current_audio_mode_access: ffi_feature_access(device.capabilities.audio_modes.current_mode),
+        audio_mode_settings_access: ffi_feature_access(
+            device.capabilities.audio_modes.settings_config,
+        ),
+        audio_mode_favorites_access: ffi_feature_access(device.capabilities.audio_modes.favorites),
+        audio_mode_custom_profiles_access: ffi_feature_access(
+            device.capabilities.audio_modes.custom_profiles,
+        ),
+        audio_mode_supported_prompts_support: ffi_feature_support(
+            device.capabilities.audio_modes.supported_prompts,
+        ),
+        equalizer_access: ffi_feature_access(device.capabilities.sound.equalizer),
+    }
+}
+
+fn ffi_feature_support(value: BossFeatureSupport) -> u8 {
+    match value {
+        BossFeatureSupport::Supported => 0,
+        BossFeatureSupport::Unsupported => 1,
+        BossFeatureSupport::Unknown => 2,
+    }
+}
+
+fn ffi_feature_access(value: BossFeatureAccess) -> u8 {
+    match value {
+        BossFeatureAccess::ReadOnly => 0,
+        BossFeatureAccess::ReadWrite => 1,
+        BossFeatureAccess::Unsupported => 2,
+        BossFeatureAccess::Unknown => 3,
     }
 }

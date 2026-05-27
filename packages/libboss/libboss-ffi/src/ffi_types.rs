@@ -344,6 +344,19 @@ pub struct BossFfiBootstrappedDevice {
     pub transport_kind: u8,
     pub default_device_id: i32,
     pub default_port: i32,
+    pub standby_timer_access: u8,
+    pub wear_detection_access: u8,
+    pub auto_aware_access: u8,
+    pub auto_play_pause_access: u8,
+    pub auto_answer_access: u8,
+    pub volume_control_access: u8,
+    pub audio_modes_support: u8,
+    pub current_audio_mode_access: u8,
+    pub audio_mode_settings_access: u8,
+    pub audio_mode_favorites_access: u8,
+    pub audio_mode_custom_profiles_access: u8,
+    pub audio_mode_supported_prompts_support: u8,
+    pub equalizer_access: u8,
 }
 
 impl Default for BossFfiBootstrappedDevice {
@@ -360,6 +373,19 @@ impl Default for BossFfiBootstrappedDevice {
             transport_kind: 0,
             default_device_id: 0,
             default_port: 0,
+            standby_timer_access: 0,
+            wear_detection_access: 0,
+            auto_aware_access: 0,
+            auto_play_pause_access: 0,
+            auto_answer_access: 0,
+            volume_control_access: 0,
+            audio_modes_support: 0,
+            current_audio_mode_access: 0,
+            audio_mode_settings_access: 0,
+            audio_mode_favorites_access: 0,
+            audio_mode_custom_profiles_access: 0,
+            audio_mode_supported_prompts_support: 0,
+            equalizer_access: 0,
         }
     }
 }

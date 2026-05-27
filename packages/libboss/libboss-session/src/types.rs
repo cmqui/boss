@@ -1,6 +1,6 @@
 use libboss_core::{
-    BmapVersionInfo, BossOnHeadDetectionValue, BossTransportKind, BossVolumeControlStatus,
-    FunctionBlockSet, ProductIdVariant,
+    BmapVersionInfo, BossDeviceCapabilities, BossOnHeadDetectionValue, BossProtocolSupport,
+    BossVolumeControlStatus, ProductIdVariant,
 };
 
 use crate::{BossSettingSource, BossSettingUnavailableReason};
@@ -27,10 +27,8 @@ pub struct BootstrappedDevice {
     pub product_id: u16,
     pub product_name: String,
     pub product_variant: ProductIdVariant,
-    pub supported_function_blocks: FunctionBlockSet,
-    pub transport_kind: BossTransportKind,
-    pub default_device_id: i32,
-    pub default_port: i32,
+    pub protocol_support: BossProtocolSupport,
+    pub capabilities: BossDeviceCapabilities,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

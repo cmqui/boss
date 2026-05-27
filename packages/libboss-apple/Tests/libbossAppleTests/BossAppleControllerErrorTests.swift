@@ -58,6 +58,27 @@ final class BossAppleControllerErrorTests: XCTestCase {
         )
     }
 
+    func testRetrySecureCharacteristicFallsBackForUnsupportedBootstrapStyleErrors() {
+        XCTAssertTrue(
+            BossAppleController.retrySecureCharacteristicIfNeeded(
+                BossAppleControlError.bmapErrorResponse(context: "libboss", payloadHex: "04"),
+                .unsecure
+            )
+        )
+        XCTAssertTrue(
+            BossAppleController.retrySecureCharacteristicIfNeeded(
+                BossAppleControlError.bmapErrorResponse(context: "libboss", payloadHex: "03"),
+                .unsecure
+            )
+        )
+        XCTAssertFalse(
+            BossAppleController.retrySecureCharacteristicIfNeeded(
+                BossAppleControlError.bmapErrorResponse(context: "libboss", payloadHex: "04"),
+                .secure
+            )
+        )
+    }
+
     func testCompositeInPlaceDetectionUnsupportedMatchesProtocolUnsupportedOnly() {
         XCTAssertTrue(
             BossAppleController.isCompositeInPlaceDetectionUnsupported(

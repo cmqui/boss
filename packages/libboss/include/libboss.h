@@ -236,6 +236,19 @@ typedef struct BossFfiBootstrappedDevice {
     uint8_t transport_kind;
     int32_t default_device_id;
     int32_t default_port;
+    uint8_t standby_timer_access;
+    uint8_t wear_detection_access;
+    uint8_t auto_aware_access;
+    uint8_t auto_play_pause_access;
+    uint8_t auto_answer_access;
+    uint8_t volume_control_access;
+    uint8_t audio_modes_support;
+    uint8_t current_audio_mode_access;
+    uint8_t audio_mode_settings_access;
+    uint8_t audio_mode_favorites_access;
+    uint8_t audio_mode_custom_profiles_access;
+    uint8_t audio_mode_supported_prompts_support;
+    uint8_t equalizer_access;
 } BossFfiBootstrappedDevice;
 
 typedef struct BossFfiError {

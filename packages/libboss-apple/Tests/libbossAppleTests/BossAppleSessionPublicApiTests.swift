@@ -131,6 +131,76 @@ final class BossAppleSessionPublicApiTests: XCTestCase {
         XCTAssertEqual(second.currentAudioModeIndex, 6)
     }
 
+    func testLoadWorkspaceSnapshotReusesModeSnapshotEqualizer() async throws {
+        let settings = sampleAudioModeSettingsConfig()
+        let equalizer = sampleEqualizerSettings()
+        let deviceSettings = sampleDeviceSettingsReport()
+        let audioMode = BossAppleAudioModeConfig(
+            modeIndex: 2,
+            prompt: .comfort,
+            name: "Comfort",
+            favorite: true,
+            userConfigurable: false,
+            userConfigured: false,
+            settings: settings
+        )
+
+        var overrides = BossAppleSessionOperationOverrides()
+        overrides.bootstrap = {
+            BossAppleBootstrappedDevice(
+                bmapVersion: BossAppleBmapVersionInfo(version: "1.0"),
+                productID: 0x4082,
+                productName: "QC Ultra",
+                productVariant: BossAppleProductVariant(productID: 0x4082, variant: 1, product: nil, variantName: "Black"),
+                protocolSupport: BossAppleProtocolSupport(
+                    functionBlocks: BossAppleFunctionBlockSet(bits: [1, 31]),
+                    transportKind: .ble,
+                    defaultDeviceID: 0,
+                    defaultPort: 0
+                ),
+                capabilities: BossAppleDeviceCapabilities(
+                    settings: BossAppleSettingsCapabilities(
+                        standbyTimer: .readWrite,
+                        wearDetection: .readWrite,
+                        autoAware: .readWrite,
+                        autoPlayPause: .readWrite,
+                        autoAnswer: .readWrite,
+                        volumeControl: .readWrite
+                    ),
+                    audioModes: BossAppleAudioModeCapabilities(
+                        modes: .supported,
+                        currentMode: .readWrite,
+                        settingsConfig: .readWrite,
+                        favorites: .readWrite,
+                        customProfiles: .readWrite,
+                        supportedPrompts: .unsupported
+                    ),
+                    sound: BossAppleSoundCapabilities(equalizer: .readWrite)
+                )
+            )
+        }
+        overrides.refreshModeWorkspaceSnapshot = {
+            BossAppleModeWorkspaceSnapshot(
+                currentAudioModeIndex: 2,
+                settings: settings,
+                equalizer: equalizer,
+                deviceSettings: deviceSettings
+            )
+        }
+        overrides.audioModeConfigs = { [audioMode] }
+        overrides.standbyTimer = { nil }
+        overrides.equalizer = {
+            throw BossAppleControlError.unsupportedOperation("loadWorkspaceSnapshot should reuse the mode snapshot equalizer")
+        }
+
+        let session = BossAppleSession(operationOverrides: overrides)
+        let workspace = try await session.loadWorkspaceSnapshot()
+
+        XCTAssertEqual(workspace.equalizer, equalizer)
+        XCTAssertEqual(workspace.settingsWorkspace.deviceSettings, deviceSettings)
+        XCTAssertEqual(workspace.audioModeWorkspace?.audioModes, [audioMode])
+    }
+
     func testCurrentAudioModeUpdateStreamReusesLastKnownValueWhenStreamYields255() async throws {
         var overrides = BossAppleSessionOperationOverrides()
         overrides.currentAudioModeUpdateStream = { makeStream(elements: [6, 255, 6]) }
@@ -320,6 +390,7 @@ final class BossAppleSessionPublicApiTests: XCTestCase {
             )
         }
     }
+
 }
 
 private extension BossAppleSessionPublicApiTests {
@@ -337,10 +408,31 @@ private extension BossAppleSessionPublicApiTests {
             productID: 0x4082,
             productName: "QC Ultra",
             productVariant: BossAppleProductVariant(productID: 0x4082, variant: 1, product: nil, variantName: "Black"),
-            supportedFunctionBlocks: BossAppleFunctionBlockSet(bits: [1, 31]),
-            transportKind: .ble,
-            defaultDeviceID: 0,
-            defaultPort: 0
+            protocolSupport: BossAppleProtocolSupport(
+                functionBlocks: BossAppleFunctionBlockSet(bits: [1, 31]),
+                transportKind: .ble,
+                defaultDeviceID: 0,
+                defaultPort: 0
+            ),
+            capabilities: BossAppleDeviceCapabilities(
+                settings: BossAppleSettingsCapabilities(
+                    standbyTimer: .readWrite,
+                    wearDetection: .readWrite,
+                    autoAware: .readWrite,
+                    autoPlayPause: .readWrite,
+                    autoAnswer: .readWrite,
+                    volumeControl: .readWrite
+                ),
+                audioModes: BossAppleAudioModeCapabilities(
+                    modes: .supported,
+                    currentMode: .readWrite,
+                    settingsConfig: .readWrite,
+                    favorites: .readWrite,
+                    customProfiles: .readWrite,
+                    supportedPrompts: .supported
+                ),
+                sound: BossAppleSoundCapabilities(equalizer: .readWrite)
+            )
         )
     }
 
