@@ -3,11 +3,11 @@ set -euo pipefail
 
 # Builds libboss-ffi for the active configuration and optionally installs the
 # dylib into the app bundle for runtime-loaded builds.
-# SRCROOT is packages/boss-macos when run from the Boss Xcode target.
+# SRCROOT is packages/ui/apple/boss-macos when run from the Boss Xcode target.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-LIBBOSS_DIR="${PACKAGE_DIR}/../libboss"
+LIBBOSS_DIR="${PACKAGE_DIR}/../../../core/libboss"
 BUILD_SCRIPT="${LIBBOSS_DIR}/scripts/build-ffi-artifact.sh"
 
 PROFILE=debug

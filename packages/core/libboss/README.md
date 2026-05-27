@@ -39,4 +39,4 @@ cargo fmt --all
 
 - `libboss-apple` uses `libboss-ffi` for protocol/session work
 - `bossctl` and `boss-macos` consume the Apple layer, not this workspace directly
-- the old Swift implementation lives in [`../libboss-OLD`](../libboss-OLD/README.md) and is deprecated
+- the old Swift implementation lives in [`../../old/libboss`](../../old/libboss/README.md) and is deprecated

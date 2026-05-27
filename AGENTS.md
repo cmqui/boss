@@ -1,10 +1,10 @@
 Packages:
-- `packages/libboss`: platform-agnostic BMAP protocol/core logic. Product: `libboss`.
-- `packages/libboss-apple`: Apple/CoreBluetooth integration and async APIs over `libboss`. Product: `libbossApple`. Has tests in `Tests/libbossAppleTests`.
-- `packages/bossctl`: macOS CLI for controlling devices through `libbossApple`. Product: `bossctl`.
-- `packages/boss-apple-app`: apple-specific shared app logic. Product: `bossAppleApp`.
-- `packages/boss-macos`: macOS SwiftUI app using `libbossApple`.
-- `packages/boss-ios`: iOS SwiftUI app using `libbossApple`.
+- `packages/core/libboss`: platform-agnostic BMAP protocol/core logic. Product: `libboss`.
+- `packages/core/libboss-apple`: Apple/CoreBluetooth integration and async APIs over `libboss`. Product: `libbossApple`. Has tests in `Tests/libbossAppleTests`.
+- `packages/ui/bossctl`: macOS CLI for controlling devices through `libbossApple`. Product: `bossctl`.
+- `packages/ui/apple/app-core`: apple-specific shared app logic. Product: `bossAppleApp`.
+- `packages/ui/apple/boss-macos`: macOS SwiftUI app using `libbossApple`.
+- `packages/ui/apple/boss-ios`: iOS SwiftUI app using `libbossApple`.
 
 Dependency graph:
 - `libboss` is the core package.

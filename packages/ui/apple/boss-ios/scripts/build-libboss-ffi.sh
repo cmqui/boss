@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-LIBBOSS_DIR="${PACKAGE_DIR}/../libboss"
+LIBBOSS_DIR="${PACKAGE_DIR}/../../../core/libboss"
 BUILD_SCRIPT="${LIBBOSS_DIR}/scripts/build-ffi-artifact.sh"
 
 PROFILE=debug

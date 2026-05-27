@@ -7,9 +7,9 @@ configs:
   Release: release
 packages:
   bossAppleApp:
-    path: ../boss-apple-app
+    path: ../app-core
   libbossApple:
-    path: ../libboss-apple
+    path: ../../../core/libboss-apple
 settings:
   base:
     SWIFT_VERSION: 6.0
@@ -41,7 +41,7 @@ targets:
     deploymentTarget: "17.0"
     settings:
       base:
-        OTHER_LDFLAGS: $(inherited) -Wl,-force_load,$(SRCROOT)/../libboss/target/apple-static/current/libboss_ffi.a
+        OTHER_LDFLAGS: $(inherited) -Wl,-force_load,$(SRCROOT)/../../../core/libboss/target/apple-static/current/libboss_ffi.a
     sources:
       - path: Sources/BossiOS
         excludes:
@@ -60,7 +60,7 @@ targets:
         script: |
           /bin/bash "${SRCROOT}/scripts/build-libboss-ffi.sh"
         outputFiles:
-          - $(SRCROOT)/../libboss/target/apple-static/current/libboss_ffi.a
+          - $(SRCROOT)/../../../core/libboss/target/apple-static/current/libboss_ffi.a
         basedOnDependencyAnalysis: false
 schemes:
   BossiOS:

@@ -9,18 +9,18 @@
 
 ## Current State
 
-The repo already has meaningful Rust coverage in `packages/libboss`:
+The repo already has meaningful Rust coverage in `packages/core/libboss`:
 
-- `packages/libboss/libboss-core/tests/core_parity.rs`
-- `packages/libboss/libboss-session/src/tests.rs`
-- `packages/libboss/libboss-ffi/src/tests.rs`
+- `packages/core/libboss/libboss-core/tests/core_parity.rs`
+- `packages/core/libboss/libboss-session/src/tests.rs`
+- `packages/core/libboss/libboss-ffi/src/tests.rs`
 
 The thinner areas are the higher-level Swift packages:
 
-- `packages/libboss-apple` has a small XCTest surface in `Tests/libbossAppleTests/AppleBleBossTransportTests.swift`
-- `packages/boss-apple-app` has one smoke test in `Tests/BossAppleAppTests/BossAppleAppTests.swift`
-- `packages/bossctl` currently has no test target
-- `packages/boss-macos` and `packages/boss-ios` do not appear to have meaningful automated tests yet
+- `packages/core/libboss-apple` has a small XCTest surface in `Tests/libbossAppleTests/AppleBleBossTransportTests.swift`
+- `packages/ui/apple/app-core` has one smoke test in `Tests/BossAppleAppTests/BossAppleAppTests.swift`
+- `packages/ui/bossctl` currently has no test target
+- `packages/ui/apple/boss-macos` and `packages/ui/apple/boss-ios` do not appear to have meaningful automated tests yet
 
 That means the core protocol layer is in better shape than the Apple bridge, app state, and CLI surfaces that users interact with directly.
 
@@ -38,7 +38,7 @@ The main principle is to keep most logic tests below the UI layer and above raw 
 
 ## Package Plan
 
-### `packages/libboss`
+### `packages/core/libboss`
 
 This is already the strongest test area. Keep expanding it, but optimize for contract coverage rather than raw line count.
 
@@ -51,12 +51,12 @@ Add next:
 
 Good homes:
 
-- `packages/libboss/libboss-core/tests/codec_regressions.rs`
-- `packages/libboss/libboss-core/tests/transport_properties.rs`
-- `packages/libboss/libboss-session/tests/session_regressions.rs`
-- `packages/libboss/libboss-ffi/tests/ffi_contract.rs`
+- `packages/core/libboss/libboss-core/tests/codec_regressions.rs`
+- `packages/core/libboss/libboss-core/tests/transport_properties.rs`
+- `packages/core/libboss/libboss-session/tests/session_regressions.rs`
+- `packages/core/libboss/libboss-ffi/tests/ffi_contract.rs`
 
-### `packages/libboss-apple`
+### `packages/core/libboss-apple`
 
 This package is the main gap between well-tested Rust logic and user-facing Swift code. It should get contract-style tests around:
 
@@ -76,17 +76,17 @@ High-value test areas:
 
 Recommended new test files:
 
-- `packages/libboss-apple/Tests/libbossAppleTests/BossRustSessionBridgeRuntimeTests.swift`
-- `packages/libboss-apple/Tests/libbossAppleTests/BossRustSessionBridgeConversionTests.swift`
-- `packages/libboss-apple/Tests/libbossAppleTests/BossAppleSessionRetryTests.swift`
-- `packages/libboss-apple/Tests/libbossAppleTests/BossAppleControllerErrorTests.swift`
-- `packages/libboss-apple/Tests/libbossAppleTests/BossAppleSettingsSnapshotTests.swift`
+- `packages/core/libboss-apple/Tests/libbossAppleTests/BossRustSessionBridgeRuntimeTests.swift`
+- `packages/core/libboss-apple/Tests/libbossAppleTests/BossRustSessionBridgeConversionTests.swift`
+- `packages/core/libboss-apple/Tests/libbossAppleTests/BossAppleSessionRetryTests.swift`
+- `packages/core/libboss-apple/Tests/libbossAppleTests/BossAppleControllerErrorTests.swift`
+- `packages/core/libboss-apple/Tests/libbossAppleTests/BossAppleSettingsSnapshotTests.swift`
 
 Structural prerequisite:
 
 - introduce small protocols for runtime loading, BLE transport/discovery, and session/controller construction so hardware-facing code can be replaced with fakes in tests
 
-### `packages/boss-apple-app`
+### `packages/ui/apple/app-core`
 
 This package should be treated as a state-management layer, not just a SwiftUI shell. The main test target should be `BossAppViewModel`.
 
@@ -109,16 +109,16 @@ High-value scenarios:
 
 Recommended new test files:
 
-- `packages/boss-apple-app/Tests/BossAppleAppTests/BossAppViewModelLifecycleTests.swift`
-- `packages/boss-apple-app/Tests/BossAppleAppTests/BossAppViewModelDiscoveryTests.swift`
-- `packages/boss-apple-app/Tests/BossAppleAppTests/BossAppViewModelModeActionTests.swift`
-- `packages/boss-apple-app/Tests/BossAppleAppTests/BossAppViewModelProfilesTests.swift`
+- `packages/ui/apple/app-core/Tests/BossAppleAppTests/BossAppViewModelLifecycleTests.swift`
+- `packages/ui/apple/app-core/Tests/BossAppleAppTests/BossAppViewModelDiscoveryTests.swift`
+- `packages/ui/apple/app-core/Tests/BossAppleAppTests/BossAppViewModelModeActionTests.swift`
+- `packages/ui/apple/app-core/Tests/BossAppleAppTests/BossAppViewModelProfilesTests.swift`
 
 Structural prerequisite:
 
 - inject a fake `BossAppleSession` / `BossAppleController` layer instead of constructing concrete production objects directly inside the view model
 
-### `packages/bossctl`
+### `packages/ui/bossctl`
 
 `bossctl` is currently unprotected and should be the first Swift package expanded. It has a lot of pure logic that is easy to test:
 
@@ -130,14 +130,14 @@ Structural prerequisite:
 - `Formatting.swift`
 - `Output.swift`
 
-Add a test target in `packages/bossctl/Package.swift`, then create:
+Add a test target in `packages/ui/bossctl/Package.swift`, then create:
 
-- `packages/bossctl/Tests/bossctlTests/ArgumentParserTests.swift`
-- `packages/bossctl/Tests/bossctlTests/CommandParsingTests.swift`
-- `packages/bossctl/Tests/bossctlTests/ConnectionOptionsTests.swift`
-- `packages/bossctl/Tests/bossctlTests/SettingsCommandTests.swift`
-- `packages/bossctl/Tests/bossctlTests/AudioModeCommandTests.swift`
-- `packages/bossctl/Tests/bossctlTests/FormattingTests.swift`
+- `packages/ui/bossctl/Tests/bossctlTests/ArgumentParserTests.swift`
+- `packages/ui/bossctl/Tests/bossctlTests/CommandParsingTests.swift`
+- `packages/ui/bossctl/Tests/bossctlTests/ConnectionOptionsTests.swift`
+- `packages/ui/bossctl/Tests/bossctlTests/SettingsCommandTests.swift`
+- `packages/ui/bossctl/Tests/bossctlTests/AudioModeCommandTests.swift`
+- `packages/ui/bossctl/Tests/bossctlTests/FormattingTests.swift`
 
 After parser coverage, add dispatch/output tests that assert:
 
@@ -149,7 +149,7 @@ Structural prerequisite:
 
 - move command execution behind a small protocol or runner type so `Main.swift` is not the only place that can drive a command
 
-### `packages/boss-macos` and `packages/boss-ios`
+### `packages/ui/apple/boss-macos` and `packages/ui/apple/boss-ios`
 
 These should stay thin. Do not duplicate business logic tests that belong in `boss-apple-app`.
 
@@ -196,9 +196,9 @@ Create a shared fixture set for representative device interactions.
 
 Suggested layout:
 
-- `packages/libboss/testdata/bootstrap/`
-- `packages/libboss/testdata/settings/`
-- `packages/libboss-apple/Tests/Fixtures/`
+- `packages/core/libboss/testdata/bootstrap/`
+- `packages/core/libboss/testdata/settings/`
+- `packages/core/libboss-apple/Tests/Fixtures/`
 
 Each fixture should contain:
 
@@ -212,10 +212,10 @@ Use these fixtures in both Rust and Swift contract tests where practical. That g
 
 Minimum CI test matrix:
 
-- `cd packages/libboss && cargo test`
-- `cd packages/libboss-apple && swift test`
-- `cd packages/bossctl && swift test`
-- `cd packages/boss-apple-app && swift test`
+- `cd packages/core/libboss && cargo test`
+- `cd packages/core/libboss-apple && swift test`
+- `cd packages/ui/bossctl && swift test`
+- `cd packages/ui/apple/app-core && swift test`
 
 Later, add:
 

@@ -708,7 +708,7 @@ final class BossRustFfiRuntime: @unchecked Sendable {
                     )
                     candidates.append(
                         BossRustFfiRuntimeCandidate(
-                            path: base.appendingPathComponent("packages/libboss/target/\(profile)/\(dylibName)").path,
+                            path: base.appendingPathComponent("packages/core/libboss/target/\(profile)/\(dylibName)").path,
                             channel: .repositoryDebugFallback
                         )
                     )
@@ -725,7 +725,7 @@ final class BossRustFfiRuntime: @unchecked Sendable {
                 )
                 candidates.append(
                     BossRustFfiRuntimeCandidate(
-                        path: "\(cwd)/packages/libboss/target/\(profile)/\(dylibName)",
+                        path: "\(cwd)/packages/core/libboss/target/\(profile)/\(dylibName)",
                         channel: .repositoryDebugFallback
                     )
                 )

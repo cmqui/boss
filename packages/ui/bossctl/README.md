@@ -12,8 +12,8 @@ It uses:
 Build the Rust FFI once:
 
 ```sh
-cd ../libboss && cargo build -p libboss-ffi
-cd ../bossctl
+cd ../../core/libboss && cargo build -p libboss-ffi
+cd ../../ui/bossctl
 ```
 
 For a shared Homebrew runtime, point `bossctl` at the installed Rust FFI prefix:

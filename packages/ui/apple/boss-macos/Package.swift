@@ -13,8 +13,8 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(path: "../boss-apple-app"),
-        .package(path: "../libboss-apple"),
+        .package(path: "../app-core"),
+        .package(path: "../../../core/libboss-apple"),
     ],
     targets: [
         .executableTarget(

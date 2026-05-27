@@ -1,12 +1,12 @@
 SHELL := /bin/bash
 
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-LIBBOSS_DIR := $(ROOT_DIR)/packages/libboss
-LIBBOSS_APPLE_DIR := $(ROOT_DIR)/packages/libboss-apple
-BOSSCTL_DIR := $(ROOT_DIR)/packages/bossctl
-BOSS_MACOS_DIR := $(ROOT_DIR)/packages/boss-macos
-BOSS_IOS_DIR := $(ROOT_DIR)/packages/boss-ios
-BOSS_APPLE_APP_DIR := $(ROOT_DIR)/packages/boss-apple-app
+LIBBOSS_DIR := $(ROOT_DIR)/packages/core/libboss
+LIBBOSS_APPLE_DIR := $(ROOT_DIR)/packages/core/libboss-apple
+BOSSCTL_DIR := $(ROOT_DIR)/packages/ui/bossctl
+BOSS_MACOS_DIR := $(ROOT_DIR)/packages/ui/apple/boss-macos
+BOSS_IOS_DIR := $(ROOT_DIR)/packages/ui/apple/boss-ios
+BOSS_APPLE_APP_DIR := $(ROOT_DIR)/packages/ui/apple/app-core
 PACKAGING_DIR := $(ROOT_DIR)/packaging
 HOMEBREW_PACKAGING_DIR := $(PACKAGING_DIR)/homebrew
 HOMEBREW_BUILD_DIR := $(HOMEBREW_PACKAGING_DIR)/build
@@ -93,10 +93,10 @@ help:
 		'  ffi-ios-device                       Build iOS device static Rust FFI artifact' \
 		'  ffi-ios-sim                          Build iOS simulator static Rust FFI artifact' \
 		'  ffi-ios                              Build both iOS static Rust FFI artifacts' \
-		'  test-rust                            Run cargo test in packages/libboss' \
-		'  test-apple                           Run swift test in packages/libboss-apple' \
-		'  test-bossctl                         Run swift test in packages/bossctl' \
-		'  test-boss-apple-app                  Run swift test in packages/boss-apple-app' \
+		'  test-rust                            Run cargo test in packages/core/libboss' \
+		'  test-apple                           Run swift test in packages/core/libboss-apple' \
+		'  test-bossctl                         Run swift test in packages/ui/bossctl' \
+		'  test-boss-apple-app                  Run swift test in packages/ui/apple/app-core' \
 		'  test                                 Run repo test targets used in the migration work' \
 		'  bossctl                              Build bossctl' \
 		'  xcodeproj-macos                      Generate Boss.xcodeproj' \

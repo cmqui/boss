@@ -8,10 +8,10 @@ Replace the current "one update stream = one packet consumer" model with a share
 
 This plan is intentionally scoped to the Rust-backed path used by:
 
-- `packages/libboss`
-- `packages/libboss-apple`
-- `packages/bossctl`
-- `packages/boss-apple-app`
+- `packages/core/libboss`
+- `packages/core/libboss-apple`
+- `packages/ui/bossctl`
+- `packages/ui/apple/app-core`
 
 It is written to be handed to Codex in a fresh chat.
 
@@ -21,9 +21,9 @@ The current live-update architecture is structurally unsafe when more than one u
 
 Today, each Rust FFI update stream created via `boss_update_stream_create(...)` owns its own `FfiLink` and calls `next_packet(...)` independently:
 
-- `packages/libboss/libboss-ffi/src/host_link.rs`
-- `packages/libboss/libboss-ffi/src/update_stream.rs`
-- `packages/libboss-apple/Sources/libbossApple/BossRustSessionBridge.swift`
+- `packages/core/libboss/libboss-ffi/src/host_link.rs`
+- `packages/core/libboss/libboss-ffi/src/update_stream.rs`
+- `packages/core/libboss-apple/Sources/libbossApple/BossRustSessionBridge.swift`
 
 That means:
 
@@ -77,11 +77,11 @@ Do not oversell the multiplexer as a guaranteed fix for that one device behavior
 
 Files:
 
-- `packages/libboss/libboss-ffi/src/update_stream.rs`
-- `packages/libboss-apple/Sources/libbossApple/BossRustSessionBridge.swift`
-- `packages/libboss-apple/Sources/libbossApple/BossAppleSession.swift`
-- `packages/bossctl/Sources/bossctl/StreamCommand.swift`
-- `packages/bossctl/Sources/bossctl/BmapCommand.swift`
+- `packages/core/libboss/libboss-ffi/src/update_stream.rs`
+- `packages/core/libboss-apple/Sources/libbossApple/BossRustSessionBridge.swift`
+- `packages/core/libboss-apple/Sources/libbossApple/BossAppleSession.swift`
+- `packages/ui/bossctl/Sources/bossctl/StreamCommand.swift`
+- `packages/ui/bossctl/Sources/bossctl/BmapCommand.swift`
 
 ### Known app-layer workaround currently in place
 
@@ -93,8 +93,8 @@ The app no longer uses the earlier "all typed streams live at once" design. It c
 
 Files:
 
-- `packages/boss-apple-app/Sources/BossAppleApp/BossAppViewModel+Lifecycle.swift`
-- `packages/boss-apple-app/Sources/BossAppleApp/BossAppSessioning.swift`
+- `packages/ui/apple/app-core/Sources/BossAppleApp/BossAppViewModel+Lifecycle.swift`
+- `packages/ui/apple/app-core/Sources/BossAppleApp/BossAppSessioning.swift`
 
 This workaround should remain until the multiplexer is proven stable.
 
@@ -153,10 +153,10 @@ Possible shape:
 
 Likely files:
 
-- `packages/libboss/libboss-ffi/src/update_stream.rs`
-- `packages/libboss/libboss-ffi/src/host_link.rs`
+- `packages/core/libboss/libboss-ffi/src/update_stream.rs`
+- `packages/core/libboss/libboss-ffi/src/host_link.rs`
 - possibly a new file such as:
-  - `packages/libboss/libboss-ffi/src/update_broker.rs`
+  - `packages/core/libboss/libboss-ffi/src/update_broker.rs`
 
 ### 2. Preserve typed stream APIs at the FFI boundary
 
@@ -204,7 +204,7 @@ Do not regress the earlier QC Ultra 2 HP fix.
 
 Relevant file:
 
-- `packages/libboss/libboss-ffi/src/update_stream.rs`
+- `packages/core/libboss/libboss-ffi/src/update_stream.rs`
 
 ### 5. Keep reducer-based streams on top of the broker
 
@@ -287,7 +287,7 @@ Add coverage for:
 
 Likely test location:
 
-- `packages/libboss/libboss-ffi/src/tests.rs`
+- `packages/core/libboss/libboss-ffi/src/tests.rs`
 
 ### Swift bridge tests
 
@@ -299,8 +299,8 @@ Add or update tests for:
 
 Likely test locations:
 
-- `packages/libboss-apple/Tests/libbossAppleTests`
-- `packages/boss-apple-app/Tests/BossAppleAppTests`
+- `packages/core/libboss-apple/Tests/libbossAppleTests`
+- `packages/ui/apple/app-core/Tests/BossAppleAppTests`
 
 ### CLI verification
 
@@ -352,10 +352,10 @@ Minimum acceptable deliverables:
 If you are picking this up in a new chat:
 
 1. Start by reading:
-   - `packages/libboss/libboss-ffi/src/update_stream.rs`
-   - `packages/libboss/libboss-ffi/src/host_link.rs`
-   - `packages/libboss-apple/Sources/libbossApple/BossRustSessionBridge.swift`
-   - `packages/libboss-apple/Sources/libbossApple/BossAppleSession.swift`
+   - `packages/core/libboss/libboss-ffi/src/update_stream.rs`
+   - `packages/core/libboss/libboss-ffi/src/host_link.rs`
+   - `packages/core/libboss-apple/Sources/libbossApple/BossRustSessionBridge.swift`
+   - `packages/core/libboss-apple/Sources/libbossApple/BossAppleSession.swift`
    - `docs/bose-bmap-qc-ultra-hp2-analysis.md`
 
 2. Treat the current app-side hybrid polling workaround as temporary but valid.

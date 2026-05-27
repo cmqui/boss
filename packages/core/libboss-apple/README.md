@@ -20,7 +20,7 @@ Session APIs such as `bootstrap()` require Rust `libboss-ffi`, either via:
 Build the dylib:
 
 ```sh
-cd packages/libboss
+cd packages/core/libboss
 cargo build -p libboss-ffi
 ```
 
@@ -57,8 +57,8 @@ The `boss-macos` Xcode project supports both runtime dylib loading and a static-
 ## CLI Validation
 
 ```sh
-cd packages/libboss && cargo build -p libboss-ffi
-cd ../bossctl
+cd packages/core/libboss && cargo build -p libboss-ffi
+cd ../../ui/bossctl
 swift run bossctl bootstrap --name Bose --timeout 20
 ```
 

@@ -5,8 +5,8 @@ SwiftUI macOS control surface for Bose devices, currently focused on QC Ultra 2 
 Run it from this package directory:
 
 ```sh
-cd ../libboss && cargo build -p libboss-ffi
-cd ../boss-macos && swift run Boss
+cd ../../../core/libboss && cargo build -p libboss-ffi
+cd ../../ui/apple/boss-macos && swift run Boss
 ```
 
 The macOS app supports both Rust FFI modes:
@@ -27,7 +27,7 @@ make boss-macos MACOS_ARCH=x86_64
 If you run outside Xcode without embedding the dylib, point at a built copy explicitly:
 
 ```sh
-export LIBBOSS_FFI_DYLIB="$PWD/../libboss/target/debug/libboss_ffi.dylib"
+export LIBBOSS_FFI_DYLIB="$PWD/../../../core/libboss/target/debug/libboss_ffi.dylib"
 swift run Boss
 ```
 

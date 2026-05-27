@@ -25,8 +25,8 @@ The immediate target is not to implement QC45 yet. The target is to make the cod
 
 Current product recognition is a small catalog lookup:
 
-- [packages/libboss/libboss-core/src/product.rs](/Users/ciara/Code/boss/packages/libboss/libboss-core/src/product.rs:1)
-- [packages/libboss-apple/Sources/libbossApple/BossApplePublicTypes.swift](/Users/ciara/Code/boss/packages/libboss-apple/Sources/libbossApple/BossApplePublicTypes.swift:1)
+- [packages/core/libboss/libboss-core/src/product.rs](/Users/ciara/Code/boss/packages/core/libboss/libboss-core/src/product.rs:1)
+- [packages/core/libboss-apple/Sources/libbossApple/BossApplePublicTypes.swift](/Users/ciara/Code/boss/packages/core/libboss-apple/Sources/libbossApple/BossApplePublicTypes.swift:1)
 
 But the rest of the stack assumes a single high-feature headphone shape. That means product support is not actually driven by catalog data.
 
@@ -44,14 +44,14 @@ This logic is instead scattered through session reads, write fallbacks, and UI a
 
 ### 3. `BossSession` is organized around one “fully featured” device model
 
-The Rust session surface in [boss_session.rs](/Users/ciara/Code/boss/packages/libboss/libboss-session/src/boss_session.rs:1) treats audio modes, custom profiles, favorites, equalizer, and device settings as one canonical feature set. That works for Ultra-style devices, but it is the wrong default for a multi-device library.
+The Rust session surface in [boss_session.rs](/Users/ciara/Code/boss/packages/core/libboss/libboss-session/src/boss_session.rs:1) treats audio modes, custom profiles, favorites, equalizer, and device settings as one canonical feature set. That works for Ultra-style devices, but it is the wrong default for a multi-device library.
 
 ### 4. The Apple bridge and app layer assume audio modes are central
 
 The current workspace load path:
 
-- [packages/libboss-apple/Sources/libbossApple/BossAppleSession.swift](/Users/ciara/Code/boss/packages/libboss-apple/Sources/libbossApple/BossAppleSession.swift:130)
-- [packages/boss-apple-app/Sources/BossAppleApp/BossAppViewModel+Lifecycle.swift](/Users/ciara/Code/boss/packages/boss-apple-app/Sources/BossAppleApp/BossAppViewModel+Lifecycle.swift:81)
+- [packages/core/libboss-apple/Sources/libbossApple/BossAppleSession.swift](/Users/ciara/Code/boss/packages/core/libboss-apple/Sources/libbossApple/BossAppleSession.swift:130)
+- [packages/ui/apple/app-core/Sources/BossAppleApp/BossAppViewModel+Lifecycle.swift](/Users/ciara/Code/boss/packages/ui/apple/app-core/Sources/BossAppleApp/BossAppViewModel+Lifecycle.swift:81)
 
 assumes that a connected device loads:
 
@@ -65,7 +65,7 @@ That model is too specific. Some devices will have settings without editable aud
 
 The macOS asset resolver currently keys directly on the Ultra product name:
 
-- [packages/boss-macos/Sources/BossMacOS/BossResources.swift](/Users/ciara/Code/boss/packages/boss-macos/Sources/BossMacOS/BossResources.swift:28)
+- [packages/ui/apple/boss-macos/Sources/BossMacOS/BossResources.swift](/Users/ciara/Code/boss/packages/ui/apple/boss-macos/Sources/BossMacOS/BossResources.swift:28)
 
 This is manageable for one device family but not for a growing product catalog.
 
@@ -506,9 +506,9 @@ Add tests for:
 
 Suggested files:
 
-- `packages/libboss/libboss-core/tests/product_catalog.rs`
-- `packages/libboss/libboss-core/tests/capability_resolution.rs`
-- `packages/libboss/libboss-session/src/tests.rs`
+- `packages/core/libboss/libboss-core/tests/product_catalog.rs`
+- `packages/core/libboss/libboss-core/tests/capability_resolution.rs`
+- `packages/core/libboss/libboss-session/src/tests.rs`
   Extend existing tests with capability-aware bootstrap and partial-workspace cases.
 
 ### Swift bridge tests
@@ -522,9 +522,9 @@ Add tests for:
 
 Suggested files:
 
-- `packages/libboss-apple/Tests/libbossAppleTests/BossRustSessionBridgeConversionTests.swift`
-- `packages/libboss-apple/Tests/libbossAppleTests/BossAppleSessionPublicApiTests.swift`
-- `packages/libboss-apple/Tests/libbossAppleTests/BossAppleControllerErrorTests.swift`
+- `packages/core/libboss-apple/Tests/libbossAppleTests/BossRustSessionBridgeConversionTests.swift`
+- `packages/core/libboss-apple/Tests/libbossAppleTests/BossAppleSessionPublicApiTests.swift`
+- `packages/core/libboss-apple/Tests/libbossAppleTests/BossAppleControllerErrorTests.swift`
 
 ### App-layer tests
 
@@ -537,8 +537,8 @@ Add tests for:
 
 Suggested files:
 
-- `packages/boss-apple-app/Tests/BossAppleAppTests/BossAppViewModelLifecycleTests.swift`
-- `packages/boss-apple-app/Tests/BossAppleAppTests/BossAppViewModelModeActionTests.swift`
+- `packages/ui/apple/app-core/Tests/BossAppleAppTests/BossAppViewModelLifecycleTests.swift`
+- `packages/ui/apple/app-core/Tests/BossAppleAppTests/BossAppViewModelModeActionTests.swift`
 
 ## Open Design Decisions
 
