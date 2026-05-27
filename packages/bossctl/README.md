@@ -51,33 +51,10 @@ swift run bossctl bmap debug-current-mode --duration 30 --name Bose
 - mode-setting and settings writes include verification logic and reconnect handling where needed
 - some devices reject specific functions on the unsecure path, so automatic secure fallback is built in where supported
 
-## Current Audio Mode Investigation
+## Further Reading
 
-In May 2026 we investigated whether `current-audio-mode` could be driven purely from the existing streaming path instead of polling.
-
-Observed behavior on hardware:
-
-- `swift run bossctl stream probe current-audio-mode --duration 30 --name Bose` produced the seeded initial value and only occasionally one additional update if the hardware mode changed very early after startup.
-- `swift run bossctl stream probe audio-mode-settings --duration 30 --name Bose` only produced the initial settings snapshot.
-- `swift run bossctl bmap trace --duration 30 --name Bose` showed only startup traffic in the tested window, with no dependable unsolicited mode-change packets.
-- `swift run bossctl bmap debug-current-mode --duration 30 --name Bose` showed the typed `currentAudioModeUpdateStream()` lining up with a single startup `audioModes.currentMode` packet and no later raw packets during hardware-side mode changes.
-
-Conclusion:
-
-- `currentAudioModeUpdateStream()` is not reliable enough on this device/firmware to replace polling for hardware-side mode changes.
-- polling should remain the source of truth for current audio mode
-- stream updates can still be treated as advisory fast-path hints when they do appear
-
-If this needs to be revisited, re-run:
-
-```sh
-swift run bossctl stream probe current-audio-mode --duration 30 --name Bose
-swift run bossctl stream probe audio-mode-settings --duration 30 --name Bose
-swift run bossctl bmap trace --duration 30 --name Bose
-swift run bossctl bmap debug-current-mode --duration 30 --name Bose
-```
-
-Also try `--characteristic secure` and `--characteristic unsecure` to rule out characteristic-specific notification behavior.
+- [../../docs/bmap-protocol-notes.md](../../docs/bmap-protocol-notes.md) for protocol and BLE transport notes
+- [../../docs/current-audio-mode-streaming.md](../../docs/current-audio-mode-streaming.md) for current-audio-mode streaming validation and re-test commands
 
 ## Debug Logging
 

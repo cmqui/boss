@@ -25,5 +25,6 @@ dist/
 target/
 **/target/
 
-docs/
+docs/*
+!docs/*.md
 decomp/

@@ -111,22 +111,10 @@ for try await update in session.modeWorkspaceUpdates(interval: .seconds(5)) {
 }
 ```
 
-### Current Audio Mode Streaming
+## Further Reading
 
-`BossAppleSession.currentAudioModeUpdateStream()` exists and can surface `audioModes.currentMode` packets when the device sends them, but hardware testing in May 2026 showed that those updates were not dependable enough to replace polling for hardware-side mode changes.
-
-Observed behavior:
-
-- the stream reliably yields the seeded initial read
-- some devices/firmware may emit an early `audioModes.currentMode` packet during startup
-- hardware-side mode changes were not consistently accompanied by later unsolicited BMAP packets in the test window
-- `audioModeSettingsUpdateStream()` did not provide a reliable substitute for detecting those mode changes
-
-Practical guidance:
-
-- treat `currentAudioModeUpdateStream()` as an opportunistic fast path
-- keep polling as the authoritative reconciliation path for current audio mode
-- if this changes on future firmware, validate with `bossctl bmap debug-current-mode` before removing polling logic
+- [../../docs/bmap-protocol-notes.md](../../docs/bmap-protocol-notes.md) for protocol and BLE transport notes
+- [../../docs/current-audio-mode-streaming.md](../../docs/current-audio-mode-streaming.md) for streaming behavior and polling guidance
 
 ## Debug Logging
 

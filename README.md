@@ -34,3 +34,7 @@ macOS app:
 cd packages/boss-macos
 swift run Boss
 ```
+
+## Docs
+
+- [docs/README.md](docs/README.md) for protocol notes and planning documents
