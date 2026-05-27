@@ -89,7 +89,8 @@ final class BossAppViewModelLifecycleTests: XCTestCase {
         session.keepModeWorkspaceUpdateStreamOpen = true
 
         let viewModel = BossAppViewModel(sessionFactory: { _ in session })
-        viewModel.backgroundCurrentModePollingInterval = .seconds(60)
+        viewModel.backgroundCurrentModePollingFastInterval = .seconds(60)
+        viewModel.backgroundCurrentModePollingIdleInterval = .seconds(60)
 
         viewModel.refresh()
         await waitUntil { viewModel.loadState == .ready }
@@ -101,6 +102,34 @@ final class BossAppViewModelLifecycleTests: XCTestCase {
 
         XCTAssertEqual(viewModel.currentAudioModeIndex, 2)
         XCTAssertEqual(viewModel.selectedAudioModeIndex, 2)
+    }
+
+    func testBackgroundPollingUsesFastIntervalAfterRecentActivity() {
+        let session = FakeBossAppSession()
+        let viewModel = BossAppViewModel(sessionFactory: { _ in session })
+        viewModel.backgroundCurrentModePollingFastInterval = .milliseconds(400)
+        viewModel.backgroundCurrentModePollingIdleInterval = .seconds(4)
+        viewModel.backgroundCurrentModePollingFastWindow = .seconds(10)
+
+        viewModel.markRecentPollingActivity()
+
+        XCTAssertEqual(
+            viewModel.currentBackgroundCurrentModePollingInterval(),
+            .milliseconds(400)
+        )
+    }
+
+    func testBackgroundPollingUsesIdleIntervalAfterFastWindowExpires() {
+        let session = FakeBossAppSession()
+        let viewModel = BossAppViewModel(sessionFactory: { _ in session })
+        viewModel.backgroundCurrentModePollingFastInterval = .milliseconds(400)
+        viewModel.backgroundCurrentModePollingIdleInterval = .seconds(4)
+        viewModel.backgroundCurrentModePollingFastUntil = ContinuousClock().now - .seconds(1)
+
+        XCTAssertEqual(
+            viewModel.currentBackgroundCurrentModePollingInterval(),
+            .seconds(4)
+        )
     }
 }
 

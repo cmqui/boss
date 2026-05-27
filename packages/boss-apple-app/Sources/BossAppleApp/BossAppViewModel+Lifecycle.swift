@@ -11,6 +11,7 @@ extension BossAppViewModel {
                 try await self.reloadAllState(using: session)
                 self.appScreen = .workspace
                 self.waitingStatusMessage = self.usesMockDeviceBackend ? "Connected to mock device." : "Connected."
+                self.markRecentPollingActivity()
                 self.startBackgroundLoad(using: session)
             } catch {
                 await self.clearSession()
@@ -232,6 +233,7 @@ extension BossAppViewModel {
                 if self.appScreen == .workspace {
                     self.cancelBackgroundLoad()
                 }
+                self.markRecentPollingActivity()
                 try await operation()
                 loadState = .ready
                 Self.log("Completed: \(label)")
@@ -258,7 +260,7 @@ extension BossAppViewModel {
             var lastObservedModeIndex: Int?
             while !Task.isCancelled {
                 guard let modeIndex = try await session.pollCurrentAudioMode() else {
-                    try await Task.sleep(for: await MainActor.run { self.backgroundCurrentModePollingInterval })
+                    try await Task.sleep(for: await MainActor.run { self.currentBackgroundCurrentModePollingInterval() })
                     continue
                 }
                 let shouldResync = await MainActor.run { () -> Bool in
@@ -288,6 +290,7 @@ extension BossAppViewModel {
                     if !self.hasDetachedSettingsDraft, let updatedMode {
                         self.applySettingsSnapshot(updatedMode.settings)
                     }
+                    self.markRecentPollingActivity()
 
                     Self.log("Current mode poll update | selected=\(self.selectedAudioModeIndex.map(String.init) ?? "nil") | current=\(modeIndex)")
 
@@ -307,12 +310,13 @@ extension BossAppViewModel {
                     Task { @MainActor [weak self] in
                         guard let self else { return }
                         guard self.backgroundLoadGeneration == generation else { return }
+                        self.markRecentPollingActivity()
                         await self.resyncWorkspaceAfterBackgroundModeChange(using: session)
                     }
                     return
                 }
 
-                try await Task.sleep(for: await MainActor.run { self.backgroundCurrentModePollingInterval })
+                try await Task.sleep(for: await MainActor.run { self.currentBackgroundCurrentModePollingInterval() })
             }
         } catch {
             await handleLiveUpdateFailure(error, session: session, source: "current audio mode")
@@ -336,6 +340,7 @@ extension BossAppViewModel {
             try await reloadModeWorkspace(using: session)
             applyAudioModes(try await session.audioModeConfigs())
             lastResultMessage = "Mode changed on device; controls refreshed"
+            markRecentPollingActivity()
         } catch {
             lastResultMessage = "Mode changed on device, but refresh failed: \(Self.describe(error))"
         }
@@ -362,6 +367,7 @@ extension BossAppViewModel {
             guard self.appScreen == .workspace, !self.isBusy else {
                 return
             }
+            self.markRecentPollingActivity()
             self.lastResultMessage = "Live \(source) updates paused: \(Self.describe(error))"
             self.liveUpdateTasks.forEach { $0.cancel() }
             self.liveUpdateTasks.removeAll()
@@ -393,7 +399,21 @@ extension BossAppViewModel {
 
         if modeChanged {
             lastResultMessage = "Mode changed on device; controls refreshed"
+            markRecentPollingActivity()
         }
+    }
+
+    func markRecentPollingActivity() {
+        let clock = ContinuousClock()
+        backgroundCurrentModePollingFastUntil = clock.now + backgroundCurrentModePollingFastWindow
+    }
+
+    func currentBackgroundCurrentModePollingInterval() -> Duration {
+        let clock = ContinuousClock()
+        if let fastUntil = backgroundCurrentModePollingFastUntil, clock.now < fastUntil {
+            return backgroundCurrentModePollingFastInterval
+        }
+        return backgroundCurrentModePollingIdleInterval
     }
 
     static func describe(_ error: Error) -> String {

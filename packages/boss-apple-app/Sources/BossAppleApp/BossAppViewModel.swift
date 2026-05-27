@@ -67,7 +67,10 @@ public final class BossAppViewModel: ObservableObject {
     let runtimeConfiguration: BossAppRuntimeConfiguration
     let cncTotalSteps = 11
     var cncDisplayMaximum: Int { cncTotalSteps - 1 }
-    var backgroundCurrentModePollingInterval: Duration = .milliseconds(750)
+    var backgroundCurrentModePollingFastInterval: Duration = .milliseconds(750)
+    var backgroundCurrentModePollingIdleInterval: Duration = .seconds(5)
+    var backgroundCurrentModePollingFastWindow: Duration = .seconds(15)
+    var backgroundCurrentModePollingFastUntil: ContinuousClock.Instant?
 
     public convenience init(configuration: BossAppRuntimeConfiguration = .current()) {
         self.init(
