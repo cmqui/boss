@@ -1,11 +1,15 @@
+pub mod audio_modes_session;
 pub mod bootstrap;
 pub mod boss_session;
+pub mod equalizer_session;
 pub mod errors;
 pub mod link;
 pub mod packet_session;
+pub mod settings_session;
 pub mod test_support;
 pub mod tests;
 pub mod types;
+pub mod workspace;
 
 pub use bootstrap::*;
 pub use boss_session::*;

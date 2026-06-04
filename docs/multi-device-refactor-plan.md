@@ -1,6 +1,6 @@
 # Multi-Device Refactor Plan
 
-Last reviewed: 2026-05-24
+Last reviewed: 2026-06-04
 
 ## Goal
 
@@ -19,7 +19,27 @@ The immediate target is not to implement QC45 yet. The target is to make the cod
 - graceful fallback where the device or transport does not support a feature
 - future support for additional Bose products without repeating the same architectural work
 
-## Current Problems
+## Current Status
+
+As of 2026-06-04, the architectural refactor is partially complete.
+
+Completed:
+
+- Rust and Swift product catalog types now expose product family and category.
+- Rust `libboss-core` has explicit protocol support and Boss capability models.
+- Rust bootstrap returns raw protocol support and derived capabilities through `BootstrappedDevice`.
+- FFI and `libboss-apple` expose capabilities to Swift.
+- `BossAppleSession.loadWorkspaceSnapshot()` returns independent settings, optional audio-mode, and optional equalizer sections.
+- App lifecycle loading can open a settings-only workspace without audio modes.
+- macOS presentation resolves device artwork by product family/variant and falls back to generic headphones art.
+
+Still open:
+
+- QC45 is not yet a known catalog product. `QC45` exists as a family enum case, but no QC45 product ID, variants, implied protocol support, or capability defaults are registered.
+- Capability-aware app and CLI behavior is incomplete outside the main workspace loading path.
+- There are no QC45 fixture-backed contract tests yet.
+
+## Remaining Problems
 
 ### 1. Product identity and product behavior are mixed together
 
@@ -28,11 +48,11 @@ Current product recognition is a small catalog lookup:
 - [packages/core/libboss/libboss-core/src/product.rs](/Users/ciara/Code/boss/packages/core/libboss/libboss-core/src/product.rs:1)
 - [packages/core/libboss-apple/Sources/libbossApple/BossApplePublicTypes.swift](/Users/ciara/Code/boss/packages/core/libboss-apple/Sources/libbossApple/BossApplePublicTypes.swift:1)
 
-But the rest of the stack assumes a single high-feature headphone shape. That means product support is not actually driven by catalog data.
+The catalog now includes family/category fields, but only the QC Ultra 2 HP product is registered. Product support is still not fully data-driven because QC45-specific catalog and capability entries do not exist yet.
 
 ### 2. Capability inference is too implicit
 
-`BootstrappedDevice` exposes raw product metadata and function blocks, but there is no first-class capability model that says which Boss features are:
+`BootstrappedDevice` now exposes raw protocol support and derived capabilities, including which Boss features are:
 
 - supported
 - writable
@@ -40,7 +60,7 @@ But the rest of the stack assumes a single high-feature headphone shape. That me
 - transport-limited
 - unavailable on this session
 
-This logic is instead scattered through session reads, write fallbacks, and UI assumptions.
+Remaining work is to make all session, CLI, and app operations consistently consult this model before attempting unsupported feature paths.
 
 ### 3. `BossSession` is organized around one “fully featured” device model
 
@@ -53,21 +73,21 @@ The current workspace load path:
 - [packages/core/libboss-apple/Sources/libbossApple/BossAppleSession.swift](/Users/ciara/Code/boss/packages/core/libboss-apple/Sources/libbossApple/BossAppleSession.swift:130)
 - [packages/ui/apple/app-core/Sources/BossAppleApp/BossAppViewModel+Lifecycle.swift](/Users/ciara/Code/boss/packages/ui/apple/app-core/Sources/BossAppleApp/BossAppViewModel+Lifecycle.swift:81)
 
-assumes that a connected device loads:
+now supports:
 
-- a mode workspace
-- audio mode catalog
-- optional equalizer inside that mode workspace
+- a settings workspace
+- optional audio mode workspace
+- optional equalizer snapshot
 
-That model is too specific. Some devices will have settings without editable audio modes. Others may have different write paths or partial support.
+Remaining work is to make every action and background stream path behave as cleanly as the initial workspace load for devices with partial support.
 
 ### 5. Product-specific presentation is hardcoded
 
-The macOS asset resolver currently keys directly on the Ultra product name:
+The macOS asset resolver now keys on product family and variant, with generic fallback artwork:
 
 - [packages/ui/apple/boss-macos/Sources/BossMacOS/BossResources.swift](/Users/ciara/Code/boss/packages/ui/apple/boss-macos/Sources/BossMacOS/BossResources.swift:28)
 
-This is manageable for one device family but not for a growing product catalog.
+QC45 still needs catalog identity and, optionally, family-specific assets.
 
 ## Refactor Objectives
 
@@ -141,7 +161,7 @@ This keeps raw BMAP support visible and testable.
 
 ### Layer 3: Derived Boss Capabilities
 
-Boss needs a first-class capability model for its own feature set. This is the main missing abstraction today.
+Boss has a first-class capability model for its own feature set. Remaining work is to apply it consistently across sessions, app actions, streams, and CLI commands.
 
 Suggested Rust shape:
 
@@ -196,7 +216,7 @@ The precise enum names can change, but the structure matters:
 
 ### Layer 4: Feature Workspaces
 
-The current workspace model is too mode-centric. Replace it with composable feature snapshots.
+The previous workspace model was too mode-centric. Swift-facing workspace loading now uses composable feature snapshots, and Rust session internals are split into feature-area modules.
 
 Suggested Rust-side conceptual split:
 
@@ -246,10 +266,10 @@ Responsibilities:
 - shared capability types
 - capability resolver logic inputs and outputs
 
-Suggested additions:
+Current implementation:
 
-- `src/catalog.rs` or expand `src/product.rs`
-- `src/capabilities.rs`
+- catalog fields live in `src/product.rs`
+- capability types and resolver logic live in `src/capabilities.rs`
 
 Avoid placing session-specific probing logic in `libboss-core`.
 
@@ -262,7 +282,7 @@ Responsibilities:
 - capability derivation from observed protocol support
 - feature snapshots and update reducers
 
-Suggested internal module split:
+Current internal module split:
 
 - `bootstrap.rs`
   Device identity and raw protocol support.
@@ -275,9 +295,9 @@ Suggested internal module split:
 - `equalizer_session.rs`
   Equalizer reads/writes and verification.
 - `workspace.rs`
-  Assembly of feature workspaces based on capabilities.
+  Feature workspace/update reducers.
 
-The public `BossSession` type can remain for now, but should delegate into narrower feature modules instead of containing all logic directly.
+The public `BossSession` type remains source-compatible while delegating feature logic through narrower module-owned impl blocks.
 
 ### Swift: `libboss-apple`
 
@@ -288,7 +308,7 @@ Responsibilities:
 - Apple transport and retry policy
 - capability-aware session surface
 
-Suggested additions:
+Implemented public types:
 
 - `BossAppleDeviceCapabilities`
 - `BossAppleSettingsCapabilities`
@@ -385,15 +405,15 @@ Add capability model types to Rust and Swift without changing the current public
 
 Deliverables:
 
-- product family/category fields in catalog types
-- new capability types in `libboss-core`
-- Swift mirror types in `libboss-apple`
+- [x] product family/category fields in catalog types
+- [x] new capability types in `libboss-core`
+- [x] Swift mirror types in `libboss-apple`
 
 Acceptance criteria:
 
-- no behavioral change yet
-- existing tests continue to pass
-- new types can be constructed in tests
+- [x] no behavioral change yet
+- [x] existing tests continue to pass
+- [x] new types can be constructed in tests
 
 ### Phase 2: Separate Bootstrap Identity From Capability Resolution
 
@@ -401,16 +421,16 @@ Refactor bootstrap so it returns raw identity and raw protocol support, then der
 
 Deliverables:
 
-- raw protocol support model
-- capability resolver module
-- `BootstrappedDevice` expanded or split to include derived capabilities
+- [x] raw protocol support model
+- [x] capability resolver logic in `libboss-core`
+- [x] `BootstrappedDevice` expanded to include derived capabilities
 
 Acceptance criteria:
 
-- product lookup remains stable
-- capability derivation is covered by unit tests
-- no UI changes required yet
-- known-product bootstrap can fall back to catalog-implied protocol support when bounded probes are unsupported
+- [x] product lookup remains stable
+- [x] capability derivation is covered by unit tests
+- [x] no UI changes required yet
+- [x] known-product bootstrap can fall back to catalog-implied protocol support when bounded probes are unsupported
 
 ### Phase 3: Split `BossSession` Internals By Feature Area
 
@@ -418,16 +438,16 @@ Move large feature clusters out of `boss_session.rs` into narrower modules.
 
 Deliverables:
 
-- settings-focused internal module
-- audio-mode-focused internal module
-- equalizer-focused internal module
-- workspace assembly module
+- [x] settings-focused internal module
+- [x] audio-mode-focused internal module
+- [x] equalizer-focused internal module
+- [x] workspace module
 
 Acceptance criteria:
 
-- public API remains source-compatible where practical
-- feature logic becomes independently testable
-- product-specific quirks are easier to isolate
+- [x] public API remains source-compatible where practical
+- [x] feature logic becomes independently testable
+- [x] product-specific quirks are easier to isolate
 
 ### Phase 4: Make Workspace Loading Capability-Aware
 
@@ -435,15 +455,15 @@ Refactor workspace loading so optional features do not break the entire session.
 
 Deliverables:
 
-- optional audio mode workspace
-- optional equalizer snapshot
-- settings workspace independent from audio modes
+- [x] optional audio mode workspace
+- [x] optional equalizer snapshot
+- [x] settings workspace independent from audio modes
 
 Acceptance criteria:
 
-- a device can connect and load partial state without audio mode support
-- unsupported feature paths return structured nil/unavailable states
-- unsupported optional feature reads do not abort the entire workspace load
+- [x] a device can connect and load partial state without audio mode support
+- [x] unsupported feature paths return structured nil/unavailable states
+- [x] unsupported optional feature reads do not abort the entire workspace load
 
 ### Phase 5: Refactor `BossAppSessioning` and App State
 
@@ -451,14 +471,14 @@ Update app protocols and view-model flows to depend on capabilities and optional
 
 Deliverables:
 
-- `BossAppSessioning` no longer encodes Ultra-specific assumptions
-- lifecycle loading paths use capabilities
-- UI sections are gated by feature presence
+- [ ] `BossAppSessioning` no longer encodes Ultra-specific assumptions
+- [x] lifecycle loading paths use capabilities
+- [x] UI sections are gated by feature presence
 
 Acceptance criteria:
 
-- mock and fake sessions can represent non-Ultra devices
-- the app no longer requires audio modes to consider a device usable
+- [x] mock and fake sessions can represent non-Ultra devices
+- [x] the app no longer requires audio modes to consider a device usable
 
 ### Phase 6: Refactor Presentation Assets
 
@@ -466,13 +486,13 @@ Move macOS device image resolution onto a product-family or asset-registry model
 
 Deliverables:
 
-- generic fallback device imagery
-- family/variant-based asset mapping
+- [x] generic fallback device imagery
+- [x] family/variant-based asset mapping
 
 Acceptance criteria:
 
-- non-Ultra devices render without product-name hardcoding
-- missing assets do not break the UI
+- [x] non-Ultra devices render without product-name hardcoding
+- [x] missing assets do not break the UI
 
 ### Phase 7: Add QC45 Catalog and Capability Rules
 
@@ -480,15 +500,15 @@ Only after the architecture above is in place, add QC45 identity and capability 
 
 Deliverables:
 
-- QC45 product entry in Rust and Swift catalogs
-- QC45 capability defaults and probes
-- fixture-backed tests for degraded/unsupported flows
+- [ ] QC45 product entry in Rust and Swift catalogs
+- [ ] QC45 capability defaults and probes
+- [ ] fixture-backed tests for degraded/unsupported flows
 
 Acceptance criteria:
 
-- QC45 can bootstrap as a known product
-- supported features are exposed normally
-- unsupported features degrade cleanly in session, CLI, and app state
+- [ ] QC45 can bootstrap as a known product
+- [ ] supported features are exposed normally
+- [ ] unsupported features degrade cleanly in session, CLI, and app state
 
 ## Testing Plan For The Refactor
 
@@ -498,11 +518,11 @@ Because QC45 hardware is unavailable, testing needs to move up one layer from �
 
 Add tests for:
 
-- product catalog lookup including family/category
-- capability resolver output for known product and protocol-support combinations
-- workspace assembly with missing audio modes
-- workspace assembly with missing equalizer
-- unsupported setting classification from representative BMAP errors
+- [x] product catalog lookup including family/category
+- [x] capability resolver output for known product and protocol-support combinations
+- [ ] workspace assembly with missing audio modes
+- [ ] workspace assembly with missing equalizer
+- [ ] unsupported setting classification from representative BMAP errors
 
 Suggested files:
 
@@ -515,10 +535,10 @@ Suggested files:
 
 Add tests for:
 
-- FFI conversion of capability models
-- workspace conversion with optional audio mode/equalizer sections
-- unsupported and unavailable error mapping
-- session behavior when capability-gated reads are absent
+- [x] FFI conversion of capability models
+- [x] workspace conversion with optional audio mode/equalizer sections
+- [ ] unsupported and unavailable error mapping
+- [x] session behavior when capability-gated reads are absent
 
 Suggested files:
 
@@ -530,10 +550,10 @@ Suggested files:
 
 Add tests for:
 
-- successful connection with settings-only workspace
-- successful connection with settings + equalizer but no audio modes
-- successful connection with audio modes but no equalizer
-- hidden or disabled UI actions for unsupported features
+- [x] successful connection with settings-only workspace
+- [ ] successful connection with settings + equalizer but no audio modes
+- [ ] successful connection with audio modes but no equalizer
+- [ ] hidden or disabled UI actions for unsupported features
 
 Suggested files:
 
@@ -544,11 +564,15 @@ Suggested files:
 
 ### 1. How much capability information should be persisted in public bootstrapped-device types?
 
+Status: resolved for the current implementation.
+
 Recommendation:
 
 Include capabilities in `BootstrappedDevice` or `BossAppleBootstrappedDevice` so downstream layers do not need to repeat derivation logic. Keep raw function blocks too.
 
 ### 2. Should unsupported feature reads return `nil`, observed-unavailable states, or throw?
+
+Status: partially implemented.
 
 Recommendation:
 
@@ -557,6 +581,8 @@ Recommendation:
 - For mutation requests against unsupported features, fail early with a precise unsupported error.
 
 ### 3. Should capability derivation actively probe functions after bootstrap?
+
+Status: still open.
 
 Recommendation:
 
@@ -569,6 +595,8 @@ Examples:
 
 ### 4. Should the app use product family for presentation decisions?
 
+Status: implemented for macOS device artwork; behavior gating still should prefer capabilities.
+
 Recommendation:
 
 Yes for presentation defaults and assets.
@@ -578,11 +606,16 @@ No for behavior gating when capability data exists.
 
 The best first slice is architectural, not product-specific:
 
-1. Add product family/category fields in Rust and Swift catalog types.
-2. Introduce `BossDeviceCapabilities` and Swift mirrors.
-3. Refactor bootstrap output to include raw protocol support and derived capabilities.
-4. Make workspace loading return optional audio-mode and equalizer sections.
-5. Update `BossAppSessioning` and app lifecycle code to handle those optional sections cleanly.
+1. [x] Add product family/category fields in Rust and Swift catalog types.
+2. [x] Introduce `BossDeviceCapabilities` and Swift mirrors.
+3. [x] Refactor bootstrap output to include raw protocol support and derived capabilities.
+4. [x] Make workspace loading return optional audio-mode and equalizer sections.
+5. [ ] Update `BossAppSessioning` and app lifecycle code to handle those optional sections cleanly.
+
+Current next slice:
+
+1. Finish capability-aware behavior for `BossAppSessioning`, CLI commands, actions, and streams.
+2. Add QC45 catalog/capability entries once the expected product ID and supported function behavior are known or fixture-backed.
 
 Only after that should QC45-specific support begin.
 
@@ -590,9 +623,9 @@ Only after that should QC45-specific support begin.
 
 The refactor is complete when:
 
-- product identity is no longer the same thing as feature support
-- capabilities are explicit in Rust and Swift
-- app and CLI logic depend on capabilities rather than Ultra-only assumptions
-- devices with partial support can connect without crashing or failing workspace load
-- macOS presentation no longer hardcodes one product name
-- adding a new Bose product requires localized catalog, capability, and test updates rather than a repo-wide rewrite
+- [x] product identity is no longer the same thing as feature support
+- [x] capabilities are explicit in Rust and Swift
+- [ ] app and CLI logic depend on capabilities rather than Ultra-only assumptions
+- [x] devices with partial support can connect without crashing or failing workspace load
+- [x] macOS presentation no longer hardcodes one product name
+- [ ] adding a new Bose product requires localized catalog, capability, and test updates rather than a repo-wide rewrite
