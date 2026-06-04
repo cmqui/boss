@@ -428,6 +428,9 @@ extension BossAppViewModel {
 
     static func describe(_ error: Error) -> String {
         if let controlError = error as? BossAppleControlError {
+            if controlError.isLikelyDeviceStandby {
+                return "The device appears to be in standby. Wake it up, then try again."
+            }
             switch controlError {
             case .noFreeCustomAudioModeSlot:
                 return "No free custom profile slots are available on the device. Delete an existing custom profile or overwrite one instead."

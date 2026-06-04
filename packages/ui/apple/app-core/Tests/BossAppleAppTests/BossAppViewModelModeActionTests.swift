@@ -24,6 +24,25 @@ final class BossAppViewModelModeActionTests: XCTestCase {
         XCTAssertEqual(viewModel.settings, .fixture(cncLevel: 4))
     }
 
+    func testSelectAudioModeShowsStandbyMessageForHostSendFailure() async throws {
+        let session = FakeBossAppSession()
+        session.workspaceSnapshot = .fixture()
+        session.currentAudioModeWriteError = BossAppleControlError.unsupportedOperation(
+            "UnsupportedOperation(\"host send callback returned other\")"
+        )
+
+        let viewModel = BossAppViewModel(sessionFactory: { _ in session })
+        viewModel.refresh()
+        await waitUntil { viewModel.loadState == .ready }
+
+        viewModel.selectAudioMode(2)
+        await waitUntil {
+            viewModel.loadState == .failed("The device appears to be in standby. Wake it up, then try again.")
+        }
+
+        XCTAssertEqual(session.setCurrentAudioModeCalls, [2])
+    }
+
     func testApplyModeSettingsWritesPatchAndClearsDetachedDraft() async throws {
         let session = FakeBossAppSession()
         session.workspaceSnapshot = .fixture()

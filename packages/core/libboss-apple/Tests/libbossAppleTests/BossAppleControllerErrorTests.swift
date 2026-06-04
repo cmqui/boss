@@ -58,6 +58,17 @@ final class BossAppleControllerErrorTests: XCTestCase {
         )
     }
 
+    func testLikelyStandbyDetectionMatchesHostSendFailure() {
+        XCTAssertTrue(
+            BossAppleControlError.unsupportedOperation(
+                "UnsupportedOperation(\"host send callback returned other\")"
+            )
+            .isLikelyDeviceStandby
+        )
+        XCTAssertFalse(BossAppleControlError.unsupportedOperation("nope").isLikelyDeviceStandby)
+        XCTAssertFalse(BossAppleControlError.responseTimedOut(seconds: 5).isLikelyDeviceStandby)
+    }
+
     func testRetrySecureCharacteristicFallsBackForUnsupportedBootstrapStyleErrors() {
         XCTAssertTrue(
             BossAppleController.retrySecureCharacteristicIfNeeded(

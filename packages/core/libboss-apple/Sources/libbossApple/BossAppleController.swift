@@ -69,6 +69,13 @@ public enum BossAppleControlError: Error, Sendable, Equatable, CustomStringConve
         return Self.bmapErrorCode(from: payloadHex)
     }
 
+    public var isLikelyDeviceStandby: Bool {
+        guard case .unsupportedOperation(let message) = self else {
+            return false
+        }
+        return message.localizedCaseInsensitiveContains("host send callback returned other")
+    }
+
     public var description: String {
         switch self {
         case .responseStreamEnded:

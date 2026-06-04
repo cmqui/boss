@@ -16,6 +16,7 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
     var audioModeCatalogUpdateValues: [[BossAppleAudioModeConfig]]?
     var supportedPrompts: [BossAppleAudioModePrompt] = [.quiet]
     var firmwareVersionInfo = BossAppleFirmwareVersionInfo(version: "1.0.0", port: 0)
+    var currentAudioModeWriteError: Error?
     var currentAudioModeWriteResult: BossAppleCurrentAudioModeWriteResult = .unchanged(1)
     var audioModeSettingsWriteResult: BossAppleAudioModeSettingsWriteResult = .unchanged(.fixture())
     var equalizerWriteResult: BossAppleEqualizerWriteResult = .unchanged(.fixture())
@@ -114,6 +115,9 @@ final class FakeBossAppSession: @unchecked Sendable, BossAppSessioning {
 
     func setCurrentAudioMode(index targetIndex: Int, playVoicePrompt: Bool) async throws -> BossAppleCurrentAudioModeWriteResult {
         setCurrentAudioModeCalls.append(targetIndex)
+        if let currentAudioModeWriteError {
+            throw currentAudioModeWriteError
+        }
         return currentAudioModeWriteResult
     }
 
